@@ -61,7 +61,7 @@ const officers = [
     role: "Treasurer",
     bio: "Keeping the organization organized and on track with meticulous record-keeping and scheduling.",
     image: "/officers/TRE.JPG",
-    socials: { facebook: "https://www.facebook.com/xua.iris", email: "#" }
+    socials: { facebook: "https://www.facebook.com/xua.iris", email: "iris.chua@dlsau.edu.ph" }
   },
   {
     id: 8,

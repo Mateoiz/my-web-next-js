@@ -87,7 +87,7 @@ export default function Navbar() {
             <Link href="/About" className={navLinkStyles}>About</Link>
             {/* NEW OFFICERS LINK */}
             <Link href="/Officers" className={navLinkStyles}>Officers</Link>
-            <Link href="/events" className={navLinkStyles}>Events</Link>
+            <Link href="/Events" className={navLinkStyles}>Events</Link>
             <Link href="/Contact" className={contactBtnStyles}>Contact Us</Link>
           </div>
           
@@ -122,7 +122,7 @@ export default function Navbar() {
           <Link href="/About" onClick={closeMenu} className={mobileLinkStyles}>About</Link>
           {/* NEW OFFICERS LINK MOBILE */}
           <Link href="/Officers" onClick={closeMenu} className={mobileLinkStyles}>Officers</Link>
-          <Link href="/events" onClick={closeMenu} className={mobileLinkStyles}>Events</Link>
+          <Link href="/Events" onClick={closeMenu} className={mobileLinkStyles}>Events</Link>
           <div className="mt-8">
             <Link 
               href="/Contact" 
