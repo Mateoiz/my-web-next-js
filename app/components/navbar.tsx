@@ -51,12 +51,11 @@ export default function Navbar() {
             href="/" 
             className="
               flex items-center group 
-              bg-white/95 backdrop-blur-sm 
+              bg-transparent hover:bg-white 
               px-5 py-2 rounded-lg 
-              shadow-[0_0_15px_rgba(34,197,94,0.5)] 
-              hover:shadow-[0_0_25px_rgba(34,197,94,0.8)] 
               transition-all duration-300
               z-50 relative
+              hover:shadow-[0_0_25px_rgba(34,197,94,0.8)]
             "
           >
             <Image
@@ -67,21 +66,16 @@ export default function Navbar() {
               className="group-hover:scale-110 transition-transform duration-300 drop-shadow-sm"
             />
             
-            {/* --- TEXT FOLDING ANIMATION ---
-               1. overflow-hidden: Hides text as width shrinks
-               2. whitespace-nowrap: Prevents text from breaking lines as it shrinks
-               3. Conditional Logic: 
-                  - Open: w-0, opacity-0, ml-0 (Hidden)
-                  - Closed: w-auto, opacity-100, ml-3 (Visible)
-            */}
             <div className={`
               flex flex-col 
               overflow-hidden whitespace-nowrap 
               transition-all duration-500 ease-in-out
               ${isMobileMenuOpen ? "w-0 opacity-0 ml-0" : "w-auto opacity-100 ml-3"}
             `}>
-              <span className="font-bold text-lg leading-tight text-green-700">JPCS</span>
-              <span className="text-[10px] opacity-90 tracking-wider text-gray-800 font-semibold">
+              <span className="font-bold text-lg leading-tight text-white group-hover:text-green-700 transition-colors duration-300">
+                JPCS
+              </span>
+              <span className="text-[10px] opacity-90 tracking-wider text-gray-300 group-hover:text-black font-semibold transition-colors duration-300">
                 DE LA SALLE ARANETA UNIVERSITY
               </span>
             </div>
@@ -91,6 +85,8 @@ export default function Navbar() {
           <div className="hidden md:flex gap-8 items-center text-sm font-medium">
             <Link href="/" className={navLinkStyles}>Home</Link>
             <Link href="/about" className={navLinkStyles}>About</Link>
+            {/* NEW OFFICERS LINK */}
+            <Link href="/Officers" className={navLinkStyles}>Officers</Link>
             <Link href="/events" className={navLinkStyles}>Events</Link>
             <Link href="/contact" className={contactBtnStyles}>Contact Us</Link>
           </div>
@@ -124,6 +120,8 @@ export default function Navbar() {
         <div className="flex flex-col gap-2 text-white font-medium">
           <Link href="/" onClick={closeMenu} className={mobileLinkStyles}>Home</Link>
           <Link href="/about" onClick={closeMenu} className={mobileLinkStyles}>About</Link>
+          {/* NEW OFFICERS LINK MOBILE */}
+          <Link href="/Officers" onClick={closeMenu} className={mobileLinkStyles}>Officers</Link>
           <Link href="/events" onClick={closeMenu} className={mobileLinkStyles}>Events</Link>
           <div className="mt-8">
             <Link 

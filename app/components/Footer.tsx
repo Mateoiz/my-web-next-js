@@ -23,10 +23,10 @@ export default function Footer() {
             <Link 
               key={index} 
               href={link.href}
-              // These two lines make it open in a new tab
               target="_blank" 
               rel="noopener noreferrer"
-              className="text-2xl hover:text-gray-400 transition-colors"
+              // CHANGED HERE: hover:text-green-500 makes them turn green
+              className="text-2xl hover:text-green-500 transition-colors duration-300"
             >
               {link.icon}
             </Link>
@@ -43,7 +43,7 @@ export default function Footer() {
             className="h-8 w-auto"
           />
           <p>
-            &copy; {currentYear} La Salle Computer Society. All Rights Reserved.
+            &copy; {currentYear} De La Salle Araneta University JPCS.
           </p>
         </div>
 

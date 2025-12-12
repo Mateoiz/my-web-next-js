@@ -2,52 +2,53 @@
 
 import { useEffect, useRef } from 'react';
 
-// Define properties for a single cube particle
 interface Particle {
   x: number;
   y: number;
   size: number;
-  speedX: number;
-  speedY: number;
+  // We separate 'velocity' (current movement) from 'baseSpeed' (natural drift)
+  vx: number;
+  vy: number;
+  baseVx: number;
+  baseVy: number;
   rotation: number;
   rotationSpeed: number;
   opacity: number;
 }
 
-// Correct way:
 export default function FloatingCubes() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const particles = useRef<Particle[]>([]);
+  const mouse = useRef({ x: -1000, y: -1000 }); // Start off-screen
   const requestId = useRef<number>(0);
 
-  // Configuration for subtlety
   const config = {
-    particleCount: 30, // Keep low so it's not distracting
-    color: '#22c55e',  // Tailwind green-500 (matches your theme)
-    baseSpeedY: 0.3,   // Very slow vertical movement
-    baseSpeedX: 0.1,   // Slight horizontal drift
+    particleCount: 35,
+    color: '#22c55e', // Green
     minSize: 10,
     maxSize: 30,
+    interactionRadius: 150, // How close mouse needs to be to push cubes
+    pushStrength: 2,        // How hard the mouse pushes
+    friction: 0.95,         // How quickly they slow down after being pushed (0.9 = fast stop, 0.99 = icy slide)
   };
 
-  // Helper to get random number between range
   const random = (min: number, max: number) => Math.random() * (max - min) + min;
 
-  // Initialize a single particle with random starting values
-  const createParticle = (canvasWidth: number, canvasHeight: number, initial: boolean = false): Particle => {
+  const createParticle = (w: number, h: number, initial: boolean = false): Particle => {
+    const baseVx = random(-0.2, 0.2); // Slight horizontal drift
+    const baseVy = random(0.1, 0.5);  // Slow fall down
+
     return {
-      // If initial load, place anywhere. If resetting, place just above top screen.
-      x: random(0, canvasWidth),
-      y: initial ? random(0, canvasHeight) : -50, 
+      x: random(0, w),
+      y: initial ? random(0, h) : -50,
       size: random(config.minSize, config.maxSize),
-      // Slight random variations in speed for natural look
-      speedX: random(-config.baseSpeedX, config.baseSpeedX),
-      speedY: random(config.baseSpeedY / 2, config.baseSpeedY * 1.5),
+      vx: baseVx,
+      vy: baseVy,
+      baseVx: baseVx,
+      baseVy: baseVy,
       rotation: random(0, 360),
-      // Very slow rotation
-      rotationSpeed: random(-0.01, 0.01),
-      // Low opacity for subtlety (between 0.1 and 0.4)
-      opacity: random(0.1, 0.4)
+      rotationSpeed: random(-0.02, 0.02),
+      opacity: random(0.1, 0.4),
     };
   };
 
@@ -57,7 +58,7 @@ export default function FloatingCubes() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // 1. Init Canvas Size & Particles
+    // 1. Setup & Resize
     const init = () => {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
@@ -68,37 +69,67 @@ export default function FloatingCubes() {
     };
     
     window.addEventListener('resize', init);
-    init(); // Run once on mount
+    init();
 
-    // 2. Animation Loop
+    // 2. Track Mouse
+    const handleMouseMove = (e: MouseEvent) => {
+      mouse.current = { x: e.clientX, y: e.clientY };
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+
+    // 3. Animation Loop
     const animate = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       particles.current.forEach((p, index) => {
-        // Update position and rotation
-        p.y += p.speedY;
-        p.x += p.speedX;
-        p.rotation += p.rotationSpeed;
+        // --- PHYSICS CALCULATION ---
+        
+        // Calculate distance to mouse
+        const dx = p.x - mouse.current.x;
+        const dy = p.y - mouse.current.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
 
-        // Reset particle if it goes off bottom or side screen
-        if (p.y > canvas.height + p.size || p.x < -p.size || p.x > canvas.width + p.size) {
-           particles.current[index] = createParticle(canvas.width, canvas.height);
+        // If mouse is close, push the particle away
+        if (distance < config.interactionRadius) {
+          const forceDirectionX = dx / distance;
+          const forceDirectionY = dy / distance;
+          // The closer the mouse, the stronger the push
+          const force = (config.interactionRadius - distance) / config.interactionRadius;
+          
+          p.vx += forceDirectionX * force * config.pushStrength;
+          p.vy += forceDirectionY * force * config.pushStrength;
         }
 
-        // Draw the cube (as an outlined square)
-        ctx.save(); // Save current context state
-        ctx.globalAlpha = p.opacity; // Set subtlety level
-        ctx.strokeStyle = config.color;
-        ctx.lineWidth = 1.5; // Thin wiring look
+        // Apply friction to blend "burst speed" back to "base speed"
+        // This makes the movement smooth instead of jerky
+        p.vx = p.vx * config.friction + p.baseVx * (1 - config.friction);
+        p.vy = p.vy * config.friction + p.baseVy * (1 - config.friction);
 
-        // Move origin to particle center for rotation
+        // Update positions
+        p.x += p.vx;
+        p.y += p.vy;
+        p.rotation += p.rotationSpeed;
+
+        // Reset if off-screen (Looping logic)
+        // We give it a buffer (+ p.size) so it doesn't pop out visibly
+        if (p.y > canvas.height + p.size) {
+           particles.current[index] = createParticle(canvas.width, canvas.height);
+        }
+        // Horizontal wrap-around for smoother feel
+        if (p.x > canvas.width + p.size) p.x = -p.size;
+        if (p.x < -p.size) p.x = canvas.width + p.size;
+
+        // --- DRAWING ---
+        ctx.save();
+        ctx.globalAlpha = p.opacity;
+        ctx.strokeStyle = config.color;
+        ctx.lineWidth = 1.5;
+
         ctx.translate(p.x, p.y);
         ctx.rotate(p.rotation);
-
-        // Draw square centered at (0,0) relative to translation
         ctx.strokeRect(-p.size / 2, -p.size / 2, p.size, p.size);
 
-        ctx.restore(); // Restore context for next particle
+        ctx.restore();
       });
 
       requestId.current = requestAnimationFrame(animate);
@@ -106,9 +137,9 @@ export default function FloatingCubes() {
 
     animate();
 
-    // Cleanup
     return () => {
       window.removeEventListener('resize', init);
+      window.removeEventListener('mousemove', handleMouseMove);
       if (requestId.current) cancelAnimationFrame(requestId.current);
     };
   }, []);
@@ -116,7 +147,6 @@ export default function FloatingCubes() {
   return (
     <canvas
       ref={canvasRef}
-      // Same positioning as the cursor layer: fixed, back layer, ignoring clicks
       className="fixed inset-0 pointer-events-none z-0"
     />
   );
