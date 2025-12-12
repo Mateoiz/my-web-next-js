@@ -1,21 +1,20 @@
 import Link from 'next/link';
 import Image from 'next/image';
-// Importing brand icons from react-icons/fa (FontAwesome)
-import { FaFacebook, FaInstagram, FaLinkedin, FaGithub, FaTwitter } from 'react-icons/fa';
+import { FaFacebook, FaTwitter, FaInstagram, FaYoutube, FaLinkedin } from 'react-icons/fa';
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
 
-  // EDIT HERE: Add your actual social media links
   const socialLinks = [
-    { href: "https://www.facebook.com/JPCSDLSAU", icon: <FaFacebook size={20} />, label: "Facebook" },
-    { href: "https://instagram.com", icon: <FaInstagram size={20} />, label: "Instagram" },
-    { href: "https://linkedin.com", icon: <FaLinkedin size={20} />, label: "LinkedIn" },
-    { href: "https://github.com", icon: <FaGithub size={20} />, label: "GitHub" },
+    { icon: <FaFacebook />, href: 'https://www.facebook.com/JPCSDLSAU' },
+    { icon: <FaTwitter />, href: 'https://twitter.com' },
+    { icon: <FaInstagram />, href: 'https://www.instagram.com/jpcs_dlsau?igsh=YXo5emdqNTNpaDd6' },
+    { icon: <FaYoutube />, href: 'https://youtube.com' },
+    { icon: <FaLinkedin />, href: 'https://linkedin.com' },
   ];
 
   return (
-<footer className="bg-black text-white py-6 mt-auto">
+    <footer className="bg-black text-white py-6 mt-auto">
       <div className="container mx-auto flex flex-col items-center gap-4 px-4">
         
         {/* Social Media Icons Section */}
@@ -23,7 +22,10 @@ export default function Footer() {
           {socialLinks.map((link, index) => (
             <Link 
               key={index} 
-              href={link.href} 
+              href={link.href}
+              // These two lines make it open in a new tab
+              target="_blank" 
+              rel="noopener noreferrer"
               className="text-2xl hover:text-gray-400 transition-colors"
             >
               {link.icon}
@@ -33,16 +35,15 @@ export default function Footer() {
 
         {/* Copyright Section with Logo */}
         <div className="flex items-center gap-3 text-sm md:text-base">
-          {/* Assuming Logo.png is in your /public folder */}
           <Image 
-            src="/logo.png"
-            alt="DLSAU JPCS Logo" 
+            src="/Logo.png" 
+            alt="La Salle Computer Society Logo" 
             width={30} 
             height={30} 
             className="h-8 w-auto"
           />
           <p>
-            &copy; {currentYear} DLSAU Junior Philippine Computer Society. All Rights Reserved.
+            &copy; {currentYear} La Salle Computer Society. All Rights Reserved.
           </p>
         </div>
 

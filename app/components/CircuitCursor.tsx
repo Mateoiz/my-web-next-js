@@ -26,10 +26,10 @@ export default function CircuitCursor() {
     // Configuration options for the trail
     const config = {
       trailLength: 40,      // How long the trail is
-      lineWidth: 2,         // Thickness of the wiring
+      lineWidth: 1,         // Thickness of the wiring
       color: '#22c55e',     // Tailwind green-500 - matches your logo
-      glowBlur: 10,         // The neon glow effect
-      fadeSpeed: 0.04,      // How quickly the trail disappears
+      glowBlur: 15,         // The neon glow effect
+      fadeSpeed: 0.10,      // How quickly the trail disappears
     };
 
     // --- 1. Handle Resizing ---
