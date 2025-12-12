@@ -12,15 +12,15 @@ const officers = [
     name: "Justine Llyod Garma",
     role: "President",
     bio: "Leading the vision for JPCS with a passion for innovation and community building. Focused on creating impactful workshops this year.",
-    image: "/placeholder.png", // Replace with: /images/officers/jane.jpg
-    socials: { linkedin: "#", github: "#", email: "mailto:jane@example.com" }
+    image: "/officers/PRES.JPG", // Replace with: /images/officers/jane.jpg
+    socials: { linkedin: "#", github: "#", email: "" }
   },
   {
     id: 2,
     name: "Ice Matthew Ramirez",
     role: "Vice President - Operations",
     bio: "Ensuring smooth operations within the organization and managing member engagement. A backend development enthusiast.",
-    image: "/placeholder.png",
+    image: "/officers/VPO.JPG",
     socials: { linkedin: "#", github: "#" }
   },
   {
@@ -28,7 +28,7 @@ const officers = [
     name: "Louievince Kyle Laguidao" ,
     role: "Vice President - External",
     bio: "Building bridges with other organizations and industry partners. Expert in networking and corporate relations.",
-    image: "/placeholder.png",
+    image: "/officers/VPE.JPG",
     socials: { linkedin: "#", email: "mailto:maria@example.com" }
   },
   {
@@ -36,7 +36,7 @@ const officers = [
     name: "Ma. Antonette Melon",
     role: "Vice President - Internal",
     bio: "Ensuring Internal Operations are fluid and are optimized for efficiency.",
-    image: "/placeholder.png",
+    image: "/officers/VPI.JPG",
     socials: { linkedin: "#", github: "#" }
   },
   {
@@ -44,7 +44,7 @@ const officers = [
     name: "Reynalyn Ruth Morbo",
     role: "Secretary",
     bio: "Keeping the organization organized and on track with meticulous record-keeping and scheduling.",
-    image: "/placeholder.png",
+    image: "/officers/SEC.JPG",
     socials: { linkedin: "#", email: "mailto:sarah@example.com" }
   },
 ];
