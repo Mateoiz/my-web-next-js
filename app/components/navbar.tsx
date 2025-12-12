@@ -84,11 +84,11 @@ export default function Navbar() {
           {/* Desktop Navigation */}
           <div className="hidden md:flex gap-8 items-center text-sm font-medium">
             <Link href="/" className={navLinkStyles}>Home</Link>
-            <Link href="/about" className={navLinkStyles}>About</Link>
+            <Link href="/About" className={navLinkStyles}>About</Link>
             {/* NEW OFFICERS LINK */}
             <Link href="/Officers" className={navLinkStyles}>Officers</Link>
             <Link href="/events" className={navLinkStyles}>Events</Link>
-            <Link href="/contact" className={contactBtnStyles}>Contact Us</Link>
+            <Link href="/Contact" className={contactBtnStyles}>Contact Us</Link>
           </div>
           
           {/* Mobile Menu Button */}
@@ -119,13 +119,13 @@ export default function Navbar() {
       >
         <div className="flex flex-col gap-2 text-white font-medium">
           <Link href="/" onClick={closeMenu} className={mobileLinkStyles}>Home</Link>
-          <Link href="/about" onClick={closeMenu} className={mobileLinkStyles}>About</Link>
+          <Link href="/About" onClick={closeMenu} className={mobileLinkStyles}>About</Link>
           {/* NEW OFFICERS LINK MOBILE */}
           <Link href="/Officers" onClick={closeMenu} className={mobileLinkStyles}>Officers</Link>
           <Link href="/events" onClick={closeMenu} className={mobileLinkStyles}>Events</Link>
           <div className="mt-8">
             <Link 
-              href="/contact" 
+              href="/Contact" 
               onClick={closeMenu} 
               className="block w-full text-center py-3 bg-green-600 hover:bg-green-500 text-black font-bold rounded-md shadow-[0_0_15px_rgba(34,197,94,0.4)] transition-all"
             >

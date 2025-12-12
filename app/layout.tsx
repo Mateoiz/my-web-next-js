@@ -5,7 +5,7 @@ import Footer from "./components/Footer";
 import Navbar from "./components/navbar"; 
 import CircuitCursor from "./components/CircuitCursor"; 
 // 1. Import the new component
-import FloatingCubes from "./components/FloatingCubes";
+import FloatingCubes from "./components/FloatingCubes"; // No curly braces!
 
 export const metadata: Metadata = {
   title: "JPCS DLSAU",
