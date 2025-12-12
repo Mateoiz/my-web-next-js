@@ -53,10 +53,10 @@ export default function Home() {
       >
         {/* 'About Us' Button (Ghost Style) */}
         <Link 
-          href="/about"
+          href="/About"
           className="group relative px-8 py-4 bg-transparent border border-green-500 text-green-500 font-bold rounded-full overflow-hidden transition-all hover:shadow-[0_0_20px_rgba(34,197,94,0.4)]"
         >
-          <div className="absolute inset-0 w-0 bg-green-500 transition-all duration-[250ms] ease-out group-hover:w-full opacity-10" />
+          <div className="absolute inset-0 w-0 bg-green-500 transition-all duration-250ms ease-out group-hover:w-full opacity-10" />
           <span className="relative flex items-center gap-2">
             <FaInfoCircle /> About Us
           </span>
@@ -64,7 +64,7 @@ export default function Home() {
 
         {/* 'Contact Us' Button (Solid Glow Style) */}
         <Link 
-          href="/contact"
+          href="/Contact"
           className="px-8 py-4 bg-green-600 hover:bg-green-500 text-black font-bold rounded-full shadow-[0_0_20px_rgba(34,197,94,0.4)] hover:shadow-[0_0_35px_rgba(34,197,94,0.6)] transition-all flex items-center gap-2 transform hover:scale-105"
         >
           Contact Us <FaArrowRight />
