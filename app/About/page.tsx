@@ -22,7 +22,7 @@ export default function AboutPage() {
   }, []);
 
   return (
-    <section className="min-h-screen bg-black text-white relative overflow-hidden pb-20">
+    <section className="min-h-screen py-24 px-4 md:px-8 relative overflow-hidden bg-transparent text-white">
       
       {/* FIX 1: Updated gradient syntax for Tailwind v4 */}
       <div className="absolute top-0 left-0 w-full h-[500px] bg-linear-to-b from-green-900/20 to-transparent pointer-events-none" />

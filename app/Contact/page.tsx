@@ -20,7 +20,7 @@ export default function ContactPage() {
   };
 
   return (
-    <section className="min-h-screen pt-24 pb-12 px-4 md:px-8 relative overflow-hidden bg-black text-white">
+    <section className="min-h-screen py-24 px-4 md:px-8 relative overflow-hidden bg-transparent text-white">
       
       {/* Background Decor */}
       <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-green-600/10 blur-[120px] rounded-full pointer-events-none" />
