@@ -11,6 +11,25 @@ import SecretGame from "./components/SecretGame"; // <--- Imported here
 export const metadata: Metadata = {
   title: "JPCS DLSAU",
   description: "Junior Philippine Computer Society - DLSAU Chapter",
+  openGraph: {
+    title: "JPCS DLSAU",
+    description: "Junior Philippine Computer Society - DLSAU Chapter",
+    images: [
+      {
+        url: "/og-image.jpg", // This should match the path to your image in the public folder
+        width: 1200,
+        height: 630,
+        alt: "JPCS DLSAU Preview Image",
+      },
+    ],
+  },
+  // You can also add twitter metadata for Twitter cards
+  twitter: {
+    card: "summary_large_image",
+    title: "JPCS DLSAU",
+    description: "Junior Philippine Computer Society - DLSAU Chapter",
+    images: ["/og-image.png"], // This should match the path to your image in the public folder
+  },
 };
 
 export default function RootLayout({
