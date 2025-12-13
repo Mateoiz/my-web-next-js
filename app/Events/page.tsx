@@ -13,7 +13,7 @@ const events = [
     date: "January 30, 2026",
     location: "DLSAU Osmeña Hall",
     description: "Kickstart the year with our annual general assembly. Expect guest speakers, roadmap reveals, and free swag.",
-    poster: "/events/E1.jpg", 
+    poster: "/events/E1.JPG", 
   },
   {
     id: 2,
@@ -21,7 +21,7 @@ const events = [
     date: "January 30, 2026",
     location: "DLSAU Osmeña Hall",
     description: "Showcase your creativity. Theme: 'Future of Tech'. Prizes include Adobe CC subscriptions and cash.",
-    poster: "/events/E2.jpg",
+    poster: "/events/E2.JPG",
   },
   {
     id: 3,
@@ -29,7 +29,7 @@ const events = [
     date: "CAST Week",
     location: "University Gym",
     description: "Valorant, League, and Tekken 8. Open to all colleges. Registration starts next week.",
-    poster: "/events/E3.jpg",
+    poster: "/events/E3.JPG",
   },
   {
     id: 4,
@@ -37,7 +37,7 @@ const events = [
     date: "March 2026",
     location: "DLSAU Grounds",
     description: "Touch grass with us. Basketball, and Volleyball. A day to unwind from the code mines.",
-    poster: "/events/E4.jpg",
+    poster: "/events/E4.JPG",
   },
   {
     id: 5,
@@ -45,7 +45,7 @@ const events = [
     date: "April 2026",
     location: "Barangay Potrero",
     description: "Tech Literacy 101: Teaching basic computer skills to the local youth. Volunteers needed.",
-    poster: "/events/E5.jpg",
+    poster: "/events/E5.JPG",
   },
 ];
 

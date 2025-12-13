@@ -79,13 +79,13 @@ const multimediaTeam = [
     name: "Jhenelle Fern Refuerzo", 
     role: "Graphic Designer", 
     icon: <FaPaintBrush />,
-    image: "/creatives/GA1.jpg" // CHANGE THIS PATH
+    image: "/creatives/GA1.JPG" // CHANGE THIS PATH
   },
   { 
     name: "Chelsy Mei Tuazon", 
     role: "Graphic Designer", 
     icon: <FaPaintBrush />,
-    image: "/creatives/GA2.jpg" // CHANGE THIS PATH
+    image: "/creatives/GA2.JPG" // CHANGE THIS PATH
   },
   { 
     name: "Marcelino III Zapanta", 
@@ -109,13 +109,13 @@ const multimediaTeam = [
     name: "Carlos Alcantara", 
     role: "Video Editor", 
     icon: <FaVideo />,
-    image: "/creatives/VE.jpg" // CHANGE THIS PATH
+    image: "/creatives/VE.JPG" // CHANGE THIS PATH
   },
   { 
     name: "Manuel Zian Kyle Piangco", 
     role: "Captions / Content", 
     icon: <FaPen />,
-    image: "/creatives/CAP.jpg" // CHANGE THIS PATH
+    image: "/creatives/CAP.JPG" // CHANGE THIS PATH
   },
 ];
 

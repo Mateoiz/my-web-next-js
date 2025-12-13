@@ -6,10 +6,10 @@ import { motion } from "framer-motion";
 
 // --- YOUR DATA ---
 const carouselImages = [
-  "/about/CS2.jpg", 
-  "/about/CS1.jpg", 
-  "/about/CS3.jpg", 
-  "/about/CS4.jpg",
+  "/about/CS2.JPG", 
+  "/about/CS1.JPG", 
+  "/about/CS3.JPG", 
+  "/about/CS4.JPG",
 ];
 
 export default function AboutPage() {
@@ -64,7 +64,7 @@ export default function AboutPage() {
                 >
                     <div className="absolute inset-0 bg-green-500/20 mix-blend-overlay z-10" />
                     <Image
-                        src="/about/WWD.jpg" 
+                        src="/about/WWD.JPG" 
                         alt="JPCS Team"
                         fill
                         className="object-cover grayscale contrast-125" 
