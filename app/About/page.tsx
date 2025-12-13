@@ -1,25 +1,84 @@
 "use client";
 
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState, ReactNode } from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
 
-// --- YOUR DATA ---
-const carouselImages = [
+// --- STATIC DATA (Moved outside component for better performance) ---
+const CAROUSEL_IMAGES = [
   "/about/CS2.JPG", 
   "/about/CS1.JPG", 
   "/about/CS3.JPG", 
   "/about/CS4.JPG",
 ];
 
+const VISION_TEXT = [
+  "To provide Computer Science students the extra-curricular learning environment that will help them gain more knowledge, more skills and the right attitude that can ensure their preparedness in becoming computing and technology professionals.",
+  "The organization aims to provide Computer Science students the extracurricular learning environment that will help them gain more knowledge, more skills and right attitude that can ensure them of their preparedness in becoming computing and technology professionals.",
+  "It provides students an opportunity to experience unity with other Computer Science students through common project.",
+  "It also aims to provide the knowledge and skills the students needed by creating and maintaining an exciting extracurricular environment, wherein the youth is united under the banner of leadership, technical excellence and ethical conduct while fostering among them lasting friendship."
+];
+
+const MISSION_TEXT = "As an organization that is actively involved in Information and Communication Technology-related concerns of education, industry, business, and government, Junior Philippine Computer Society is pleased to collaborate with its officers and members in helping the university in developing world-class Computer Science students that have leadership, integrity, faith and excellence.";
+
+// --- REUSABLE SUB-COMPONENT ---
+interface InfoCardProps {
+  title: string;
+  children: ReactNode;
+  delay?: number;
+  hasDecoration?: boolean;
+}
+
+const InfoCard = ({ title, children, delay = 0, hasDecoration = false }: InfoCardProps) => (
+  <motion.div 
+    initial={{ opacity: 0, y: 20 }}
+    whileInView={{ opacity: 1, y: 0 }}
+    viewport={{ once: true }}
+    transition={{ delay, duration: 0.5 }}
+    whileHover={{ scale: 1.01, borderColor: "rgba(34,197,94,0.6)" }}
+    className="group relative p-8 md:p-10 rounded-2xl bg-zinc-900/60 border border-zinc-700/50 backdrop-blur-md flex flex-col overflow-hidden h-full"
+  >
+    {/* Tech Decoration Line */}
+    <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-transparent via-green-500 to-transparent opacity-50 group-hover:opacity-100 transition-opacity" />
+    
+    <h3 className="text-3xl font-bold text-white mb-8 flex items-center gap-3">
+       <span className="relative flex h-3 w-3">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+          <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+       </span>
+       {title}
+    </h3>
+    
+    <div className="text-gray-300 leading-relaxed text-base space-y-6 font-light grow">
+      {children}
+    </div>
+
+    {hasDecoration && (
+      <div className="w-full h-32 relative opacity-20 mt-6">
+         <div className="absolute inset-0 bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,#22c55e_10px,#22c55e_11px)]" />
+      </div>
+    )}
+  </motion.div>
+);
+
 export default function AboutPage() {
   const carouselRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
 
   useEffect(() => {
-    if (carouselRef.current) {
-      setWidth(carouselRef.current.scrollWidth - carouselRef.current.offsetWidth);
-    }
+    // Function to calculate scrollable width
+    const updateWidth = () => {
+      if (carouselRef.current) {
+        setWidth(carouselRef.current.scrollWidth - carouselRef.current.offsetWidth);
+      }
+    };
+
+    // Calculate initially
+    updateWidth();
+
+    // Recalculate on window resize (Optimized for robustness)
+    window.addEventListener("resize", updateWidth);
+    return () => window.removeEventListener("resize", updateWidth);
   }, []);
 
   return (
@@ -67,8 +126,11 @@ export default function AboutPage() {
                         src="/about/WWD.JPG" 
                         alt="JPCS Team"
                         fill
+                        priority // Optimization: Load this immediately as it's above the fold
+                        sizes="(max-width: 768px) 100vw, 60vw"
                         className="object-cover grayscale contrast-125" 
                     />
+                    {/* Tech Corners */}
                     <div className="absolute top-0 left-0 w-16 h-16 border-t-4 border-l-4 border-green-500 z-20" />
                     <div className="absolute bottom-0 right-0 w-16 h-16 border-b-4 border-r-4 border-green-500 z-20" />
                 </motion.div>
@@ -101,70 +163,23 @@ export default function AboutPage() {
             </div>
         </div>
 
-        {/* --- 3. VISION & MISSION (Word for Word, but Styled) --- */}
-        <div className="grid lg:grid-cols-2 gap-8 mb-32">
+        {/* --- 3. VISION & MISSION --- */}
+        <div className="grid lg:grid-cols-2 gap-8 mb-32 items-stretch">
           
-          {/* VISION CARD */}
-          <motion.div 
-            whileHover={{ scale: 1.01, borderColor: "rgba(34,197,94,0.6)" }}
-            className="group relative p-8 md:p-10 rounded-2xl bg-zinc-900/60 border border-zinc-700/50 backdrop-blur-md flex flex-col overflow-hidden"
-          >
-            {/* Tech Decoration */}
-            <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-transparent via-green-500 to-transparent opacity-50 group-hover:opacity-100 transition-opacity" />
-            
-            <h3 className="text-3xl font-bold text-white mb-8 flex items-center gap-3">
-               {/* Blinking Status Light */}
-               <span className="relative flex h-3 w-3">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
-               </span>
-               VISION
-            </h3>
-            
-            <div className="text-gray-300 leading-relaxed text-base space-y-6 font-light">
-              <p className="border-l-2 border-green-500/30 pl-4">
-                To provide Computer Science students the extra-curricular learning environment that will help them gain more knowledge, more skills and the right attitude that can ensure their preparedness in becoming computing and technology professionals.
-              </p>
-              <p>
-                The organization aims to provide Computer Science students the extracurricular learning environment that will help them gain more knowledge, more skills and right attitude that can ensure them of their preparedness in becoming computing and technology professionals. 
-              </p>
-              <p>
-                It provides students an opportunity to experience unity with other Computer Science students through common project. 
-              </p>
-              <p>
-                It also aims to provide the knowledge and skills the students needed by creating and maintaining an exciting extracurricular environment, wherein the youth is united under the banner of <span className="text-green-400 font-semibold">leadership, technical excellence and ethical conduct</span> while fostering among them lasting friendship.
-              </p>
-            </div>
-          </motion.div>
+          <InfoCard title="VISION">
+            <p className="border-l-2 border-green-500/30 pl-4">{VISION_TEXT[0]}</p>
+            <p>{VISION_TEXT[1]}</p>
+            <p>{VISION_TEXT[2]}</p>
+            <p>
+              It also aims to provide the knowledge and skills the students needed by creating and maintaining an exciting extracurricular environment, wherein the youth is united under the banner of <span className="text-green-400 font-semibold">leadership, technical excellence and ethical conduct</span> while fostering among them lasting friendship.
+            </p>
+          </InfoCard>
 
-          {/* MISSION CARD */}
-          <motion.div 
-            whileHover={{ scale: 1.01, borderColor: "rgba(34,197,94,0.6)" }}
-            className="group relative p-8 md:p-10 rounded-2xl bg-zinc-900/60 border border-zinc-700/50 backdrop-blur-md flex flex-col overflow-hidden"
-          >
-             {/* Tech Decoration */}
-             <div className="absolute top-0 left-0 w-full h-1  bg-linear-to-r from-transparent via-green-500 to-transparent opacity-50 group-hover:opacity-100 transition-opacity" />
-
-            <h3 className="text-3xl font-bold text-white mb-8 flex items-center gap-3">
-               {/* Blinking Status Light */}
-               <span className="relative flex h-3 w-3">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
-               </span>
-               MISSION
-            </h3>
-            
-            <div className="text-gray-300 leading-relaxed text-base h-full flex flex-col justify-between">
-              <p className="border-l-2 border-green-500/30 pl-4 mb-6">
+          <InfoCard title="MISSION" delay={0.2} hasDecoration={true}>
+             <p className="border-l-2 border-green-500/30 pl-4 mb-6">
                 As an organization that is actively involved in Information and Communication Technology-related concerns of education, industry, business, and government, Junior Philippine Computer Society is pleased to collaborate with its officers and members in helping the university in developing world-class Computer Science students that have <span className="text-white font-bold bg-green-500/20 px-1 rounded-sm">leadership, integrity, faith and excellence</span>.
-              </p>
-              
-              {/* Decorative graphic at the bottom of mission */}
-              <div className="w-full h-32 relative opacity-20 mt-auto">
-                 <div className="absolute inset-0 bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,#22c55e_10px,#22c55e_11px)]" />
-              </div>
-            </div>
-          </motion.div>
+             </p>
+          </InfoCard>
 
         </div>
 
@@ -185,15 +200,16 @@ export default function AboutPage() {
               dragConstraints={{ right: 0, left: -width }} 
               className="flex gap-6"
             >
-              {carouselImages.map((src, index) => (
+              {CAROUSEL_IMAGES.map((src, index) => (
                 <motion.div 
                   key={index} 
-                  className="min-w-[300px] h-[400px] md:min-w-[400px] relative rounded-xl overflow-hidden border border-zinc-800"
+                  className="min-w-[300px] h-[400px] md:min-w-[400px] relative rounded-xl overflow-hidden border border-zinc-800 bg-zinc-900"
                 >
                   <Image 
                     src={src} 
-                    alt="Activity" 
+                    alt={`Activity ${index + 1}`} 
                     fill 
+                    sizes="(max-width: 768px) 100vw, 33vw"
                     className="object-cover pointer-events-none" 
                   />
                   <div className="absolute bottom-0 w-full h-1/2 bg-linear-to-t from-black to-transparent opacity-80" />

@@ -9,10 +9,24 @@ export default function ContactPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [result, setResult] = useState(""); 
 
+  // --- NEW: Email Validation Helper ---
+  const isValidEmail = (email: string) => {
+    // Simple but effective regex for basic email structure
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setResult(""); // Clear previous messages
+
+    // --- STEP 1: Validate Email Format ---
+    if (!isValidEmail(formState.email)) {
+      setResult("Error: Please enter a valid email address (e.g., name@email.com)");
+      return; // Stop here, do not send
+    }
+
     setIsSubmitting(true);
-    setResult("");
 
     try {
       const response = await fetch("https://api.web3forms.com/submit", {
@@ -22,14 +36,12 @@ export default function ContactPage() {
           Accept: "application/json",
         },
         body: JSON.stringify({
-          // =========================================================
-          // 👇 PASTE THE KEY YOU RECEIVED AT jpcs@dlsau.edu.ph HERE 👇
-          // =========================================================
-          access_key: "10785cf2-8db3-4033-805e-f2200df7cdd2", 
-          // =========================================================
+          // ---------------------------------------------------------
+          access_key: "10785cf2-8db3-4033-805e-f2200df7cdd2", // <--- PASTE KEY HERE
+          // ---------------------------------------------------------
           
           name: formState.name,
-          email: formState.email,
+          email: formState.email, // Web3Forms uses this as 'Reply-To'
           message: formState.message,
           subject: `New Message from ${formState.name} (JPCS Website)`,
         }),
@@ -48,13 +60,13 @@ export default function ContactPage() {
       setResult("Transmission Failed. Please try again.");
     } finally {
       setIsSubmitting(false);
+      // Clear success/error message after 5 seconds
       setTimeout(() => setResult(""), 5000);
     }
   };
 
   return (
     <section className="min-h-screen pt-24 pb-12 px-4 md:px-8 relative overflow-hidden bg-transparent text-white">
-      {/* ... (Rest of your design code remains exactly the same) ... */}
       
       {/* Background Decor */}
       <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-green-600/10 blur-[120px] rounded-full pointer-events-none" />
@@ -111,11 +123,11 @@ export default function ContactPage() {
               </div>
             </div>
 
-            {/* Google Map */}
+{/* Google Map */}
             <div className="w-full h-[300px] rounded-xl overflow-hidden border border-zinc-800 relative group">
                <div className="absolute inset-0 border-4px border-transparent group-hover:border-green-500/20 transition-all z-10 pointer-events-none rounded-xl" />
                <iframe 
-                 src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3859.7310431334863!2d120.99598627587532!3d14.67119897534275!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3397b6a2b78fd96f%3A0xf64909861b56b1b9!2sDe%20La%20Salle%20Araneta%20University!5e0!3m2!1sen!2sph!4v1765609512626!5m2!1sen!2sph" 
+                 src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3860.200567676776!2d120.9961623148408!3d14.66807608975936!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3397b69bc7d22e3b%3A0x6b40445f53239a06!2sDe%20La%20Salle%20Araneta%20University!5e0!3m2!1sen!2sph!4v1625561234567!5m2!1sen!2sph" 
                  width="100%" 
                  height="100%" 
                  style={{ border: 0, filter: "invert(90%) hue-rotate(180deg)" }} 
@@ -192,10 +204,19 @@ export default function ContactPage() {
                   {isSubmitting ? "Transmitting..." : "Send Message"}
                 </button>
 
+                {/* --- FEEDBACK MESSAGE --- */}
                 {result && (
-                  <p className={`text-center text-sm font-mono mt-4 ${result.includes("Success") ? "text-green-400" : "text-red-400"}`}>
+                  <motion.div 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className={`text-center p-3 rounded-md text-sm font-bold border ${
+                      result.includes("Success") 
+                        ? "bg-green-500/10 text-green-400 border-green-500/30" 
+                        : "bg-red-500/10 text-red-400 border-red-500/30"
+                    }`}
+                  >
                     {result}
-                  </p>
+                  </motion.div>
                 )}
               </div>
             </form>
