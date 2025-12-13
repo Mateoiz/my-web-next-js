@@ -2,25 +2,59 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { FaMapMarkerAlt, FaEnvelope, FaPhone, FaFacebook, FaTwitter, FaInstagram, FaLinkedin } from "react-icons/fa";
+import { FaMapMarkerAlt, FaEnvelope } from "react-icons/fa";
 
 export default function ContactPage() {
   const [formState, setFormState] = useState({ name: "", email: "", message: "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [result, setResult] = useState(""); 
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    // Simulate network request
-    setTimeout(() => {
-      alert("Message Sent! (This is a demo)");
+    setResult("");
+
+    try {
+      const response = await fetch("https://api.web3forms.com/submit", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          // =========================================================
+          // 👇 PASTE THE KEY YOU RECEIVED AT jpcs@dlsau.edu.ph HERE 👇
+          // =========================================================
+          access_key: "10785cf2-8db3-4033-805e-f2200df7cdd2", 
+          // =========================================================
+          
+          name: formState.name,
+          email: formState.email,
+          message: formState.message,
+          subject: `New Message from ${formState.name} (JPCS Website)`,
+        }),
+      });
+
+      const json = await response.json();
+
+      if (response.status === 200) {
+        setResult("Message Transmitted Successfully.");
+        setFormState({ name: "", email: "", message: "" }); 
+      } else {
+        setResult(json.message);
+      }
+    } catch (error) {
+      console.log(error);
+      setResult("Transmission Failed. Please try again.");
+    } finally {
       setIsSubmitting(false);
-      setFormState({ name: "", email: "", message: "" });
-    }, 1500);
+      setTimeout(() => setResult(""), 5000);
+    }
   };
 
   return (
-    <section className="min-h-screen py-24 px-4 md:px-8 relative overflow-hidden bg-transparent text-white">
+    <section className="min-h-screen pt-24 pb-12 px-4 md:px-8 relative overflow-hidden bg-transparent text-white">
+      {/* ... (Rest of your design code remains exactly the same) ... */}
       
       {/* Background Decor */}
       <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-green-600/10 blur-[120px] rounded-full pointer-events-none" />
@@ -50,7 +84,6 @@ export default function ContactPage() {
             transition={{ delay: 0.2 }}
             className="w-full lg:w-1/2 space-y-8"
           >
-            {/* Contact Details Cards */}
             <div className="grid gap-6">
               <div className="flex items-start gap-4 p-6 bg-zinc-900/50 border border-green-500/20 rounded-xl backdrop-blur-sm hover:border-green-500/50 transition-colors">
                 <div className="p-3 bg-green-500/10 rounded-lg text-green-400 text-xl">
@@ -59,8 +92,8 @@ export default function ContactPage() {
                 <div>
                   <h3 className="font-bold text-lg mb-1">Visit HQ</h3>
                   <p className="text-gray-400 text-sm leading-relaxed">
-                    Salvador Araneta Campus, 303 Victoneta Ave, <br />
-                    Malabon, 1475 Metro Manila
+                    De La Salle Araneta University<br />
+                    Victoneta Ave, Potrero, Malabon, Metro Manila
                   </p>
                 </div>
               </div>
@@ -72,21 +105,20 @@ export default function ContactPage() {
                 <div>
                   <h3 className="font-bold text-lg mb-1">Email Us</h3>
                   <p className="text-gray-400 text-sm">
-                    jpcs@dlsau.edu.ph
+                    jpcs.dlsau@edu.ph
                   </p>
                 </div>
               </div>
             </div>
 
-            {/* Google Map Embed */}
+            {/* Google Map */}
             <div className="w-full h-[300px] rounded-xl overflow-hidden border border-zinc-800 relative group">
-               {/* Tech overlay on map */}
                <div className="absolute inset-0 border-4px border-transparent group-hover:border-green-500/20 transition-all z-10 pointer-events-none rounded-xl" />
                <iframe 
-                 src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d1929.854249045586!2d120.99937157203804!3d14.672477224188663!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3397b6a2b78fd96f%3A0xf64909861b56b1b9!2sDe%20La%20Salle%20Araneta%20University!5e0!3m2!1sen!2sph!4v1765544465795!5m2!1sen!2sph"  
+                 src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3859.7310431334863!2d120.99598627587532!3d14.67119897534275!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3397b6a2b78fd96f%3A0xf64909861b56b1b9!2sDe%20La%20Salle%20Araneta%20University!5e0!3m2!1sen!2sph!4v1765609512626!5m2!1sen!2sph" 
                  width="100%" 
                  height="100%" 
-                 style={{ border: 0, filter: "invert(90%) hue-rotate(180deg)" }} // Optional: Makes map dark mode-ish
+                 style={{ border: 0, filter: "invert(90%) hue-rotate(180deg)" }} 
                  allowFullScreen 
                  loading="lazy" 
                  referrerPolicy="no-referrer-when-downgrade"
@@ -102,7 +134,6 @@ export default function ContactPage() {
             className="w-full lg:w-1/2"
           >
             <form onSubmit={handleSubmit} className="p-8 rounded-2xl bg-zinc-900/30 border border-zinc-800 backdrop-blur-md relative">
-              {/* Corner Accents */}
               <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-green-500 rounded-tl-lg" />
               <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-green-500 rounded-br-lg" />
 
@@ -112,6 +143,7 @@ export default function ContactPage() {
                   <input 
                     type="text" 
                     id="name"
+                    name="name"
                     value={formState.name}
                     onChange={(e) => setFormState({...formState, name: e.target.value})}
                     required
@@ -125,6 +157,7 @@ export default function ContactPage() {
                   <input 
                     type="email" 
                     id="email"
+                    name="email"
                     value={formState.email}
                     onChange={(e) => setFormState({...formState, email: e.target.value})}
                     required
@@ -137,6 +170,7 @@ export default function ContactPage() {
                   <label htmlFor="message" className="block text-sm font-medium text-gray-400 mb-2">Message</label>
                   <textarea 
                     id="message"
+                    name="message"
                     rows={5}
                     value={formState.message}
                     onChange={(e) => setFormState({...formState, message: e.target.value})}
@@ -157,6 +191,12 @@ export default function ContactPage() {
                 >
                   {isSubmitting ? "Transmitting..." : "Send Message"}
                 </button>
+
+                {result && (
+                  <p className={`text-center text-sm font-mono mt-4 ${result.includes("Success") ? "text-green-400" : "text-red-400"}`}>
+                    {result}
+                  </p>
+                )}
               </div>
             </form>
           </motion.div>

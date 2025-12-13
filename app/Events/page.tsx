@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
+import Link from "next/link"; // Import Link
 import { FaCalendarAlt, FaMapMarkerAlt, FaExternalLinkAlt, FaMicrochip } from "react-icons/fa";
 
 // --- EVENT DATA ---
@@ -14,14 +15,16 @@ const events = [
     location: "DLSAU Osmeña Hall",
     description: "Kickstart the year with our annual general assembly. Expect guest speakers, roadmap reveals, and free swag.",
     poster: "/events/E1.JPG", 
+    link: "https://facebook.com/your-event-link", 
   },
   {
     id: 2,
     title: "Video Editing Competition",
-    date: "January 30, 2026",
-    location: "DLSAU Osmeña Hall",
+    date: "February 15, 2026",
+    location: "Computer Lab 3",
     description: "Showcase your creativity. Theme: 'Future of Tech'. Prizes include Adobe CC subscriptions and cash.",
     poster: "/events/E2.JPG",
+    link: "#",
   },
   {
     id: 3,
@@ -30,22 +33,25 @@ const events = [
     location: "University Gym",
     description: "Valorant, League, and Tekken 8. Open to all colleges. Registration starts next week.",
     poster: "/events/E3.JPG",
+    link: "#",
   },
   {
     id: 4,
     title: "AFK: Sportsfest",
     date: "March 2026",
     location: "DLSAU Grounds",
-    description: "Touch grass with us. Basketball, and Volleyball. A day to unwind from the code mines.",
+    description: "Touch grass with us. Basketball, Volleyball, and Patintero. A day to unwind from the code mines.",
     poster: "/events/E4.JPG",
+    link: "#",
   },
   {
     id: 5,
-    title: "Outreach Program",
+    title: "AFK: Outreach Program",
     date: "April 2026",
     location: "Barangay Potrero",
     description: "Tech Literacy 101: Teaching basic computer skills to the local youth. Volunteers needed.",
     poster: "/events/E5.JPG",
+    link: "#",
   },
 ];
 
@@ -56,8 +62,12 @@ export default function EventsPage() {
     <section className="min-h-screen bg-transparent text-white relative">
       
       {/* Background Grid */}
-      <div className="fixed inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-size:24px_24px] pointer-events-none -z-10" />
-      <div className="fixed inset-0 bg-black/90 -z-20" />
+      <div className="fixed inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-size:24px_24px pointer-events-none -z-10" />
+      
+      {/* FIX: Changed from 'bg-black/90' to 'bg-black/40' 
+        This makes the background transparent enough for the cubes to show through
+      */}
+      <div className="fixed inset-0 bg-black/40 pointer-events-none -z-20" />
 
       <div className="container mx-auto px-4 md:px-8 pt-32 pb-20">
         
@@ -81,17 +91,16 @@ export default function EventsPage() {
                 whileInView={{ opacity: 1, x: 0 }}
                 viewport={{ margin: "-20% 0px -20% 0px" }} // Triggers when item is center screen
                 onViewportEnter={() => setActiveEvent(index)}
-                // ADDED: onClick handler to manually set active event
                 onClick={() => setActiveEvent(index)}
-                className={`group relative p-8 rounded-xl border-l-4 transition-all duration-300 cursor-pointer ${
+                className={`group relative p-8 rounded-xl border-l-4 transition-all duration-300 cursor-pointer backdrop-blur-sm ${
                   activeEvent === index
-                    ? "bg-zinc-900 border-green-500 shadow-[0_0_30px_rgba(34,197,94,0.1)]"
-                    : "bg-zinc-900/40 border-zinc-700 hover:bg-zinc-800"
+                    ? "bg-zinc-900/90 border-green-500 shadow-[0_0_30px_rgba(34,197,94,0.1)]"
+                    : "bg-zinc-900/40 border-zinc-700 hover:bg-zinc-800/60"
                 }`}
               >
                 {/* Header: Date & Location */}
                 <div className="flex flex-wrap items-center gap-4 text-sm font-mono text-gray-400 mb-4">
-                  <span className={`flex items-center gap-2 px-3 py-1 rounded-full ${activeEvent === index ? 'bg-green-500/20 text-green-400' : 'bg-zinc-800'}`}>
+                  <span className={`flex items-center gap-2 px-3 py-1 rounded-full ${activeEvent === index ? 'bg-green-500/20 text-green-400' : 'bg-zinc-800/80'}`}>
                     <FaCalendarAlt /> {event.date}
                   </span>
                   <span className="flex items-center gap-2">
@@ -110,9 +119,15 @@ export default function EventsPage() {
                     {event.description}
                   </p>
                   
-                  <button className="mt-6 flex items-center gap-2 text-green-400 font-bold uppercase tracking-wider text-xs hover:underline">
+                  {/* Link Button */}
+                  <Link 
+                    href={event.link} 
+                    target="_blank"
+                    className="mt-6 inline-flex items-center gap-2 text-green-400 font-bold uppercase tracking-wider text-xs hover:underline pointer-events-auto"
+                    onClick={(e) => e.stopPropagation()} 
+                  >
                     Initialize <FaExternalLinkAlt />
-                  </button>
+                  </Link>
                 </div>
 
                 {/* Mobile-Only Image */}
@@ -131,7 +146,7 @@ export default function EventsPage() {
             <div className="sticky top-32 h-[600px] w-full flex items-center justify-center">
               
               {/* THE HOLOGRAPHIC CONTAINER */}
-              <div className="relative w-full h-full max-w-[400px] max-h-[550px] bg-black rounded-2xl border-2 border-green-500/30 p-2 shadow-[0_0_50px_rgba(34,197,94,0.1)]">
+              <div className="relative w-full h-full max-w-[400px] max-h-[550px] bg-black/60 backdrop-blur-md rounded-2xl border-2 border-green-500/30 p-2 shadow-[0_0_50px_rgba(34,197,94,0.1)]">
                 
                 {/* Animated Content Switcher */}
                 <AnimatePresence mode="wait">
@@ -151,7 +166,7 @@ export default function EventsPage() {
                     />
 
                     {/* Holographic Overlays */}
-                    <div className="absolute inset-0 bg-[linear-gradient(transparent_50%,rgba(0,0,0,0.5)_50%)] bg-size:100%_4px] opacity-20 pointer-events-none" />
+                    <div className="absolute inset-0 bg-[linear-gradient(transparent_50%,rgba(0,0,0,0.5)_50%)] bg-size:100%_4px opacity-20 pointer-events-none" />
                     <div className="absolute inset-0 bg-linear-to-t from-black via-transparent to-transparent opacity-80" />
 
                     {/* Tech Data Overlay */}

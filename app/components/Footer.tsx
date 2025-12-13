@@ -7,10 +7,8 @@ export default function Footer() {
 
   const socialLinks = [
     { icon: <FaFacebook />, href: 'https://www.facebook.com/JPCSDLSAU' },
-    { icon: <FaTwitter />, href: 'https://twitter.com' },
     { icon: <FaInstagram />, href: 'https://www.instagram.com/jpcs_dlsau?igsh=YXo5emdqNTNpaDd6' },
     { icon: <FaYoutube />, href: 'https://youtube.com' },
-    { icon: <FaLinkedin />, href: 'https://linkedin.com' },
   ];
 
   return (
