@@ -5,6 +5,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { FaArrowRight, FaInfoCircle } from "react-icons/fa";
 
+
 export default function Home() {
   // State to track the mouse position relative to the text
   const [maskPosition, setMaskPosition] = useState({ x: 0, y: 0 });
