@@ -9,24 +9,29 @@ const KONAMI_CODE = [
   "ArrowLeft", "ArrowRight", "ArrowLeft", "ArrowRight", 
   "b", "a"
 ];
-const PRIZE_SCORE = 30;
+// Mobile Swipe Sequence: Up, Down, Left, Right
+const MOBILE_CODE = ["UP", "DOWN", "LEFT", "RIGHT"];
 
-// --- FLAPPY BIRD CONSTANTS ---
-const GRAVITY = 0.5;        // Lowered slightly for better feel
+const PRIZE_SCORE = 30;
+const GRAVITY = 0.5;
 const JUMP_STRENGTH = -8;
 const PIPE_SPEED = 3;
 const PIPE_SPAWN_RATE = 1800; 
 const GAME_HEIGHT = 400;
 const BIRD_SIZE = 30;
-const GAP_SIZE = 140;       // Made gap slightly bigger for fairness
+const GAP_SIZE = 140;
 
 export default function SecretGame() {
   // --- GLOBAL STATE ---
   const [inputSequence, setInputSequence] = useState<string[]>([]);
+  const [swipeSequence, setSwipeSequence] = useState<string[]>([]); // New State for Swipes
   const [isOpen, setIsOpen] = useState(false);
   const [activeGame, setActiveGame] = useState<"menu" | "override" | "flappy">("menu");
   const [prizeUnlocked, setPrizeUnlocked] = useState(false);
   const [showPrizeToast, setShowPrizeToast] = useState(false);
+
+  // --- TOUCH TRACKING REFS ---
+  const touchStartRef = useRef<{ x: number, y: number } | null>(null);
 
   // --- SYSTEM OVERRIDE STATE ---
   const [overrideState, setOverrideState] = useState<"idle" | "playing" | "gameover">("idle");
@@ -38,13 +43,11 @@ export default function SecretGame() {
 
   // --- FLAPPY BIRD STATE ---
   const [flappyState, setFlappyState] = useState<"idle" | "playing" | "gameover">("idle");
-  // We use refs for physics state to avoid "stale closure" bugs in the loop
   const birdY = useRef(GAME_HEIGHT / 2);
   const birdVelocity = useRef(0);
   const pipesRef = useRef<{ x: number; height: number; passed: boolean }[]>([]);
   const scoreRef = useRef(0);
   
-  // These states are ONLY used for rendering
   const [renderBirdY, setRenderBirdY] = useState(GAME_HEIGHT / 2);
   const [renderPipes, setRenderPipes] = useState<{ x: number; height: number; passed: boolean }[]>([]);
   const [renderScore, setRenderScore] = useState(0);
@@ -53,7 +56,7 @@ export default function SecretGame() {
   const pipeSpawnRef = useRef<NodeJS.Timeout | null>(null);
 
   // --------------------------------------------------------------------------
-  // 1. GLOBAL: LISTEN FOR KONAMI CODE
+  // 1. LISTEN FOR KONAMI CODE (DESKTOP)
   // --------------------------------------------------------------------------
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -61,8 +64,7 @@ export default function SecretGame() {
       setInputSequence(newSequence);
 
       if (JSON.stringify(newSequence) === JSON.stringify(KONAMI_CODE)) {
-        setIsOpen(true);
-        setActiveGame("menu");
+        openSecretMenu();
         setInputSequence([]); 
       }
     };
@@ -71,13 +73,80 @@ export default function SecretGame() {
   }, [inputSequence]);
 
   // --------------------------------------------------------------------------
-  // 2. SHARED: PRIZE CHECKER
+  // 2. LISTEN FOR SWIPES (MOBILE)
+  // --------------------------------------------------------------------------
+  useEffect(() => {
+    const handleTouchStart = (e: TouchEvent) => {
+      touchStartRef.current = {
+        x: e.touches[0].clientX,
+        y: e.touches[0].clientY
+      };
+    };
+
+    const handleTouchEnd = (e: TouchEvent) => {
+      if (!touchStartRef.current) return;
+
+      const touchEnd = {
+        x: e.changedTouches[0].clientX,
+        y: e.changedTouches[0].clientY
+      };
+
+      const diffX = touchEnd.x - touchStartRef.current.x;
+      const diffY = touchEnd.y - touchStartRef.current.y;
+      
+      // Determine swipe direction (must be a significant swipe > 30px)
+      let direction = "";
+      if (Math.abs(diffX) > Math.abs(diffY)) {
+        // Horizontal
+        if (Math.abs(diffX) > 30) direction = diffX > 0 ? "RIGHT" : "LEFT";
+      } else {
+        // Vertical
+        if (Math.abs(diffY) > 30) direction = diffY > 0 ? "DOWN" : "UP";
+      }
+
+      if (direction) {
+        // Add to sequence
+        setSwipeSequence(prev => {
+          const newSeq = [...prev, direction].slice(-4); // Keep last 4 swipes
+          
+          // Check if it matches Up, Down, Left, Right
+          if (JSON.stringify(newSeq) === JSON.stringify(MOBILE_CODE)) {
+            openSecretMenu();
+            return []; // Reset
+          }
+          return newSeq;
+        });
+      }
+      
+      touchStartRef.current = null;
+    };
+
+    window.addEventListener("touchstart", handleTouchStart);
+    window.addEventListener("touchend", handleTouchEnd);
+    return () => {
+      window.removeEventListener("touchstart", handleTouchStart);
+      window.removeEventListener("touchend", handleTouchEnd);
+    };
+  }, []);
+
+  const openSecretMenu = () => {
+    setIsOpen(true);
+    setActiveGame("menu");
+    // Haptic feedback if available
+    if (typeof navigator !== "undefined" && navigator.vibrate) {
+        navigator.vibrate(200); 
+    }
+  };
+
+  // --------------------------------------------------------------------------
+  // 3. PRIZE CHECKER
   // --------------------------------------------------------------------------
   const checkScore = (currentScore: number) => {
     if (currentScore === PRIZE_SCORE && !prizeUnlocked) {
       setPrizeUnlocked(true);
       setShowPrizeToast(true);
       setTimeout(() => setShowPrizeToast(false), 6000);
+      if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate([100, 50, 100]);
     }
   };
 
@@ -106,7 +175,7 @@ export default function SecretGame() {
   };
 
   // --------------------------------------------------------------------------
-  // 3. GAME 1 LOGIC: SYSTEM OVERRIDE (Whack-a-Mole)
+  // 4. GAME 1: SYSTEM OVERRIDE
   // --------------------------------------------------------------------------
   const nextOverrideRound = useCallback(() => {
     setActiveCell((prev) => {
@@ -145,29 +214,23 @@ export default function SecretGame() {
   };
 
   // --------------------------------------------------------------------------
-  // 4. GAME 2 LOGIC: FLAPPY GLITCH (FIXED)
+  // 5. GAME 2: FLAPPY GLITCH
   // --------------------------------------------------------------------------
   const startFlappy = () => {
-    // 1. Reset Logic
     if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
     if (pipeSpawnRef.current) clearInterval(pipeSpawnRef.current);
 
     setFlappyState("playing");
-    
-    // Reset Refs (Physics State)
     birdY.current = GAME_HEIGHT / 2;
     birdVelocity.current = 0;
     pipesRef.current = [];
     scoreRef.current = 0;
 
-    // Reset Visual State
     setRenderBirdY(GAME_HEIGHT / 2);
     setRenderPipes([]);
     setRenderScore(0);
 
-    // 2. Start Pipe Spawner
     pipeSpawnRef.current = setInterval(() => {
-      // Spawn pipe far to the right (400px is game width)
       pipesRef.current.push({ 
         x: 400, 
         height: Math.random() * (GAME_HEIGHT - GAP_SIZE - 50) + 50, 
@@ -175,26 +238,21 @@ export default function SecretGame() {
       });
     }, PIPE_SPAWN_RATE);
 
-    // 3. Start Game Loop
     gameLoopRef.current = requestAnimationFrame(flappyLoop);
   };
 
   const flappyLoop = () => {
-    // A. Apply Physics
     birdVelocity.current += GRAVITY;
     birdY.current += birdVelocity.current;
 
-    // B. Move Pipes
     pipesRef.current.forEach(pipe => {
       pipe.x -= PIPE_SPEED;
     });
     
-    // Cleanup off-screen pipes
     if (pipesRef.current.length > 0 && pipesRef.current[0].x < -50) {
       pipesRef.current.shift();
     }
 
-    // C. Collision Detection
     const birdTop = birdY.current;
     const birdBottom = birdY.current + BIRD_SIZE;
     const birdLeft = 50; 
@@ -202,27 +260,20 @@ export default function SecretGame() {
     
     let collision = false;
 
-    // Floor/Ceiling
-    if (birdTop < 0 || birdBottom > GAME_HEIGHT) {
-      collision = true;
-    }
+    if (birdTop < 0 || birdBottom > GAME_HEIGHT) collision = true;
 
-    // Pipes
     pipesRef.current.forEach(pipe => {
       const pipeLeft = pipe.x;
-      const pipeRight = pipe.x + 40; // Pipe width
+      const pipeRight = pipe.x + 40; 
       const gapTop = pipe.height;
       const gapBottom = pipe.height + GAP_SIZE;
 
-      // Check horizontal overlap
       if (birdRight > pipeLeft && birdLeft < pipeRight) {
-        // Check vertical hit
         if (birdTop < gapTop || birdBottom > gapBottom) {
           collision = true;
         }
       }
 
-      // Score Update
       if (!pipe.passed && birdLeft > pipeRight) {
         pipe.passed = true;
         scoreRef.current += 1;
@@ -230,23 +281,22 @@ export default function SecretGame() {
       }
     });
 
-    // D. Update React State for Rendering
-    // We update state every frame. React 18 handles this efficiently.
     setRenderBirdY(birdY.current);
-    setRenderPipes([...pipesRef.current]); // Copy array to trigger re-render
+    setRenderPipes([...pipesRef.current]);
     setRenderScore(scoreRef.current);
 
-    // E. Decide Next Frame
     if (collision) {
       setFlappyState("gameover");
       if (pipeSpawnRef.current) clearInterval(pipeSpawnRef.current);
+      if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(200);
     } else {
       gameLoopRef.current = requestAnimationFrame(flappyLoop);
     }
   };
 
   const flappyJump = (e: React.MouseEvent | React.TouchEvent) => {
-    e.preventDefault(); // Prevent double firing on touch devices
+    // Prevent default to stop scrolling/zooming while tapping
+    if(e.cancelable) e.preventDefault(); 
     if (flappyState === "playing") {
       birdVelocity.current = JUMP_STRENGTH;
     }
@@ -383,7 +433,7 @@ export default function SecretGame() {
                <div 
                  onMouseDown={flappyJump}
                  onTouchStart={flappyJump}
-                 className="relative w-full bg-zinc-900 border border-zinc-700 overflow-hidden cursor-pointer select-none"
+                 className="relative w-full bg-zinc-900 border border-zinc-700 overflow-hidden cursor-pointer select-none touch-none"
                  style={{ height: GAME_HEIGHT + 'px' }}
                >
                  {/* Score Overlay */}
@@ -398,12 +448,10 @@ export default function SecretGame() {
                  {/* The Pipes */}
                  {renderPipes.map((pipe, i) => (
                     <div key={i}>
-                       {/* Top Pipe */}
                        <div 
                          className="absolute w-[40px] bg-green-900 border-b-4 border-green-500"
                          style={{ left: pipe.x + 'px', top: 0, height: pipe.height + 'px' }}
                        />
-                       {/* Bottom Pipe */}
                        <div 
                          className="absolute w-[40px] bg-green-900 border-t-4 border-green-500"
                          style={{ left: pipe.x + 'px', top: (pipe.height + GAP_SIZE) + 'px', bottom: 0 }}
