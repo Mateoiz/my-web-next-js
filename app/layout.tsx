@@ -11,25 +11,31 @@ import FloatingCubes from "./components/FloatingCubes";
 import SecretGame from "./components/SecretGame"; 
 
 export const metadata: Metadata = {
-  title: "JPCS DLSAU",
-  description: "Junior Philippine Computer Society - DLSAU Chapter",
+  title: "JPCS DLSAU", // This is the tab title
+  
+  // 1. CHANGE THIS (Main Google Search Description)
+  description: "The official student organization for Computer Science at De La Salle Araneta University. We empower the next generation of tech innovators.",
+
   openGraph: {
     title: "JPCS DLSAU",
-    description: "Junior Philippine Computer Society - DLSAU Chapter",
+    // 2. CHANGE THIS (Facebook/Discord Preview)
+    description: "The official student organization for Computer Science at De La Salle Araneta University. We empower the next generation of tech innovators.",
     images: [
       {
-        url: "/og-image.jpg", 
+        url: "/public/og-image.jpg",
         width: 1200,
         height: 630,
-        alt: "JPCS DLSAU Preview Image",
+        alt: "JPCS DLSAU Preview",
       },
     ],
   },
+
   twitter: {
     card: "summary_large_image",
     title: "JPCS DLSAU",
-    description: "Junior Philippine Computer Society - DLSAU Chapter",
-    images: ["/og-image.png"], 
+    // 3. CHANGE THIS (Twitter/X Preview)
+    description: "The official student organization for Computer Science at De La Salle Araneta University. We empower the next generation of tech innovators.",
+    images: ["/og-image.png"],
   },
 };
 
