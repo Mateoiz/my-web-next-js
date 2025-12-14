@@ -9,6 +9,7 @@ import Navbar from "./components/navbar"; // Note: Ensure casing matches file na
 import CircuitCursor from "./components/CircuitCursor"; 
 import FloatingCubes from "./components/FloatingCubes"; 
 import SecretGame from "./components/SecretGame"; 
+import MusicPlayer from "./components/MusicPlayer";
 
 export const metadata: Metadata = {
   title: "JPCS DLSAU", // This is the tab title
@@ -67,6 +68,7 @@ export default function RootLayout({
           {/* --- FOOTER & TOOLS --- */}
           <Footer />
           <ThemeToggle />
+          <MusicPlayer />
           
           {/* --- SECRET EASTER EGG --- */}
           <SecretGame />
