@@ -37,26 +37,26 @@ export default function Home() {
         
         {/* INTERACTIVE SPOTLIGHT TEXT */}
         {/* We wrap the text in a relative container to stack the layers */}
-        <div 
+    <div 
           ref={textRef}
-          className="relative cursor-default select-none"
+          // ADDED: -my-10 to pull the surrounding elements closer since we added huge padding inside
+          className="relative cursor-default select-none -my-10"
           onMouseMove={handleMouseMove}
           onMouseEnter={() => setIsHovered(true)}
           onMouseLeave={() => setIsHovered(false)}
         >
-          {/* LAYER 1: Base Text (Gray/White Gradient) */}
-          <h1 className="text-7xl md:text-9xl font-extrabold tracking-tighter text-transparent bg-clip-text bg-linear-to-r from-zinc-400 to-zinc-700 opacity-80">
+          {/* LAYER 1: Base Text */}
+          {/* CHANGED: py-10 (huge padding) and leading-tight (taller line height) */}
+          <h1 className="text-7xl md:text-9xl font-extrabold tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-zinc-300 to-zinc-500 opacity-80 py-12 px-5 leading-tight">
             JPCS
           </h1>
 
-          {/* LAYER 2: Spotlight Text (Bright Green) */}
-          {/* This layer sits exactly on top but is masked by the cursor position */}
+          {/* LAYER 2: Spotlight Text */}
+          {/* MUST MATCH LAYER 1 EXACTLY */}
           <h1 
-            className="absolute top-0 left-0 text-7xl md:text-9xl font-extrabold tracking-tighter text-green-500 pointer-events-none transition-opacity duration-500"
+            className="absolute top-0 left-0 text-7xl md:text-9xl font-extrabold tracking-tighter text-green-500 pointer-events-none transition-opacity duration-500 py-12 px-5 leading-tight"
             style={{
-              // If hovered, we show the mask. If not, we hide the green layer completely (opacity 0)
               opacity: isHovered ? 1 : 0,
-              // The Magic: A radial gradient mask that follows x/y coordinates
               maskImage: `radial-gradient(circle 120px at ${maskPosition.x}px ${maskPosition.y}px, black, transparent)`,
               WebkitMaskImage: `radial-gradient(circle 120px at ${maskPosition.x}px ${maskPosition.y}px, black, transparent)`
             }}
@@ -68,7 +68,7 @@ export default function Home() {
         {/* University Name */}
         <motion.h2 
           initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
+         animate={{ opacity: 1 }}
           transition={{ delay: 0.5, duration: 1 }}
           className="text-2xl md:text-4xl font-light text-green-400 tracking-widest uppercase"
         >
@@ -79,7 +79,7 @@ export default function Home() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.8 }}
-          className="text-gray-400 text-lg md:text-xl max-w-2xl mx-auto pt-4"
+          className="text-black dark:text-white text-lg md:text-xl max-w-2xl mx-auto pt-4" 
         >
           Empowering the next generation of tech innovators and leaders.
         </motion.p>
@@ -103,7 +103,7 @@ export default function Home() {
           </span>
         </Link>
 
-        {/* 'Contact Us' Button */}
+        {/*  'Contact Us' Button */}
         <Link 
           href="/Contact"
           className="px-8 py-4 bg-green-600 hover:bg-green-500 text-black font-bold rounded-full shadow-[0_0_20px_rgba(34,197,94,0.4)] hover:shadow-[0_0_35px_rgba(34,197,94,0.6)] transition-all flex items-center gap-2 transform hover:scale-105"

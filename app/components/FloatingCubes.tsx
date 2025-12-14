@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useTheme } from 'next-themes';
 
 interface Particle {
   x: number;
   y: number;
   size: number;
-  // We separate 'velocity' (current movement) from 'baseSpeed' (natural drift)
   vx: number;
   vy: number;
   baseVx: number;
@@ -19,24 +19,37 @@ interface Particle {
 export default function FloatingCubes() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const particles = useRef<Particle[]>([]);
-  const mouse = useRef({ x: -1000, y: -1000 }); // Start off-screen
+  const mouse = useRef({ x: -1000, y: -1000 });
   const requestId = useRef<number>(0);
+
+  // Theme Logic
+  const { resolvedTheme } = useTheme();
+  // Default to green so it works immediately, will update on mount
+  const colorRef = useRef('#22c55e'); 
 
   const config = {
     particleCount: 35,
-    color: '#22c55e', // Green
     minSize: 10,
     maxSize: 30,
-    interactionRadius: 150, // How close mouse needs to be to push cubes
-    pushStrength: 2,        // How hard the mouse pushes
-    friction: 0.95,         // How quickly they slow down after being pushed (0.9 = fast stop, 0.99 = icy slide)
+    interactionRadius: 150,
+    pushStrength: 2,
+    friction: 0.95,
   };
 
   const random = (min: number, max: number) => Math.random() * (max - min) + min;
 
+  // 1. Update Color Ref when theme changes
+  useEffect(() => {
+    if (resolvedTheme === 'light') {
+      colorRef.current = '#18181b'; // Zinc-950 (Black/Dark Gray)
+    } else {
+      colorRef.current = '#22c55e'; // Green-500
+    }
+  }, [resolvedTheme]);
+
   const createParticle = (w: number, h: number, initial: boolean = false): Particle => {
-    const baseVx = random(-0.2, 0.2); // Slight horizontal drift
-    const baseVy = random(0.1, 0.5);  // Slow fall down
+    const baseVx = random(-0.2, 0.2);
+    const baseVy = random(0.1, 0.5);
 
     return {
       x: random(0, w),
@@ -52,13 +65,14 @@ export default function FloatingCubes() {
     };
   };
 
+  // 2. Main Animation Loop
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // 1. Setup & Resize
+    // Setup & Resize
     const init = () => {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
@@ -68,67 +82,59 @@ export default function FloatingCubes() {
       }
     };
     
-    window.addEventListener('resize', init);
+    // Initialize immediately
     init();
+    window.addEventListener('resize', init);
 
-    // 2. Track Mouse
+    // Track Mouse
     const handleMouseMove = (e: MouseEvent) => {
       mouse.current = { x: e.clientX, y: e.clientY };
     };
     window.addEventListener('mousemove', handleMouseMove);
 
-    // 3. Animation Loop
+    // Animation Loop
     const animate = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       particles.current.forEach((p, index) => {
-        // --- PHYSICS CALCULATION ---
-        
-        // Calculate distance to mouse
+        // Physics
         const dx = p.x - mouse.current.x;
         const dy = p.y - mouse.current.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
 
-        // If mouse is close, push the particle away
         if (distance < config.interactionRadius) {
           const forceDirectionX = dx / distance;
           const forceDirectionY = dy / distance;
-          // The closer the mouse, the stronger the push
           const force = (config.interactionRadius - distance) / config.interactionRadius;
           
           p.vx += forceDirectionX * force * config.pushStrength;
           p.vy += forceDirectionY * force * config.pushStrength;
         }
 
-        // Apply friction to blend "burst speed" back to "base speed"
-        // This makes the movement smooth instead of jerky
         p.vx = p.vx * config.friction + p.baseVx * (1 - config.friction);
         p.vy = p.vy * config.friction + p.baseVy * (1 - config.friction);
 
-        // Update positions
         p.x += p.vx;
         p.y += p.vy;
         p.rotation += p.rotationSpeed;
 
-        // Reset if off-screen (Looping logic)
-        // We give it a buffer (+ p.size) so it doesn't pop out visibly
+        // Loop particles
         if (p.y > canvas.height + p.size) {
            particles.current[index] = createParticle(canvas.width, canvas.height);
         }
-        // Horizontal wrap-around for smoother feel
         if (p.x > canvas.width + p.size) p.x = -p.size;
         if (p.x < -p.size) p.x = canvas.width + p.size;
 
-        // --- DRAWING ---
+        // Draw
         ctx.save();
         ctx.globalAlpha = p.opacity;
-        ctx.strokeStyle = config.color;
+        ctx.strokeStyle = colorRef.current; // Uses the ref which updates automatically
         ctx.lineWidth = 1.5;
-
+        
         ctx.translate(p.x, p.y);
         ctx.rotate(p.rotation);
         ctx.strokeRect(-p.size / 2, -p.size / 2, p.size, p.size);
-
+        
         ctx.restore();
       });
 
@@ -142,12 +148,15 @@ export default function FloatingCubes() {
       window.removeEventListener('mousemove', handleMouseMove);
       if (requestId.current) cancelAnimationFrame(requestId.current);
     };
-  }, []);
+  }, []); 
+
+  // REMOVED THE "if (!mounted) return null" CHECK
+  // This ensures the canvas is always there when the useEffect above runs.
 
   return (
     <canvas
       ref={canvasRef}
-      className="fixed inset-0 pointer-events-none z-0"
+      className="fixed inset-0 pointer-events-none z-0 transition-opacity duration-500"
     />
   );
 }
