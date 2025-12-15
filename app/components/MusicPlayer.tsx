@@ -5,9 +5,14 @@ import { FaMusic, FaSlash } from "react-icons/fa";
 
 export default function MusicPlayer() {
   const [isPlaying, setIsPlaying] = useState(false);
+  // 1. ADD THIS STATE
+  const [mounted, setMounted] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
+    // 2. SET MOUNTED TO TRUE ON LOAD
+    setMounted(true);
+
     audioRef.current = new Audio("/bg-music.mp3");
     
     if (audioRef.current) {
@@ -37,26 +42,26 @@ export default function MusicPlayer() {
     }
   };
 
+  // 3. PREVENT RENDERING UNTIL MOUNTED
+  // This ensures Math.random() only runs on the browser, preventing the mismatch
+  if (!mounted) return null;
+
   return (
     <>
       {/* --- 1. THE VISUALIZER OVERLAY --- */}
-      {/* This sits fixed at the bottom of the screen */}
       <div 
         className={`fixed bottom-0 left-0 w-full h-32 z-30 pointer-events-none flex items-end justify-center gap-1 md:gap-2 px-4 transition-opacity duration-1000 ${
           isPlaying ? "opacity-100" : "opacity-0"
         }`}
       >
-        {/* We generate 20 bars for the wave effect */}
         {[...Array(20)].map((_, i) => (
           <div
             key={i}
             className="w-2 md:w-3 bg-zinc-800 dark:bg-green-500/50 rounded-t-sm transition-all duration-300"
             style={{
-              // Only animate if playing
+              // Math.random() is now safe because we are strictly on the client
               animation: isPlaying ? `musicWave 1s ease-in-out infinite` : "none",
-              // Randomize the delay so they don't move in unison
               animationDelay: `${Math.random() * 0.5}s`,
-              // Randomize the height for a jagged look
               height: isPlaying ? `${Math.random() * 40 + 10}%` : "10px", 
             }}
           />
@@ -92,7 +97,6 @@ export default function MusicPlayer() {
       </button>
 
       {/* --- 3. CUSTOM CSS FOR THE ANIMATION --- */}
-      {/* We inject this style here so you don't have to edit global CSS */}
       <style jsx global>{`
         @keyframes musicWave {
           0%, 100% {
@@ -100,7 +104,7 @@ export default function MusicPlayer() {
             opacity: 0.5;
           }
           50% {
-            height: 80px; /* Max height of the wave */
+            height: 80px;
             opacity: 1;
           }
         }

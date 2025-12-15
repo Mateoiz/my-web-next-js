@@ -2,8 +2,9 @@
 
 import { useRef, useEffect, useState } from "react";
 import Image from "next/image";
+import Link from "next/link"; 
 import { motion, Variants } from "framer-motion";
-import { FaFacebook, FaEnvelope, FaCamera, FaPen, FaVideo, FaPaintBrush } from "react-icons/fa";
+import { FaFacebook, FaEnvelope, FaCamera, FaPen, FaVideo, FaPaintBrush, FaArrowRight } from "react-icons/fa";
 
 // --- 1. MAIN OFFICERS DATA ---
 const officers = [
@@ -141,8 +142,6 @@ export default function OfficersPage() {
   }, []);
 
   return (
-    // ADAPTED: Removed bg-transparent and hardcoded text-white. 
-    // Now relies on layout.tsx for background, and handles text color dynamically.
     <section className="min-h-screen py-24 px-4 md:px-8 relative overflow-hidden transition-colors duration-300">
       
       {/* Header Section */}
@@ -150,7 +149,6 @@ export default function OfficersPage() {
         <motion.h1 
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          // ADAPTED: text-zinc-900 (Light) vs text-white (Dark)
           className="text-4xl md:text-6xl font-bold mb-6 text-zinc-900 dark:text-white transition-colors duration-300"
         >
           Meet the <span className="text-green-600 dark:text-green-500">Leaders</span>
@@ -159,7 +157,6 @@ export default function OfficersPage() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.2 }}
-          // ADAPTED: text-zinc-600 (Light) vs text-gray-300 (Dark)
           className="text-zinc-600 dark:text-gray-300 text-lg md:text-xl max-w-2xl mx-auto transition-colors duration-300"
         >
           The dedicated minds behind De La Salle Araneta JPCS, committed to fostering technological excellence and community.
@@ -186,7 +183,6 @@ export default function OfficersPage() {
                 <div className="relative group">
                   <div className="absolute inset-0 bg-green-500 blur-[20px] opacity-20 group-hover:opacity-40 transition-opacity duration-500 rounded-xl"></div>
                   
-                  {/* ADAPTED: Border and Background color for the image frame */}
                   <div className="relative h-[350px] w-[300px] md:h-[400px] md:w-[350px] rounded-xl overflow-hidden border-2 border-green-500/30 bg-white dark:bg-zinc-900 shadow-xl z-10 transition-colors duration-300">
                     <Image
                       src={officer.image}
@@ -194,7 +190,6 @@ export default function OfficersPage() {
                       fill
                       className="object-cover group-hover:scale-105 transition-transform duration-500"
                     />
-                    {/* Scanlines effect (Optional: reduced opacity in light mode) */}
                     <div className="absolute inset-0 bg-[url('/scanlines.png')] opacity-5 dark:opacity-10 pointer-events-none"></div>
                   </div>
                 </div>
@@ -202,22 +197,18 @@ export default function OfficersPage() {
 
               {/* Text Section */}
               <div className={`w-full md:w-1/2 flex flex-col ${isEven ? 'md:items-start text-left' : 'md:items-end text-right'}`}>
-                {/* ADAPTED: Badge colors */}
                 <span className="inline-block py-1 px-3 rounded-full bg-green-100 dark:bg-green-500/10 text-green-700 dark:text-green-400 text-sm font-mono mb-4 border border-green-500/30 transition-colors duration-300">
                   {officer.role}
                 </span>
                 
-                {/* ADAPTED: Name color */}
                 <h2 className="text-3xl md:text-4xl font-bold text-zinc-900 dark:text-white mb-4 transition-colors duration-300">
                   {officer.name}
                 </h2>
                 
-                {/* ADAPTED: Bio text color */}
                 <p className="text-zinc-600 dark:text-gray-300 text-lg leading-relaxed mb-8 max-w-xl transition-colors duration-300">
                   {officer.bio}
                 </p>
 
-                {/* ADAPTED: Social Icons */}
                 <div className="flex gap-4 text-2xl text-zinc-400 dark:text-gray-400">
                   {officer.socials.facebook && (
                     <a href={officer.socials.facebook} target="_blank" rel="noopener noreferrer" className="hover:text-green-600 dark:hover:text-green-500 transition-colors">
@@ -238,7 +229,7 @@ export default function OfficersPage() {
       </div>
 
       {/* --- MULTIMEDIA TEAM CAROUSEL --- */}
-      <div className="max-w-7xl mx-auto relative z-20 mt-32 pb-20">
+      <div className="max-w-7xl mx-auto relative z-20 mt-32 pb-12">
         <div className="text-center mb-12">
           <h2 className="text-3xl md:text-5xl font-bold mb-4 text-zinc-900 dark:text-white transition-colors duration-300">
             The <span className="text-green-600 dark:text-green-500">Creatives</span>
@@ -259,11 +250,9 @@ export default function OfficersPage() {
             {multimediaTeam.map((member, index) => (
               <motion.div 
                 key={index} 
-                // ADAPTED: Card background and border
                 className="min-w-[280px] h-[350px] relative rounded-2xl overflow-hidden bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-green-500/20 group hover:border-green-500/50 shadow-lg dark:shadow-none transition-all duration-300"
               >
                 {/* Image Section */}
-                {/* ADAPTED: Background behind image */}
                 <div className="relative h-2/3 w-full bg-zinc-100 dark:bg-zinc-800">
                    <Image
                       src={member.image} 
@@ -271,14 +260,12 @@ export default function OfficersPage() {
                       fill
                       className="object-cover opacity-90 group-hover:opacity-100 transition-opacity"
                     />
-                   {/* Icon Badge - ADAPTED colors */}
                    <div className="absolute top-4 right-4 p-2 bg-white/80 dark:bg-black/50 backdrop-blur-md rounded-full text-green-600 dark:text-green-400 border border-green-500/30 shadow-sm">
                      {member.icon}
                    </div>
                 </div>
 
                 {/* Info Text */}
-                {/* ADAPTED: Gradient background for text area */}
                 <div className="h-1/3 p-6 flex flex-col justify-center bg-white dark:bg-gradient-to-t dark:from-black dark:to-zinc-900 transition-colors duration-300">
                   <h3 className="text-xl font-bold text-zinc-800 dark:text-white group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors">
                     {member.name}
@@ -293,7 +280,35 @@ export default function OfficersPage() {
         </motion.div>
       </div>
 
-      {/* Background Decor - Kept subtle for both modes */}
+      {/* --- JOIN TEAM CTA SECTION --- */}
+      <motion.div 
+        initial={{ opacity: 0, y: 30 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        transition={{ delay: 0.2 }}
+        className="relative z-20 max-w-3xl mx-auto text-center mt-12 mb-32 px-4"
+      >
+        <div className="p-8 md:p-12 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-sm border border-zinc-200 dark:border-green-500/30 rounded-2xl shadow-xl dark:shadow-[0_0_30px_rgba(34,197,94,0.1)]">
+           <h3 className="text-2xl md:text-3xl font-bold text-zinc-900 dark:text-white mb-4">
+             Want to be part of the Legacy?
+           </h3>
+           <p className="text-zinc-600 dark:text-gray-300 mb-8 max-w-xl mx-auto">
+             We are constantly looking for talented individuals to join us. If you have the passion for tech and leadership, we want you.
+           </p>
+           
+           {/* UPDATED: Added target="_blank" and rel="noopener noreferrer" */}
+           <Link 
+             href="https://docs.google.com/forms/d/e/1FAIpQLScqZdimJAZDOsH3ksLFjyvUBV4ru5iXy2WFWImtabTu7-ku3Q/viewform" 
+             target="_blank"
+             rel="noopener noreferrer"
+             className="inline-flex items-center gap-3 px-8 py-4 bg-green-600 hover:bg-green-500 text-white font-bold text-lg rounded-full shadow-[0_0_20px_rgba(34,197,94,0.3)] hover:shadow-[0_0_35px_rgba(34,197,94,0.6)] transition-all transform hover:scale-105"
+           >
+             Be a part of our team <FaArrowRight />
+           </Link>
+        </div>
+      </motion.div>
+
+      {/* Background Decor */}
       <div className="absolute top-[20%] right-0 w-1/3 h-1/3 bg-green-500/10 blur-[100px] rounded-full z-0 pointer-events-none"></div>
       <div className="absolute bottom-[20%] left-0 w-1/3 h-1/3 bg-green-500/5 blur-[120px] rounded-full z-0 pointer-events-none"></div>
     </section>
