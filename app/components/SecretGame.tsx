@@ -4,7 +4,8 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { FaTimes, FaMicrochip, FaFeatherAlt, FaGamepad, FaTrophy } from "react-icons/fa";
 // Import the leaderboard component we made above
 import SecretLeaderboard from "./SecretLeaderboard"; 
-import { db } from "../../lib/firebase";
+// Adjust this path if needed based on your folder structure (e.g., "@/lib/firebase")
+import { db } from "../../lib/firebase"; 
 
 // --- CONFIGURATION ---
 const KONAMI_CODE = ["ArrowUp", "ArrowUp", "ArrowDown", "ArrowDown", "ArrowLeft", "ArrowRight", "ArrowLeft", "ArrowRight", "b", "a"];
@@ -27,6 +28,8 @@ export default function SecretGame() {
 
   // --- INPUT TRACKING ---
   const [inputSequence, setInputSequence] = useState<string[]>([]);
+  // ADDED: State to track mobile swipes
+  const [swipeSequence, setSwipeSequence] = useState<string[]>([]);
   const touchStartRef = useRef<{ x: number, y: number } | null>(null);
 
   // --- OVERRIDE STATE ---
@@ -53,7 +56,7 @@ export default function SecretGame() {
   const [renderPipes, setRenderPipes] = useState<{ x: number; height: number }[]>([]);
 
   // --------------------------------------------------------------------------
-  // 1. INPUT LISTENERS (Konami & Swipes)
+  // 1. INPUT LISTENERS (Konami Code)
   // --------------------------------------------------------------------------
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -65,27 +68,60 @@ export default function SecretGame() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [inputSequence]);
 
+  // --------------------------------------------------------------------------
+  // 2. LISTEN FOR SWIPES (MOBILE) - IMPROVED STRICTNESS
+  // --------------------------------------------------------------------------
   useEffect(() => {
     const handleTouchStart = (e: TouchEvent) => {
-      touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      touchStartRef.current = {
+        x: e.touches[0].clientX,
+        y: e.touches[0].clientY
+      };
     };
 
-    // Simple swipe detection logic
     const handleTouchEnd = (e: TouchEvent) => {
       if (!touchStartRef.current) return;
-      const dx = e.changedTouches[0].clientX - touchStartRef.current.x;
-      const dy = e.changedTouches[0].clientY - touchStartRef.current.y;
-      
-      let dir = "";
-      if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 30) dir = dx > 0 ? "RIGHT" : "LEFT";
-      else if (Math.abs(dy) > 30) dir = dy > 0 ? "DOWN" : "UP";
 
-      if (dir) {
-        // We use a temp variable here or state functional update for tracking logic
-        // For brevity, assuming the logic from your original code works well here
-        // (Just ensure reset happens correctly)
-        if (dir === MOBILE_CODE[0]) openSecretMenu(); // Simplified for demo
+      const touchEnd = {
+        x: e.changedTouches[0].clientX,
+        y: e.changedTouches[0].clientY
+      };
+
+      const diffX = touchEnd.x - touchStartRef.current.x;
+      const diffY = touchEnd.y - touchStartRef.current.y;
+      
+      // CONFIG: Minimum distance to count as a swipe (increased to prevent scroll triggers)
+      const MIN_SWIPE_DISTANCE = 75; 
+      // CONFIG: How strict the angle must be (1.5 means X must be 1.5x bigger than Y to be horizontal)
+      const AXIS_STRICTNESS = 1.5;
+
+      let direction = "";
+
+      // Check if Horizontal Swipe
+      if (Math.abs(diffX) > Math.abs(diffY) * AXIS_STRICTNESS) {
+        if (Math.abs(diffX) > MIN_SWIPE_DISTANCE) {
+          direction = diffX > 0 ? "RIGHT" : "LEFT";
+        }
+      } 
+      // Check if Vertical Swipe
+      else if (Math.abs(diffY) > Math.abs(diffX) * AXIS_STRICTNESS) {
+        if (Math.abs(diffY) > MIN_SWIPE_DISTANCE) {
+          direction = diffY > 0 ? "DOWN" : "UP";
+        }
       }
+
+      if (direction) {
+        setSwipeSequence(prev => {
+          const newSeq = [...prev, direction].slice(-4); 
+          
+          if (JSON.stringify(newSeq) === JSON.stringify(MOBILE_CODE)) {
+            openSecretMenu();
+            return []; 
+          }
+          return newSeq;
+        });
+      }
+      
       touchStartRef.current = null;
     };
 
@@ -97,10 +133,14 @@ export default function SecretGame() {
     };
   }, []);
 
+  // --------------------------------------------------------------------------
+  // 3. GAME MANAGEMENT LOGIC
+  // --------------------------------------------------------------------------
   const openSecretMenu = () => {
     setIsOpen(true);
     setActiveGame("menu");
     setInputSequence([]);
+    setSwipeSequence([]); // Reset swipes too
     if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(200);
   };
 
@@ -134,7 +174,7 @@ export default function SecretGame() {
   };
 
   // --------------------------------------------------------------------------
-  // 2. GAME LOGIC: SYSTEM OVERRIDE
+  // 4. GAME LOGIC: SYSTEM OVERRIDE
   // --------------------------------------------------------------------------
   const startOverride = () => {
     setOverrideState("playing");
@@ -173,7 +213,7 @@ export default function SecretGame() {
   };
 
   // --------------------------------------------------------------------------
-  // 3. GAME LOGIC: FLAPPY GLITCH
+  // 5. GAME LOGIC: FLAPPY GLITCH
   // --------------------------------------------------------------------------
   const startFlappy = () => {
     if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
