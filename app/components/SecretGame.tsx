@@ -70,11 +70,13 @@ export default function SecretGame() {
 
   useEffect(() => {
     const handleTouchStart = (e: TouchEvent) => {
+      // FIX: Don't track global swipes if the game is already open (prevents conflict)
+      if (isOpen) return;
       touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
     };
 
     const handleTouchEnd = (e: TouchEvent) => {
-      if (!touchStartRef.current) return;
+      if (isOpen || !touchStartRef.current) return;
       const touchEnd = { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
       const diffX = touchEnd.x - touchStartRef.current.x;
       const diffY = touchEnd.y - touchStartRef.current.y;
@@ -108,7 +110,7 @@ export default function SecretGame() {
       window.removeEventListener("touchstart", handleTouchStart);
       window.removeEventListener("touchend", handleTouchEnd);
     };
-  }, []);
+  }, [isOpen]);
 
   // --------------------------------------------------------------------------
   // 2. NAVIGATION & MANAGEMENT
@@ -178,7 +180,13 @@ export default function SecretGame() {
     }, difficultyRef.current);
   }, []);
 
-  const handleOverrideClick = (index: number) => {
+  const handleOverrideClick = (e: React.SyntheticEvent | Event, index: number) => {
+    // FIX: Prevent default to stop mobile ghost clicks and zooming
+    if (e && e.cancelable) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
     if (overrideState !== "playing") return;
     
     if (index === activeCell) {
@@ -282,9 +290,14 @@ export default function SecretGame() {
     gameLoopRef.current = requestAnimationFrame(flappyLoop);
   };
 
-  const flappyJump = (e: React.MouseEvent | React.TouchEvent) => {
+  const flappyJump = (e: React.SyntheticEvent | Event) => {
+    // FIX: Unified handler with preventDefault to stop double tapping
+    if (e && e.cancelable) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
     if (countdown !== null) return; 
-    if (e.cancelable) e.preventDefault();
     if (flappyState === "playing") birdVelocity.current = JUMP_STRENGTH;
   };
 
@@ -347,11 +360,14 @@ export default function SecretGame() {
                       <div className="h-full bg-green-500" style={{ width: '100%', animation: `shrink ${difficultyRef.current}ms linear forwards` }} key={roundId} />
                     </div>
                   </div>
-                  <div className="grid grid-cols-3 gap-3 flex-1">
+                  {/* FIX: touchAction: none prevents zooming/scrolling on mobile */}
+                  <div className="grid grid-cols-3 gap-3 flex-1" style={{ touchAction: 'none' }}>
                     {Array.from({ length: 9 }).map((_, i) => (
                       <div
                         key={i}
-                        onMouseDown={(e) => { e.preventDefault(); handleOverrideClick(i); }}
+                        // FIX: Both events call same handler which calls preventDefault
+                        onMouseDown={(e) => handleOverrideClick(e, i)}
+                        onTouchStart={(e) => handleOverrideClick(e, i)}
                         className={`rounded border-2 cursor-pointer transition-colors duration-75 ${activeCell === i ? "bg-green-500 border-green-400 shadow-[0_0_15px_#22c55e]" : "bg-zinc-900 border-zinc-800"}`}
                       />
                     ))}
@@ -377,25 +393,27 @@ export default function SecretGame() {
               
               {flappyState === "playing" && (
                 <div 
+                  // FIX: Unified handler
                   onMouseDown={flappyJump} 
                   onTouchStart={flappyJump} 
-                  style={{ height: GAME_HEIGHT }} 
+                  // FIX: Critical for mobile gameplay
+                  style={{ height: GAME_HEIGHT, touchAction: 'none' }} 
                   className="relative w-full bg-zinc-900/50 cursor-pointer touch-none border-b border-green-900 overflow-hidden"
                 >
                   {/* COUNTDOWN OVERLAY */}
                   {countdown !== null && (
-                     <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                      <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/50 backdrop-blur-sm pointer-events-none">
                         <div className="text-6xl font-black text-green-500 animate-pulse">
                             {countdown}
                         </div>
-                     </div>
+                      </div>
                   )}
 
                   <div className="absolute top-4 right-4 text-4xl font-black text-white/20 pointer-events-none z-10">{flappyScore}</div>
                   
                   {/* BIRD */}
                   <div 
-                    className="absolute left-[50px] bg-green-500 border-2 border-white rounded-sm shadow-[0_0_15px_#22c55e]" 
+                    className="absolute left-[50px] bg-green-500 border-2 border-white rounded-sm shadow-[0_0_15px_#22c55e] pointer-events-none" 
                     style={{ 
                         top: renderBirdY, 
                         width: BIRD_SIZE, 
@@ -405,13 +423,13 @@ export default function SecretGame() {
                   
                   {/* PIPES */}
                   {renderPipes.map((p, i) => (
-                    <div key={i}>
+                    <div key={i} className="pointer-events-none">
                       <div className="absolute w-[40px] bg-green-900/80 border-b-2 border-green-500 left-0" style={{ left: p.x, height: p.height, top: 0 }} />
                       <div className="absolute w-[40px] bg-green-900/80 border-t-2 border-green-500 left-0" style={{ left: p.x, top: p.height + GAP_SIZE, bottom: 0 }} />
                     </div>
                   ))}
                   
-                  <div className="absolute bottom-0 w-full h-1 bg-green-500/30" />
+                  <div className="absolute bottom-0 w-full h-1 bg-green-500/30 pointer-events-none" />
                 </div>
               )}
 
