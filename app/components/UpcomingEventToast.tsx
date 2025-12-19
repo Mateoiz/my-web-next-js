@@ -8,7 +8,7 @@ import { FaCalendarAlt, FaTimes, FaArrowRight } from "react-icons/fa";
 const NEXT_EVENT = {
   id: 1,
   title: "General Assembly 2026",
-  date: "Jan 30, 2026",
+  date: "February",
   location: "DLSAU Osmeña Hall",
   link: "/Events"
 };

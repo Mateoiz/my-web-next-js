@@ -7,13 +7,15 @@ import {
   useMotionValue, 
   useTransform, 
   animate, 
-  useInView 
+  useInView,
+  AnimatePresence 
 } from "framer-motion";
-import { FaChevronLeft, FaChevronRight } from "react-icons/fa"; 
+// Added FaGlobe to imports
+import { FaChevronLeft, FaChevronRight, FaFacebook, FaGlobe } from "react-icons/fa"; 
 
 // --- IMPORT COMPONENTS ---
 import FloatingCubes from "../components/FloatingCubes"; 
-import CircuitCursor from "../components/CircuitCursor"; // <--- 1. IMPORT CURSOR
+import CircuitCursor from "../components/CircuitCursor";
 
 // --- STATIC DATA ---
 const VISION_TEXT = [
@@ -32,12 +34,15 @@ const CAROUSEL_ITEMS = [
   { src: "/about/CS4.JPG", title: "Leadership", subtitle: "Leading the Way" },
 ];
 
+// --- UPDATED AFFILIATES DATA ---
 const AFFILIATES = [
   { 
     name: "De La Salle Araneta University", 
     acronym: "DLSAU", 
     color: "bg-green-700",
     logo: "/affiliates/dlsau.png",
+    facebookUrl: "https://www.facebook.com/dlsauofficial",
+    websiteUrl: "https://www.dlsau.edu.ph", // Added Website URL
     description: "De La Salle Araneta University (DLSAU) is a Catholic private Lasallian university in Malabon, Philippines. It is the seventh campus of De La Salle Philippines. It was formerly known as the Araneta Institute of Agriculture (AIA)."
   },
   { 
@@ -45,6 +50,7 @@ const AFFILIATES = [
     acronym: "CAST", 
     color: "bg-blue-600",
     logo: "/affiliates/cast.png",
+    facebookUrl: "https://www.facebook.com/CSCCASTDLSAU",
     description: "The College of Arts, Sciences, and Technology (CAST) is dedicated to providing a holistic education that equips students with the knowledge, skills, and values necessary to thrive in a rapidly evolving world."
   },
   { 
@@ -52,6 +58,8 @@ const AFFILIATES = [
     acronym: "SAMPISANAN", 
     color: "bg-yellow-500",
     logo: "/affiliates/sampisanan.png",
+    facebookUrl: "https://www.facebook.com/sampisanan",
+    websiteUrl: null, // No website URL for this one
     description: "Sampisanan ng mga Mag-aaral ng De La Salle Araneta University (SM-DLSAU) is the highest governing student body of the university. It serves as the voice of the students and acts as a bridge between the student body and the administration."
   },
 ];
@@ -90,7 +98,7 @@ const InfoCard = ({ title, children, delay = 0, hasDecoration = false }: InfoCar
     whileHover={{ scale: 1.01 }}
     className="group relative p-8 md:p-10 rounded-2xl bg-white/60 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-700/50 backdrop-blur-md flex flex-col overflow-hidden h-full shadow-lg dark:shadow-none transition-colors duration-300"
   >
-    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-green-500 to-transparent opacity-50 group-hover:opacity-100 transition-opacity" />
+    <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-transparent via-green-500 to-transparent opacity-50 group-hover:opacity-100 transition-opacity" />
     <h3 className="text-3xl font-bold text-zinc-800 dark:text-white mb-8 flex items-center gap-3">
        <span className="relative flex h-3 w-3">
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
@@ -109,9 +117,23 @@ const InfoCard = ({ title, children, delay = 0, hasDecoration = false }: InfoCar
   </motion.div>
 );
 
+// --- SUB-COMPONENT: REUSABLE TOOLTIP ---
+const Tooltip = ({ text }: { text: string }) => (
+  <motion.div 
+    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+    animate={{ opacity: 1, y: 0, scale: 1 }}
+    exit={{ opacity: 0, y: 5, scale: 0.95 }}
+    className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 px-3 py-1.5 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-[10px] font-bold tracking-widest uppercase rounded shadow-xl pointer-events-none whitespace-nowrap z-50 border border-white/10 dark:border-black/10"
+  >
+    {text}
+    <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-zinc-900 dark:border-t-zinc-100" />
+  </motion.div>
+);
+
 export default function AboutPage() {
   const carouselRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
+  const [hoveredSocial, setHoveredSocial] = useState<string | null>(null); // Tooltip state
   const x = useMotionValue(0); 
 
   useEffect(() => {
@@ -143,16 +165,13 @@ export default function AboutPage() {
   return (
     <section className="min-h-screen relative overflow-hidden pb-32 transition-colors duration-300">
       
-      {/* 2. ADD CIRCUIT CURSOR HERE */}
       <CircuitCursor />
 
-      {/* 3. ADD FLOATING CUBES BACKGROUND */}
       <div className="absolute inset-0 z-0">
          <FloatingCubes />
       </div>
 
-      {/* Top Gradient Fade */}
-      <div className="absolute top-0 left-0 w-full h-[500px] bg-gradient-to-b from-green-100/40 dark:from-green-900/20 to-transparent pointer-events-none z-0" />
+      <div className="absolute top-0 left-0 w-full h-[500px] bg-linear-to-b from-green-100/40 dark:from-green-900/20 to-transparent pointer-events-none z-0" />
 
       <div className="container mx-auto px-6 pt-32 relative z-10">
 
@@ -207,7 +226,7 @@ export default function AboutPage() {
                 >
                     <h2 className="text-3xl md:text-5xl font-black text-zinc-900 dark:text-white mb-6 uppercase tracking-tight transition-colors duration-300">
                         We Are <br/>
-                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-600 to-green-400 dark:from-green-400 dark:to-green-600 drop-shadow-sm">
+                        <span className="text-transparent bg-clip-text bg-linear-to-r from-green-600 to-green-400 dark:from-green-400 dark:to-green-600 drop-shadow-sm">
                             The Future
                         </span>
                     </h2>
@@ -226,32 +245,32 @@ export default function AboutPage() {
 
         {/* --- STATS --- */}
         <div className="flex justify-center mb-40">
-           <motion.div 
-             initial={{ opacity: 0, scale: 0.9 }}
-             whileInView={{ opacity: 1, scale: 1 }}
-             viewport={{ once: true }}
-             className="relative group"
-           >
-             <div className="absolute inset-0 bg-green-500/20 blur-3xl rounded-full -z-10 group-hover:bg-green-500/30 transition-all duration-500" />
-             <div className="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-green-500/30 px-12 py-8 rounded-2xl shadow-xl backdrop-blur-sm flex flex-col items-center gap-2 min-w-[300px]">
-                 <div className="flex items-center gap-2 mb-2">
-                    <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                    <span className="text-xs font-mono text-zinc-500 dark:text-green-400 tracking-widest uppercase">
-                       System_Status: Online
-                    </span>
-                 </div>
-                 <div className="text-7xl md:text-8xl font-black text-zinc-800 dark:text-white tracking-tighter">
-                    <Counter value={107} />
-                 </div>
-                 <div className="text-zinc-600 dark:text-zinc-400 font-medium text-lg uppercase tracking-wide">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              viewport={{ once: true }}
+              className="relative group"
+            >
+              <div className="absolute inset-0 bg-green-500/20 blur-3xl rounded-full -z-10 group-hover:bg-green-500/30 transition-all duration-500" />
+              <div className="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-green-500/30 px-12 py-8 rounded-2xl shadow-xl backdrop-blur-sm flex flex-col items-center gap-2 min-w-[300px]">
+                  <div className="flex items-center gap-2 mb-2">
+                     <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                     <span className="text-xs font-mono text-zinc-500 dark:text-green-400 tracking-widest uppercase">
+                        System_Status: Online
+                     </span>
+                  </div>
+                  <div className="text-7xl md:text-8xl font-black text-zinc-800 dark:text-white tracking-tighter">
+                     <Counter value={107} />
+                  </div>
+                  <div className="text-zinc-600 dark:text-zinc-400 font-medium text-lg uppercase tracking-wide">
                     Registered Members
-                 </div>
-                 <div className="absolute top-0 left-0 w-3 h-3 border-t border-l border-green-500 opacity-50" />
-                 <div className="absolute top-0 right-0 w-3 h-3 border-t border-r border-green-500 opacity-50" />
-                 <div className="absolute bottom-0 left-0 w-3 h-3 border-b border-l border-green-500 opacity-50" />
-                 <div className="absolute bottom-0 right-0 w-3 h-3 border-b border-r border-green-500 opacity-50" />
-             </div>
-           </motion.div>
+                  </div>
+                  <div className="absolute top-0 left-0 w-3 h-3 border-t border-l border-green-500 opacity-50" />
+                  <div className="absolute top-0 right-0 w-3 h-3 border-t border-r border-green-500 opacity-50" />
+                  <div className="absolute bottom-0 left-0 w-3 h-3 border-b border-l border-green-500 opacity-50" />
+                  <div className="absolute bottom-0 right-0 w-3 h-3 border-b border-r border-green-500 opacity-50" />
+              </div>
+            </motion.div>
         </div>
 
         {/* --- VISION & MISSION --- */}
@@ -281,7 +300,7 @@ export default function AboutPage() {
         <div className="relative py-10 mb-20">
           <div className="flex flex-col md:flex-row justify-between items-end mb-12 border-b border-zinc-200 dark:border-zinc-800 pb-6 gap-6">
             <div>
-               <h2 className="text-4xl md:text-6xl font-black uppercase text-transparent bg-clip-text bg-gradient-to-r from-zinc-900 to-zinc-500 dark:from-white dark:to-zinc-500">
+               <h2 className="text-4xl md:text-6xl font-black uppercase text-transparent bg-clip-text bg-linear-to-r from-zinc-900 to-zinc-500 dark:from-white dark:to-zinc-500">
                  What We Do
                </h2>
                <p className="mt-2 text-zinc-600 dark:text-green-400 font-mono text-sm tracking-widest uppercase">
@@ -333,7 +352,7 @@ export default function AboutPage() {
                     sizes="(max-width: 768px) 100vw, 33vw"
                     className="object-cover transition-transform duration-700 group-hover:scale-110 opacity-80 group-hover:opacity-100" 
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent opacity-90" />
+                  <div className="absolute inset-0 bg-linear-to-t from-black via-black/20 to-transparent opacity-90" />
                   <div className="absolute inset-4 border border-white/10 group-hover:border-green-500/50 transition-colors duration-300 rounded-xl" />
                   
                   <div className="absolute bottom-0 left-0 w-full p-8 translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
@@ -352,12 +371,11 @@ export default function AboutPage() {
             </motion.div>
           </motion.div>
           
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-full bg-green-500/5 blur-3xl rounded-full -z-0 pointer-events-none" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-full bg-green-500/5 blur-3xl rounded-full z-0 pointer-events-none" />
         </div>
 
-        {/* --- 5. OUR AFFILIATES --- */}
+        {/* --- OUR AFFILIATES --- */}
         <div className="relative py-20 max-w-6xl mx-auto">
-          {/* Section Header */}
           <div className="mb-20 text-center">
              <h2 className="text-4xl md:text-6xl font-black uppercase text-zinc-900 dark:text-white mb-4 transition-colors duration-300">
                Our Affiliates
@@ -377,15 +395,64 @@ export default function AboutPage() {
                  viewport={{ once: true, margin: "-100px" }}
                  transition={{ delay: index * 0.1, duration: 0.6 }}
                  className={`flex flex-col md:flex-row items-center gap-8 md:gap-16 ${
-                    index % 2 === 1 ? "md:flex-row-reverse" : "" // Alternates Left/Right layout
+                    index % 2 === 1 ? "md:flex-row-reverse" : "" 
                  }`}
                >
                  {/* TEXT COLUMN */}
                  <div className="flex-1 text-center md:text-left relative z-10">
-                     {/* Decorative Label */}
-                     <span className="inline-block py-1 px-3 rounded-full bg-green-100 dark:bg-green-500/10 text-green-700 dark:text-green-400 text-xs font-mono mb-4 border border-green-500/30">
-                        {affiliate.acronym}
-                     </span>
+                     <div className="flex items-center justify-center md:justify-start gap-4 mb-4">
+                        <span className="inline-block py-1 px-3 rounded-full bg-green-100 dark:bg-green-500/10 text-green-700 dark:text-green-400 text-xs font-mono border border-green-500/30">
+                           {affiliate.acronym}
+                        </span>
+
+                        <div className="flex items-center gap-3">
+                           {/* FACEBOOK BUTTON WITH HOVER TOOLTIP */}
+                           <div className="relative">
+                             <motion.a 
+                               href={affiliate.facebookUrl}
+                               target="_blank"
+                               rel="noopener noreferrer"
+                               onMouseEnter={() => setHoveredSocial(`${affiliate.acronym}-fb`)}
+                               onMouseLeave={() => setHoveredSocial(null)}
+                               whileHover={{ scale: 1.15, y: -2 }}
+                               whileTap={{ scale: 0.9 }}
+                               className="text-zinc-400 hover:text-[#1877F2] dark:text-zinc-500 dark:hover:text-[#1877F2] transition-colors duration-300 relative z-20"
+                               aria-label={`Visit ${affiliate.acronym} on Facebook`}
+                             >
+                               <FaFacebook size={24} />
+                             </motion.a>
+                             <AnimatePresence>
+                               {hoveredSocial === `${affiliate.acronym}-fb` && (
+                                 <Tooltip text="Facebook" />
+                               )}
+                             </AnimatePresence>
+                           </div>
+
+                           {/* WEBSITE BUTTON WITH HOVER TOOLTIP (Check if URL exists) */}
+                           {affiliate.websiteUrl && (
+                             <div className="relative">
+                               <motion.a 
+                                 href={affiliate.websiteUrl}
+                                 target="_blank"
+                                 rel="noopener noreferrer"
+                                 onMouseEnter={() => setHoveredSocial(`${affiliate.acronym}-web`)}
+                                 onMouseLeave={() => setHoveredSocial(null)}
+                                 whileHover={{ scale: 1.15, y: -2 }}
+                                 whileTap={{ scale: 0.9 }}
+                                 className="text-zinc-400 hover:text-green-600 dark:text-zinc-500 dark:hover:text-green-400 transition-colors duration-300 relative z-20"
+                                 aria-label={`Visit ${affiliate.acronym} website`}
+                               >
+                                 <FaGlobe size={24} />
+                               </motion.a>
+                               <AnimatePresence>
+                                 {hoveredSocial === `${affiliate.acronym}-web` && (
+                                   <Tooltip text="Visit Website" />
+                                 )}
+                               </AnimatePresence>
+                             </div>
+                           )}
+                        </div>
+                     </div>
 
                      <h3 className="text-3xl md:text-4xl font-bold text-zinc-900 dark:text-white mb-6 group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors">
                         {affiliate.name}
@@ -399,10 +466,9 @@ export default function AboutPage() {
                  </div>
 
                  {/* LOGO COLUMN */}
-                 <div className="relative flex-shrink-0 group cursor-default">
+                 <div className="relative shrink-0 group cursor-default">
                      <div className={`relative w-64 h-64 rounded-3xl bg-white flex items-center justify-center shadow-[0_20px_50px_rgba(0,0,0,0.1)] dark:shadow-[0_0_50px_rgba(34,197,94,0.15)] border-4 border-zinc-100 dark:border-zinc-800 overflow-hidden transform transition-all duration-500 group-hover:scale-105 group-hover:border-green-500`}>
                         
-                        {/* Fallback Acronym (Behind Image) */}
                         <span className="text-6xl font-black text-zinc-100 absolute select-none">
                           {affiliate.acronym}
                         </span>
@@ -415,7 +481,6 @@ export default function AboutPage() {
                         /> 
                      </div>
 
-                     {/* Tech Decor Elements */}
                      <div className="absolute -top-6 -right-6 w-24 h-24 border-t-2 border-r-2 border-green-500/30 rounded-tr-3xl -z-10 group-hover:translate-x-2 group-hover:-translate-y-2 transition-transform duration-500" />
                      <div className="absolute -bottom-6 -left-6 w-24 h-24 border-b-2 border-l-2 border-green-500/30 rounded-bl-3xl -z-10 group-hover:-translate-x-2 group-hover:translate-y-2 transition-transform duration-500" />
                  </div>

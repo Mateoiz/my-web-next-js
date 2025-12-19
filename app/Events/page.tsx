@@ -15,7 +15,7 @@ const events = [
   {
     id: 1,
     title: "General Assembly 2026",
-    date: "January 30, 2026",
+    date: "February",
     location: "DLSAU Osmeña Hall",
     description: "Kickstart the year with our annual general assembly. Expect guest speakers, roadmap reveals, and free swag.",
     poster: "/events/E1.JPG", 
@@ -24,7 +24,7 @@ const events = [
   {
     id: 2,
     title: "Video Editing Competition",
-    date: "February 15, 2026",
+    date: "February",
     location: "Computer Lab 3",
     description: "Showcase your creativity. Theme: 'Future of Tech'. Prizes include Adobe CC subscriptions and cash.",
     poster: "/events/E2.JPG",
