@@ -9,6 +9,7 @@ import {
   animate, 
   useInView 
 } from "framer-motion";
+import { FaChevronLeft, FaChevronRight } from "react-icons/fa"; 
 
 // --- STATIC DATA ---
 const VISION_TEXT = [
@@ -25,6 +26,31 @@ const CAROUSEL_ITEMS = [
   { src: "/about/CS1.JPG", title: "Community", subtitle: "Stronger Together" },
   { src: "/about/CS3.JPG", title: "Innovation", subtitle: "Future Ready" },
   { src: "/about/CS4.JPG", title: "Leadership", subtitle: "Leading the Way" },
+];
+
+const AFFILIATES = [
+  { 
+    name: "De La Salle Araneta University", 
+    acronym: "DLSAU", 
+    // Uses a placeholder background color if no image is found
+    color: "bg-green-700",
+    logo: "/affiliates/dlsau.png",
+    description: "De La Salle Araneta University (DLSAU) is a Catholic private Lasallian university in Malabon, Philippines. It is the seventh campus of De La Salle Philippines. It was formerly known as the Araneta Institute of Agriculture (AIA)."
+  },
+  { 
+    name: "College of Arts, Sciences, and Technology", 
+    acronym: "CAST", 
+    color: "bg-blue-600",
+    logo: "/affiliates/cast.png",
+    description: "The College of Arts, Sciences, and Technology (CAST) is dedicated to providing a holistic education that equips students with the knowledge, skills, and values necessary to thrive in a rapidly evolving world."
+  },
+  { 
+    name: "Samahan ng Pinagkaisang Samahan", 
+    acronym: "SAMPISANAN", 
+    color: "bg-yellow-500",
+    logo: "/affiliates/sampisanan.png",
+    description: "Sampisanan ng mga Mag-aaral ng De La Salle Araneta University (SM-DLSAU) is the highest governing student body of the university. It serves as the voice of the students and acts as a bridge between the student body and the administration."
+  },
 ];
 
 // --- SUB-COMPONENT: ANIMATED COUNTER ---
@@ -83,17 +109,33 @@ const InfoCard = ({ title, children, delay = 0, hasDecoration = false }: InfoCar
 export default function AboutPage() {
   const carouselRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
+  const x = useMotionValue(0); 
 
   useEffect(() => {
     const updateWidth = () => {
       if (carouselRef.current) {
-        setWidth(carouselRef.current.scrollWidth - carouselRef.current.offsetWidth);
+        const newWidth = carouselRef.current.scrollWidth - carouselRef.current.offsetWidth;
+        setWidth(newWidth);
       }
     };
     updateWidth();
     window.addEventListener("resize", updateWidth);
     return () => window.removeEventListener("resize", updateWidth);
   }, []);
+
+  const SCROLL_STEP = 400; 
+
+  const scrollLeft = () => {
+    const currentX = x.get();
+    const newX = Math.min(currentX + SCROLL_STEP, 0); 
+    animate(x, newX, { type: "spring", stiffness: 300, damping: 30 });
+  };
+
+  const scrollRight = () => {
+    const currentX = x.get();
+    const newX = Math.max(currentX - SCROLL_STEP, -width); 
+    animate(x, newX, { type: "spring", stiffness: 300, damping: 30 });
+  };
 
   return (
     <section className="min-h-screen relative overflow-hidden pb-32 transition-colors duration-300">
@@ -103,7 +145,7 @@ export default function AboutPage() {
 
       <div className="container mx-auto px-6 pt-32 relative z-10">
 
-        {/* --- 1. HERO SECTION --- */}
+        {/* --- HERO --- */}
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -118,8 +160,8 @@ export default function AboutPage() {
           </p>
         </motion.div>
 
-        {/* --- 2. WHO WE ARE --- */}
-        <div className="relative mb-20"> {/* Reduced margin bottom to fit Stats */}
+        {/* --- IDENTITY --- */}
+        <div className="relative mb-20"> 
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full text-center pointer-events-none select-none z-0">
                 <span className="text-[6rem] md:text-[12rem] font-black text-zinc-900/5 dark:text-white/5 tracking-tighter leading-none whitespace-nowrap transition-colors duration-300">
                     IDENTITY
@@ -127,7 +169,6 @@ export default function AboutPage() {
             </div>
 
             <div className="relative z-10 grid md:grid-cols-12 items-center gap-8">
-                {/* IMAGE */}
                 <motion.div 
                     initial={{ opacity: 0, x: -50 }}
                     whileInView={{ opacity: 1, x: 0 }}
@@ -147,7 +188,6 @@ export default function AboutPage() {
                     <div className="absolute bottom-0 right-0 w-16 h-16 border-b-4 border-r-4 border-green-500 z-20" />
                 </motion.div>
 
-                {/* TEXT */}
                 <motion.div 
                     initial={{ opacity: 0, x: 50 }}
                     whileInView={{ opacity: 1, x: 0 }}
@@ -173,7 +213,7 @@ export default function AboutPage() {
             </div>
         </div>
 
-        {/* --- NEW SECTION: STATS COUNTER --- */}
+        {/* --- STATS --- */}
         <div className="flex justify-center mb-40">
            <motion.div 
              initial={{ opacity: 0, scale: 0.9 }}
@@ -181,40 +221,29 @@ export default function AboutPage() {
              viewport={{ once: true }}
              className="relative group"
            >
-              {/* Glowing Background Blur */}
-              <div className="absolute inset-0 bg-green-500/20 blur-3xl rounded-full -z-10 group-hover:bg-green-500/30 transition-all duration-500" />
-              
-              {/* Main Stats Box */}
-              <div className="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-green-500/30 px-12 py-8 rounded-2xl shadow-xl backdrop-blur-sm flex flex-col items-center gap-2 min-w-[300px]">
-                 
-                 {/* Top Label */}
+             <div className="absolute inset-0 bg-green-500/20 blur-3xl rounded-full -z-10 group-hover:bg-green-500/30 transition-all duration-500" />
+             <div className="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-green-500/30 px-12 py-8 rounded-2xl shadow-xl backdrop-blur-sm flex flex-col items-center gap-2 min-w-[300px]">
                  <div className="flex items-center gap-2 mb-2">
                     <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
                     <span className="text-xs font-mono text-zinc-500 dark:text-green-400 tracking-widest uppercase">
                        System_Status: Online
                     </span>
                  </div>
-
-                 {/* The Number */}
                  <div className="text-7xl md:text-8xl font-black text-zinc-800 dark:text-white tracking-tighter">
                     <Counter value={107} />
                  </div>
-
-                 {/* Bottom Label */}
                  <div className="text-zinc-600 dark:text-zinc-400 font-medium text-lg uppercase tracking-wide">
                     Registered Members
                  </div>
-
-                 {/* Decorative Corners */}
                  <div className="absolute top-0 left-0 w-3 h-3 border-t border-l border-green-500 opacity-50" />
                  <div className="absolute top-0 right-0 w-3 h-3 border-t border-r border-green-500 opacity-50" />
                  <div className="absolute bottom-0 left-0 w-3 h-3 border-b border-l border-green-500 opacity-50" />
                  <div className="absolute bottom-0 right-0 w-3 h-3 border-b border-r border-green-500 opacity-50" />
-              </div>
+             </div>
            </motion.div>
         </div>
 
-        {/* --- 3. VISION & MISSION --- */}
+        {/* --- VISION & MISSION --- */}
         <div className="grid lg:grid-cols-2 gap-8 mb-40 items-stretch">
           <InfoCard title="VISION">
             <p className="border-l-2 border-green-500/30 pl-4">{VISION_TEXT[0]}</p>
@@ -231,14 +260,14 @@ export default function AboutPage() {
              </p>
              <div className="inline-block mt-4">
                  <span className="text-green-700 dark:text-green-300 font-bold bg-green-500/10 px-3 py-1 rounded-full text-sm border border-green-500/20">
-                    Leadership • Integrity • Faith • Excellence
+                   Leadership • Integrity • Faith • Excellence
                  </span>
              </div>
           </InfoCard>
         </div>
 
-        {/* --- 4. CAROUSEL SECTION --- */}
-        <div className="relative py-10">
+        {/* --- CAROUSEL --- */}
+        <div className="relative py-10 mb-20">
           <div className="flex flex-col md:flex-row justify-between items-end mb-12 border-b border-zinc-200 dark:border-zinc-800 pb-6 gap-6">
             <div>
                <h2 className="text-4xl md:text-6xl font-black uppercase text-transparent bg-clip-text bg-gradient-to-r from-zinc-900 to-zinc-500 dark:from-white dark:to-zinc-500">
@@ -249,20 +278,35 @@ export default function AboutPage() {
                </p>
             </div>
             
-            <div className="hidden md:flex items-center gap-2 text-zinc-400 text-sm font-mono">
-              <span>DRAG TO EXPLORE</span>
-              <div className="w-12 h-[1px] bg-zinc-400"></div>
+            <div className="flex items-center gap-4">
+               <button 
+                 onClick={scrollLeft}
+                 className="p-3 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-green-400 hover:bg-green-500 hover:text-white dark:hover:bg-green-500 dark:hover:text-black transition-all shadow-md active:scale-95"
+                 aria-label="Scroll Left"
+               >
+                 <FaChevronLeft />
+               </button>
+               <button 
+                 onClick={scrollRight}
+                 className="p-3 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-green-400 hover:bg-green-500 hover:text-white dark:hover:bg-green-500 dark:hover:text-black transition-all shadow-md active:scale-95"
+                 aria-label="Scroll Right"
+               >
+                 <FaChevronRight />
+               </button>
             </div>
           </div>
 
           <motion.div 
             ref={carouselRef} 
-            className="cursor-grab overflow-hidden active:cursor-grabbing relative z-10" 
+            className="cursor-grab overflow-hidden active:cursor-grabbing relative z-10 px-2 py-4" 
           >
             <motion.div 
               drag="x" 
               dragConstraints={{ right: 0, left: -width }} 
-              className="flex gap-6 pl-2"
+              style={{ x }} 
+              dragElastic={0.1}
+              dragTransition={{ power: 0.3, timeConstant: 200 }}
+              className="flex gap-6"
             >
               {CAROUSEL_ITEMS.map((item, index) => (
                 <motion.div 
@@ -282,15 +326,15 @@ export default function AboutPage() {
                   <div className="absolute inset-4 border border-white/10 group-hover:border-green-500/50 transition-colors duration-300 rounded-xl" />
                   
                   <div className="absolute bottom-0 left-0 w-full p-8 translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
-                     <span className="text-green-400 font-mono text-xs tracking-widest uppercase mb-2 block">
-                       Event_0{index + 1}
-                     </span>
-                     <h3 className="text-3xl font-bold text-white mb-1 group-hover:text-green-400 transition-colors">
-                       {item.title}
-                     </h3>
-                     <p className="text-zinc-400 text-sm transform opacity-0 group-hover:opacity-100 transition-all duration-300 delay-75">
-                       {item.subtitle}
-                     </p>
+                      <span className="text-green-400 font-mono text-xs tracking-widest uppercase mb-2 block">
+                        Event_0{index + 1}
+                      </span>
+                      <h3 className="text-3xl font-bold text-white mb-1 group-hover:text-green-400 transition-colors">
+                        {item.title}
+                      </h3>
+                      <p className="text-zinc-400 text-sm transform opacity-0 group-hover:opacity-100 transition-all duration-300 delay-75">
+                        {item.subtitle}
+                      </p>
                   </div>
                 </motion.div>
               ))}
@@ -298,6 +342,81 @@ export default function AboutPage() {
           </motion.div>
           
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-full bg-green-500/5 blur-3xl rounded-full -z-0 pointer-events-none" />
+        </div>
+
+        {/* --- 5. OUR AFFILIATES (NEW LAYOUT) --- */}
+        {/* --- 5. OUR AFFILIATES (IMPROVED DESIGN) --- */}
+        <div className="relative py-20 max-w-6xl mx-auto">
+          {/* Section Header */}
+          <div className="mb-20 text-center">
+             <h2 className="text-4xl md:text-6xl font-black uppercase text-zinc-900 dark:text-white mb-4 transition-colors duration-300">
+               Our Affiliates
+             </h2>
+             <div className="h-1 w-24 bg-green-500 rounded-full mx-auto" /> 
+             <p className="mt-4 text-zinc-600 dark:text-green-400 font-mono tracking-widest uppercase text-sm">
+               // Partners in Excellence
+             </p>
+          </div>
+
+          <div className="space-y-24">
+             {AFFILIATES.map((affiliate, index) => (
+               <motion.div 
+                 key={index}
+                 initial={{ opacity: 0, y: 50 }}
+                 whileInView={{ opacity: 1, y: 0 }}
+                 viewport={{ once: true, margin: "-100px" }}
+                 transition={{ delay: index * 0.1, duration: 0.6 }}
+                 // Layout: Flex Row for Desktop, Column for Mobile
+                 className={`flex flex-col md:flex-row items-center gap-8 md:gap-16 ${
+                    index % 2 === 1 ? "md:flex-row-reverse" : "" // Alternates Left/Right layout
+                 }`}
+               >
+                  {/* TEXT COLUMN */}
+                  <div className="flex-1 text-center md:text-left relative z-10">
+                     {/* Decorative Label */}
+                     <span className="inline-block py-1 px-3 rounded-full bg-green-100 dark:bg-green-500/10 text-green-700 dark:text-green-400 text-xs font-mono mb-4 border border-green-500/30">
+                        {affiliate.acronym}
+                     </span>
+
+                     <h3 className="text-3xl md:text-4xl font-bold text-zinc-900 dark:text-white mb-6 group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors">
+                        {affiliate.name}
+                     </h3>
+                     
+                     <div className="p-6 rounded-2xl bg-white/40 dark:bg-zinc-900/40 border-l-4 border-green-500 backdrop-blur-sm shadow-sm">
+                        <p className="text-zinc-700 dark:text-zinc-300 text-lg leading-relaxed">
+                            {affiliate.description}
+                        </p>
+                     </div>
+                  </div>
+
+                  {/* LOGO COLUMN */}
+                  <div className="relative flex-shrink-0 group cursor-default">
+                     {/* The Logo Box */}
+                     <div className={`relative w-64 h-64 rounded-3xl bg-white flex items-center justify-center shadow-[0_20px_50px_rgba(0,0,0,0.1)] dark:shadow-[0_0_50px_rgba(34,197,94,0.15)] border-4 border-zinc-100 dark:border-zinc-800 overflow-hidden transform transition-all duration-500 group-hover:scale-105 group-hover:border-green-500`}>
+                        
+                        {/* Fallback Acronym (Behind Image) */}
+                        <span className="text-6xl font-black text-zinc-100 absolute select-none">
+                          {affiliate.acronym}
+                        </span>
+                        
+                        {/* UNCOMMENT THIS when you have the images */}
+                        {
+                        <Image 
+                          src={affiliate.logo} 
+                          alt={affiliate.name} 
+                          fill
+                          className="object-contain p-8 relative z-10"
+                        /> 
+                        }
+                     </div>
+
+                     {/* Tech Decor Elements behind the logo */}
+                     <div className="absolute -top-6 -right-6 w-24 h-24 border-t-2 border-r-2 border-green-500/30 rounded-tr-3xl -z-10 group-hover:translate-x-2 group-hover:-translate-y-2 transition-transform duration-500" />
+                     <div className="absolute -bottom-6 -left-6 w-24 h-24 border-b-2 border-l-2 border-green-500/30 rounded-bl-3xl -z-10 group-hover:-translate-x-2 group-hover:translate-y-2 transition-transform duration-500" />
+                  </div>
+               </motion.div>
+             ))}
+          </div>
         </div>
 
       </div>

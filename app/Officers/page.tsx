@@ -2,9 +2,12 @@
 
 import { useRef, useEffect, useState } from "react";
 import Image from "next/image";
-import Link from "next/link"; 
-import { motion, Variants } from "framer-motion";
-import { FaFacebook, FaEnvelope, FaCamera, FaPen, FaVideo, FaPaintBrush, FaArrowRight } from "react-icons/fa";
+import Link from "next/link";
+import { motion, Variants, useMotionValue, animate } from "framer-motion"; // Added useMotionValue, animate
+import { 
+  FaFacebook, FaEnvelope, FaCamera, FaPen, FaVideo, FaPaintBrush, FaArrowRight,
+  FaChevronLeft, FaChevronRight // Added Chevron icons
+} from "react-icons/fa";
 
 // --- 1. MAIN OFFICERS DATA ---
 const officers = [
@@ -60,7 +63,7 @@ const officers = [
     id: 7,
     name: "Iris Caryl Chua",
     role: "Treasurer",
-    bio: "Keeping the organization organized and on track with meticulous record-keeping and scheduling.",
+    bio: "Managing the organization's finances with transparency and accountability, ensuring funds are allocated effectively.",
     image: "/officers/TRE.JPG",
     socials: { facebook: "https://www.facebook.com/xua.iris", email: "iris.chua@dlsau.edu.ph" }
   },
@@ -134,12 +137,38 @@ const cardVariants: Variants = {
 export default function OfficersPage() {
   const carouselRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
+  const x = useMotionValue(0); // Track horizontal drag position
 
+  // Recalculate drag limits on window resize
   useEffect(() => {
-    if (carouselRef.current) {
-      setWidth(carouselRef.current.scrollWidth - carouselRef.current.offsetWidth);
-    }
+    const updateWidth = () => {
+      if (carouselRef.current) {
+        // Calculate max scrollable width
+        const newWidth = carouselRef.current.scrollWidth - carouselRef.current.offsetWidth;
+        setWidth(newWidth);
+      }
+    };
+
+    updateWidth();
+    window.addEventListener("resize", updateWidth);
+    return () => window.removeEventListener("resize", updateWidth);
   }, []);
+
+  // --- MANUAL CAROUSEL CONTROLS ---
+  // Approximate width of card (280px) + gap (24px)
+  const SCROLL_STEP = 304; 
+
+  const scrollLeft = () => {
+    const currentX = x.get();
+    const newX = Math.min(currentX + SCROLL_STEP, 0); // Clamp to 0 (start)
+    animate(x, newX, { type: "spring", stiffness: 300, damping: 30 });
+  };
+
+  const scrollRight = () => {
+    const currentX = x.get();
+    const newX = Math.max(currentX - SCROLL_STEP, -width); // Clamp to -width (end)
+    animate(x, newX, { type: "spring", stiffness: 300, damping: 30 });
+  };
 
   return (
     <section className="min-h-screen py-24 px-4 md:px-8 relative overflow-hidden transition-colors duration-300">
@@ -230,21 +259,48 @@ export default function OfficersPage() {
 
       {/* --- MULTIMEDIA TEAM CAROUSEL --- */}
       <div className="max-w-7xl mx-auto relative z-20 mt-32 pb-12">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-5xl font-bold mb-4 text-zinc-900 dark:text-white transition-colors duration-300">
-            The <span className="text-green-600 dark:text-green-500">Creatives</span>
-          </h2>
-          <p className="text-zinc-600 dark:text-gray-400 transition-colors duration-300">Our Multimedia Team making magic happen.</p>
+        {/* Header with Buttons */}
+        <div className="flex flex-col md:flex-row items-center justify-between mb-12 px-4">
+          <div className="text-center md:text-left mb-6 md:mb-0">
+            <h2 className="text-3xl md:text-5xl font-bold mb-2 text-zinc-900 dark:text-white transition-colors duration-300">
+              The <span className="text-green-600 dark:text-green-500">Creatives</span>
+            </h2>
+            <p className="text-zinc-600 dark:text-gray-400 transition-colors duration-300">
+              Our Multimedia Team making magic happen.
+            </p>
+          </div>
+
+          {/* Navigation Buttons */}
+          <div className="flex gap-4">
+            <button 
+              onClick={scrollLeft}
+              className="p-3 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-green-400 hover:bg-green-500 hover:text-white dark:hover:bg-green-500 dark:hover:text-black transition-all shadow-md active:scale-95"
+              aria-label="Scroll Left"
+            >
+              <FaChevronLeft />
+            </button>
+            <button 
+              onClick={scrollRight}
+              className="p-3 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-green-400 hover:bg-green-500 hover:text-white dark:hover:bg-green-500 dark:hover:text-black transition-all shadow-md active:scale-95"
+              aria-label="Scroll Right"
+            >
+              <FaChevronRight />
+            </button>
+          </div>
         </div>
 
         <motion.div 
           ref={carouselRef} 
-          className="cursor-grab overflow-hidden px-4" 
+          className="cursor-grab overflow-hidden px-4 py-4" 
           whileTap={{ cursor: "grabbing" }}
         >
           <motion.div 
             drag="x" 
-            dragConstraints={{ right: 0, left: -width }} 
+            dragConstraints={{ right: 0, left: -width }}
+            style={{ x }} // Bind the motion value here
+            // IMPROVED PHYSICS:
+            dragElastic={0.1} // Adds resistance at edges
+            dragTransition={{ power: 0.3, timeConstant: 200 }} // Makes swipe stop more naturally
             className="flex gap-6"
           >
             {multimediaTeam.map((member, index) => (
@@ -293,10 +349,9 @@ export default function OfficersPage() {
              Want to be part of the Legacy?
            </h3>
            <p className="text-zinc-600 dark:text-gray-300 mb-8 max-w-xl mx-auto">
-             We are constantly looking for talented individuals to join us. If you have the passion for tech and leadership, we want you.
+             We are constantly looking for talented individuals to join our ranks. If you have the passion for tech and leadership, we want you.
            </p>
            
-           {/* UPDATED: Added target="_blank" and rel="noopener noreferrer" */}
            <Link 
              href="https://docs.google.com/forms/d/e/1FAIpQLScqZdimJAZDOsH3ksLFjyvUBV4ru5iXy2WFWImtabTu7-ku3Q/viewform" 
              target="_blank"
