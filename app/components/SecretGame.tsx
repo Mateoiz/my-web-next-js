@@ -1,11 +1,9 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { FaTimes, FaMicrochip, FaFeatherAlt, FaGamepad, FaTrophy } from "react-icons/fa";
-// Import the leaderboard component we made above
+import { FaTimes, FaMicrochip, FaFeatherAlt, FaGamepad, FaTrophy, FaArrowLeft } from "react-icons/fa";
 import SecretLeaderboard from "./SecretLeaderboard"; 
-// Adjust this path if needed based on your folder structure (e.g., "@/lib/firebase")
-import { db } from "../../lib/firebase"; 
+// import { db } from "../../lib/firebase"; 
 
 // --- CONFIGURATION ---
 const KONAMI_CODE = ["ArrowUp", "ArrowUp", "ArrowDown", "ArrowDown", "ArrowLeft", "ArrowRight", "ArrowLeft", "ArrowRight", "b", "a"];
@@ -13,22 +11,24 @@ const MOBILE_CODE = ["UP", "DOWN", "LEFT", "RIGHT"];
 const PRIZE_SCORE = 30;
 
 // Game Constants
-const GAME_HEIGHT = 400;
+const GAME_HEIGHT = 500; 
+const BIRD_SIZE = 30;    
+const HITBOX_PADDING = 4; 
 const GRAVITY = 0.5;
 const JUMP_STRENGTH = -8;
 const PIPE_SPEED = 3;
 const PIPE_SPAWN_RATE = 1800;
-const GAP_SIZE = 140;
+const GAP_SIZE = 160;    
 
 export default function SecretGame() {
   // --- GLOBAL STATE ---
   const [isOpen, setIsOpen] = useState(false);
   const [activeGame, setActiveGame] = useState<"menu" | "override" | "flappy">("menu");
   const [showPrizeToast, setShowPrizeToast] = useState(false);
+  const [countdown, setCountdown] = useState<number | null>(null);
 
   // --- INPUT TRACKING ---
   const [inputSequence, setInputSequence] = useState<string[]>([]);
-  // ADDED: State to track mobile swipes
   const [swipeSequence, setSwipeSequence] = useState<string[]>([]);
   const touchStartRef = useRef<{ x: number, y: number } | null>(null);
 
@@ -44,19 +44,19 @@ export default function SecretGame() {
   const [flappyState, setFlappyState] = useState<"idle" | "playing" | "gameover">("idle");
   const [flappyScore, setFlappyScore] = useState(0);
   
-  // Refs for Game Loop (Performance Optimization: don't use State for physics)
+  // Refs for Game Loop
   const birdY = useRef(GAME_HEIGHT / 2);
   const birdVelocity = useRef(0);
   const pipesRef = useRef<{ x: number; height: number; passed: boolean }[]>([]);
   const gameLoopRef = useRef<number | null>(null);
   const pipeSpawnRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Render State (Only what needs to be drawn)
+  // Render State
   const [renderBirdY, setRenderBirdY] = useState(GAME_HEIGHT / 2);
   const [renderPipes, setRenderPipes] = useState<{ x: number; height: number }[]>([]);
 
   // --------------------------------------------------------------------------
-  // 1. INPUT LISTENERS (Konami Code)
+  // 1. INPUT LISTENERS
   // --------------------------------------------------------------------------
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -68,52 +68,30 @@ export default function SecretGame() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [inputSequence]);
 
-  // --------------------------------------------------------------------------
-  // 2. LISTEN FOR SWIPES (MOBILE) - IMPROVED STRICTNESS
-  // --------------------------------------------------------------------------
   useEffect(() => {
     const handleTouchStart = (e: TouchEvent) => {
-      touchStartRef.current = {
-        x: e.touches[0].clientX,
-        y: e.touches[0].clientY
-      };
+      touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
     };
 
     const handleTouchEnd = (e: TouchEvent) => {
       if (!touchStartRef.current) return;
-
-      const touchEnd = {
-        x: e.changedTouches[0].clientX,
-        y: e.changedTouches[0].clientY
-      };
-
+      const touchEnd = { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
       const diffX = touchEnd.x - touchStartRef.current.x;
       const diffY = touchEnd.y - touchStartRef.current.y;
       
-      // CONFIG: Minimum distance to count as a swipe (increased to prevent scroll triggers)
       const MIN_SWIPE_DISTANCE = 75; 
-      // CONFIG: How strict the angle must be (1.5 means X must be 1.5x bigger than Y to be horizontal)
       const AXIS_STRICTNESS = 1.5;
 
       let direction = "";
-
-      // Check if Horizontal Swipe
       if (Math.abs(diffX) > Math.abs(diffY) * AXIS_STRICTNESS) {
-        if (Math.abs(diffX) > MIN_SWIPE_DISTANCE) {
-          direction = diffX > 0 ? "RIGHT" : "LEFT";
-        }
-      } 
-      // Check if Vertical Swipe
-      else if (Math.abs(diffY) > Math.abs(diffX) * AXIS_STRICTNESS) {
-        if (Math.abs(diffY) > MIN_SWIPE_DISTANCE) {
-          direction = diffY > 0 ? "DOWN" : "UP";
-        }
+        if (Math.abs(diffX) > MIN_SWIPE_DISTANCE) direction = diffX > 0 ? "RIGHT" : "LEFT";
+      } else if (Math.abs(diffY) > Math.abs(diffX) * AXIS_STRICTNESS) {
+        if (Math.abs(diffY) > MIN_SWIPE_DISTANCE) direction = diffY > 0 ? "DOWN" : "UP";
       }
 
       if (direction) {
         setSwipeSequence(prev => {
           const newSeq = [...prev, direction].slice(-4); 
-          
           if (JSON.stringify(newSeq) === JSON.stringify(MOBILE_CODE)) {
             openSecretMenu();
             return []; 
@@ -121,7 +99,6 @@ export default function SecretGame() {
           return newSeq;
         });
       }
-      
       touchStartRef.current = null;
     };
 
@@ -134,13 +111,13 @@ export default function SecretGame() {
   }, []);
 
   // --------------------------------------------------------------------------
-  // 3. GAME MANAGEMENT LOGIC
+  // 2. NAVIGATION & MANAGEMENT
   // --------------------------------------------------------------------------
   const openSecretMenu = () => {
     setIsOpen(true);
     setActiveGame("menu");
     setInputSequence([]);
-    setSwipeSequence([]); // Reset swipes too
+    setSwipeSequence([]);
     if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(200);
   };
 
@@ -149,16 +126,20 @@ export default function SecretGame() {
     resetAllGames();
   };
 
+  const returnToMenu = () => {
+    resetAllGames();
+    setActiveGame("menu");
+  };
+
   const resetAllGames = () => {
-    // Override Cleanup
     setOverrideState("idle");
     setOverrideScore(0);
     setActiveCell(null);
     if (overrideTimeoutRef.current) clearTimeout(overrideTimeoutRef.current);
     
-    // Flappy Cleanup
     setFlappyState("idle");
     setFlappyScore(0);
+    setCountdown(null); 
     if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
     if (pipeSpawnRef.current) clearInterval(pipeSpawnRef.current);
     
@@ -174,7 +155,7 @@ export default function SecretGame() {
   };
 
   // --------------------------------------------------------------------------
-  // 4. GAME LOGIC: SYSTEM OVERRIDE
+  // 3. GAME LOGIC: SYSTEM OVERRIDE
   // --------------------------------------------------------------------------
   const startOverride = () => {
     setOverrideState("playing");
@@ -193,7 +174,7 @@ export default function SecretGame() {
     
     if (overrideTimeoutRef.current) clearTimeout(overrideTimeoutRef.current);
     overrideTimeoutRef.current = setTimeout(() => {
-      setOverrideState("gameover"); // Time ran out
+      setOverrideState("gameover");
     }, difficultyRef.current);
   }, []);
 
@@ -207,28 +188,44 @@ export default function SecretGame() {
       difficultyRef.current = Math.max(400, difficultyRef.current * 0.95);
       nextOverrideRound();
     } else {
-      setOverrideState("gameover"); // Wrong click
+      setOverrideState("gameover");
       if (overrideTimeoutRef.current) clearTimeout(overrideTimeoutRef.current);
     }
   };
 
   // --------------------------------------------------------------------------
-  // 5. GAME LOGIC: FLAPPY GLITCH
+  // 4. GAME LOGIC: FLAPPY GLITCH
   // --------------------------------------------------------------------------
   const startFlappy = () => {
-    if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
     setFlappyState("playing");
+    setCountdown(3); 
+  };
+
+  useEffect(() => {
+    if (countdown === null) return;
+    if (countdown > 0) {
+      const timer = setTimeout(() => setCountdown(c => (c ? c - 1 : 0)), 1000);
+      return () => clearTimeout(timer);
+    } 
+    if (countdown === 0) {
+      setCountdown(null); 
+      initFlappyLoop();
+    }
+  }, [countdown]);
+
+  const initFlappyLoop = () => {
+    if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
     setFlappyScore(0);
-    
     birdY.current = GAME_HEIGHT / 2;
     birdVelocity.current = 0;
     pipesRef.current = [];
-    
-    // Spawn Pipes
+    setRenderBirdY(birdY.current);
+    setRenderPipes([]);
+
     pipeSpawnRef.current = setInterval(() => {
       pipesRef.current.push({ 
         x: 400, 
-        height: Math.random() * (GAME_HEIGHT - GAP_SIZE - 50) + 50, 
+        height: Math.random() * (GAME_HEIGHT - GAP_SIZE - 100) + 50, 
         passed: false 
       });
     }, PIPE_SPAWN_RATE);
@@ -240,12 +237,10 @@ export default function SecretGame() {
     birdVelocity.current += GRAVITY;
     birdY.current += birdVelocity.current;
 
-    // Move Pipes
     for (let i = pipesRef.current.length - 1; i >= 0; i--) {
       const pipe = pipesRef.current[i];
       pipe.x -= PIPE_SPEED;
       
-      // Scoring
       if (!pipe.passed && pipe.x + 40 < 50) {
         pipe.passed = true;
         setFlappyScore(s => {
@@ -255,30 +250,40 @@ export default function SecretGame() {
         });
       }
       
-      // Cleanup off-screen pipes
       if (pipe.x < -50) pipesRef.current.splice(i, 1);
     }
 
-    // Collision Detection
-    const hitPipe = pipesRef.current.some(p => 
-      (50 + 30 > p.x && 50 < p.x + 40) && 
-      (birdY.current < p.height || birdY.current + 30 > p.height + GAP_SIZE)
-    );
+    const hitFloor = birdY.current + BIRD_SIZE - HITBOX_PADDING >= GAME_HEIGHT;
+    const hitCeiling = birdY.current + HITBOX_PADDING <= 0;
 
-    if (birdY.current < 0 || birdY.current > GAME_HEIGHT || hitPipe) {
+    const birdLeft = 50 + HITBOX_PADDING;
+    const birdRight = 50 + BIRD_SIZE - HITBOX_PADDING;
+    const birdTop = birdY.current + HITBOX_PADDING;
+    const birdBottom = birdY.current + BIRD_SIZE - HITBOX_PADDING;
+
+    const hitPipe = pipesRef.current.some(p => {
+        const pipeLeft = p.x;
+        const pipeRight = p.x + 40;
+        if (birdRight > pipeLeft && birdLeft < pipeRight) {
+            return birdTop < p.height || birdBottom > p.height + GAP_SIZE;
+        }
+        return false;
+    });
+
+    if (hitFloor || hitCeiling || hitPipe) {
       setFlappyState("gameover");
       if (pipeSpawnRef.current) clearInterval(pipeSpawnRef.current);
       if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(200);
       return; 
     }
 
-    // Update Render State
     setRenderBirdY(birdY.current);
     setRenderPipes([...pipesRef.current]);
     gameLoopRef.current = requestAnimationFrame(flappyLoop);
   };
 
   const flappyJump = (e: React.MouseEvent | React.TouchEvent) => {
+    if (countdown !== null) return; 
     if (e.cancelable) e.preventDefault();
     if (flappyState === "playing") birdVelocity.current = JUMP_STRENGTH;
   };
@@ -287,7 +292,7 @@ export default function SecretGame() {
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4 font-mono select-none">
-      <div className="relative w-full max-w-md bg-black border-2 border-green-500 rounded-xl shadow-[0_0_50px_rgba(34,197,94,0.3)] overflow-hidden flex flex-col h-[600px] max-h-[90vh]">
+      <div className="relative w-full max-w-md bg-black border-2 border-green-500 rounded-xl shadow-[0_0_50px_rgba(34,197,94,0.3)] overflow-hidden flex flex-col h-[650px] max-h-[90vh]">
         
         {/* --- TOAST --- */}
         {showPrizeToast && (
@@ -297,20 +302,32 @@ export default function SecretGame() {
           </div>
         )}
 
-        {/* --- HEADER --- */}
+        {/* --- HEADER (WITH BACK BUTTON) --- */}
         <div className="flex justify-between items-center p-4 border-b border-green-500/30 bg-zinc-900/50">
-          <h2 className="text-lg font-bold text-green-500 flex items-center gap-2">
-            <FaMicrochip /> SECRET TERMINAL
-          </h2>
+          <div className="flex items-center gap-3">
+             {/* BACK BUTTON: Only shows if NOT in menu */}
+             {activeGame !== "menu" && (
+                <button 
+                  onClick={returnToMenu}
+                  className="p-1 rounded hover:bg-green-500/20 text-green-500 transition-colors"
+                  aria-label="Back to Menu"
+                >
+                   <FaArrowLeft />
+                </button>
+             )}
+             <h2 className="text-lg font-bold text-green-500 flex items-center gap-2">
+               <FaMicrochip /> SECRET TERMINAL
+             </h2>
+          </div>
           <button onClick={closeGame} className="text-green-500 hover:text-white"><FaTimes size={20} /></button>
         </div>
 
         {/* --- MAIN CONTENT AREA --- */}
-        <div className="relative flex-1 bg-black p-4 overflow-hidden">
+        <div className="relative flex-1 bg-black p-4 overflow-hidden flex flex-col items-center">
           
           {/* MENU */}
           {activeGame === "menu" && (
-            <div className="h-full flex flex-col justify-center gap-4">
+            <div className="h-full w-full flex flex-col justify-center gap-4">
               <p className="text-center text-gray-500 mb-2">SELECT INFILTRATION METHOD</p>
               <MenuButton icon={<FaGamepad />} title="SYSTEM OVERRIDE" desc="Reflex Test" onClick={() => setActiveGame("override")} />
               <MenuButton icon={<FaFeatherAlt />} title="FLAPPY GLITCH" desc="Flight Test" onClick={() => setActiveGame("flappy")} />
@@ -319,11 +336,11 @@ export default function SecretGame() {
 
           {/* GAME 1: OVERRIDE */}
           {activeGame === "override" && (
-            <>
-              {overrideState === "idle" && <StartScreen onStart={startOverride} onMenu={() => setActiveGame("menu")} title="System Override" />}
+            <div className="w-full h-full flex flex-col">
+              {overrideState === "idle" && <StartScreen onStart={startOverride} onMenu={returnToMenu} title="System Override" />}
               
               {overrideState === "playing" && (
-                <div className="h-full flex flex-col">
+                <div className="h-full flex flex-col w-full">
                   <div className="flex justify-between text-green-400 font-bold mb-4">
                     <span>SCORE: {overrideScore}</span>
                     <div className="w-32 h-2 bg-zinc-800 rounded-full mt-2 overflow-hidden">
@@ -342,50 +359,71 @@ export default function SecretGame() {
                 </div>
               )}
 
-              {/* LEADERBOARD OVERLAY ON GAME OVER */}
               {overrideState === "gameover" && (
                 <SecretLeaderboard 
                   score={overrideScore} 
                   gameMode="override" 
                   onReplay={startOverride} 
-                  onMenu={() => setActiveGame("menu")} 
+                  onMenu={returnToMenu} 
                 />
               )}
-            </>
+            </div>
           )}
 
           {/* GAME 2: FLAPPY */}
           {activeGame === "flappy" && (
-            <>
-              {flappyState === "idle" && <StartScreen onStart={startFlappy} onMenu={() => setActiveGame("menu")} title="Flappy Glitch" />}
+            <div className="w-full h-full relative">
+              {flappyState === "idle" && <StartScreen onStart={startFlappy} onMenu={returnToMenu} title="Flappy Glitch" />}
               
               {flappyState === "playing" && (
                 <div 
                   onMouseDown={flappyJump} 
                   onTouchStart={flappyJump} 
-                  className="absolute inset-0 bg-zinc-900 cursor-pointer touch-none"
+                  style={{ height: GAME_HEIGHT }} 
+                  className="relative w-full bg-zinc-900/50 cursor-pointer touch-none border-b border-green-900 overflow-hidden"
                 >
-                  <div className="absolute top-4 right-4 text-4xl font-black text-white/20 pointer-events-none">{flappyScore}</div>
-                  <div className="absolute left-[50px] w-[30px] h-[30px] bg-green-500 border-2 border-white rounded-sm shadow-[0_0_15px_#22c55e]" style={{ top: renderBirdY }} />
+                  {/* COUNTDOWN OVERLAY */}
+                  {countdown !== null && (
+                     <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                        <div className="text-6xl font-black text-green-500 animate-pulse">
+                            {countdown}
+                        </div>
+                     </div>
+                  )}
+
+                  <div className="absolute top-4 right-4 text-4xl font-black text-white/20 pointer-events-none z-10">{flappyScore}</div>
+                  
+                  {/* BIRD */}
+                  <div 
+                    className="absolute left-[50px] bg-green-500 border-2 border-white rounded-sm shadow-[0_0_15px_#22c55e]" 
+                    style={{ 
+                        top: renderBirdY, 
+                        width: BIRD_SIZE, 
+                        height: BIRD_SIZE 
+                    }} 
+                  />
+                  
+                  {/* PIPES */}
                   {renderPipes.map((p, i) => (
                     <div key={i}>
                       <div className="absolute w-[40px] bg-green-900/80 border-b-2 border-green-500 left-0" style={{ left: p.x, height: p.height, top: 0 }} />
                       <div className="absolute w-[40px] bg-green-900/80 border-t-2 border-green-500 left-0" style={{ left: p.x, top: p.height + GAP_SIZE, bottom: 0 }} />
                     </div>
                   ))}
+                  
+                  <div className="absolute bottom-0 w-full h-1 bg-green-500/30" />
                 </div>
               )}
 
-              {/* LEADERBOARD OVERLAY ON GAME OVER */}
               {flappyState === "gameover" && (
                 <SecretLeaderboard 
                   score={flappyScore} 
                   gameMode="flappy" 
                   onReplay={startFlappy} 
-                  onMenu={() => setActiveGame("menu")} 
+                  onMenu={returnToMenu} 
                 />
               )}
-            </>
+            </div>
           )}
         </div>
       </div>
@@ -394,7 +432,7 @@ export default function SecretGame() {
   );
 }
 
-// --- SUBCOMPONENTS FOR CLEANLINESS ---
+// --- SUBCOMPONENTS ---
 
 const MenuButton = ({ icon, title, desc, onClick }: any) => (
   <button onClick={onClick} className="group w-full py-6 border border-green-500/30 hover:bg-green-500/10 text-green-500 hover:text-green-300 rounded flex items-center justify-center gap-4 transition-all">
@@ -407,9 +445,11 @@ const MenuButton = ({ icon, title, desc, onClick }: any) => (
 );
 
 const StartScreen = ({ onStart, onMenu, title }: any) => (
-  <div className="h-full flex flex-col items-center justify-center gap-4 animate-in fade-in">
+  <div className="h-full flex flex-col items-center justify-center gap-4 animate-in fade-in w-full">
     <h3 className="text-2xl font-bold text-green-500 uppercase">{title}</h3>
     <button onClick={onStart} className="w-full max-w-[200px] py-3 bg-green-600 hover:bg-green-500 text-black font-bold rounded">START MISSION</button>
-    <button onClick={onMenu} className="text-xs text-gray-500 hover:text-white underline">Back to Menu</button>
+    <button onClick={onMenu} className="flex items-center gap-2 px-4 py-2 rounded border border-green-500/30 text-xs text-green-500 hover:bg-green-500/10 hover:text-green-400 transition-colors">
+        <FaArrowLeft size={10} /> Back to Menu
+    </button>
   </div>
 );

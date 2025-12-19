@@ -6,6 +6,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { FaCalendarAlt, FaMapMarkerAlt, FaExternalLinkAlt, FaMicrochip } from "react-icons/fa";
 
+// 1. IMPORTS
+import FloatingCubes from "../components/FloatingCubes"; 
+import CircuitCursor from "../components/CircuitCursor";
+
 // --- EVENT DATA ---
 const events = [
   {
@@ -59,15 +63,21 @@ export default function EventsPage() {
   const [activeEvent, setActiveEvent] = useState(0);
 
   return (
-    // ADAPTED: Removed background classes so it uses the layout's global background
-    <section className="min-h-screen relative transition-colors duration-300">
+    <section className="min-h-screen relative transition-colors duration-300 overflow-hidden">
       
-      {/* Container */}
-      <div className="container mx-auto px-4 md:px-8 pt-32 pb-20">
+      {/* 2. BACKGROUND LAYERS */}
+      <div className="absolute inset-0 z-0">
+         <FloatingCubes />
+      </div>
+      
+      {/* 3. CURSOR */}
+      <CircuitCursor />
+
+      {/* Container - Added 'relative z-10' to ensure content is above the background */}
+      <div className="relative z-10 container mx-auto px-4 md:px-8 pt-32 pb-20">
         
         {/* HEADER */}
         <div className="mb-20 text-center md:text-left">
-          {/* ADAPTED: Text color */}
           <h1 className="text-6xl md:text-8xl font-black mb-4 uppercase tracking-tighter text-zinc-900 dark:text-white transition-colors duration-300">
             System <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-600 to-green-400 dark:from-green-400 dark:to-green-600">Events</span>
           </h1>
@@ -89,15 +99,13 @@ export default function EventsPage() {
                   viewport={{ margin: "-20% 0px -20% 0px" }} // Triggers when item is center screen
                   onViewportEnter={() => setActiveEvent(index)}
                   onClick={() => setActiveEvent(index)}
-                  // ADAPTED: Logic for card styling based on state and theme
-                  className={`group relative p-8 rounded-xl border-l-4 transition-all duration-300 cursor-pointer backdrop-blur-sm ${
+                  className={`group relative p-8 rounded-xl border-l-4 transition-all duration-300 cursor-pointer backdrop-blur-md ${
                     isActive
-                      ? "bg-white border-green-500 shadow-xl dark:bg-zinc-900/90 dark:shadow-[0_0_30px_rgba(34,197,94,0.1)]"
+                      ? "bg-white/90 border-green-500 shadow-xl dark:bg-zinc-900/90 dark:shadow-[0_0_30px_rgba(34,197,94,0.1)]"
                       : "bg-white/40 border-zinc-300 hover:bg-white/80 dark:bg-zinc-900/40 dark:border-zinc-700 dark:hover:bg-zinc-800/60"
                   }`}
                 >
                   {/* Header: Date & Location */}
-                  {/* ADAPTED: Text colors for meta info */}
                   <div className="flex flex-wrap items-center gap-4 text-sm font-mono mb-4 text-zinc-500 dark:text-gray-400">
                     <span className={`flex items-center gap-2 px-3 py-1 rounded-full transition-colors ${
                         isActive 
@@ -112,7 +120,6 @@ export default function EventsPage() {
                   </div>
 
                   {/* Title */}
-                  {/* ADAPTED: Title color based on active state */}
                   <h3 className={`text-3xl font-bold mb-4 transition-colors ${
                       isActive 
                       ? 'text-zinc-900 dark:text-white' 
@@ -123,7 +130,6 @@ export default function EventsPage() {
 
                   {/* Description - Collapsible based on active state */}
                   <div className={`overflow-hidden transition-all duration-500 ${isActive ? 'max-h-40 opacity-100' : 'max-h-0 opacity-0 lg:max-h-20 lg:opacity-50'}`}>
-                    {/* ADAPTED: Description text color */}
                     <p className="text-zinc-600 dark:text-gray-300 leading-relaxed">
                       {event.description}
                     </p>
@@ -156,7 +162,6 @@ export default function EventsPage() {
             <div className="sticky top-32 h-[600px] w-full flex items-center justify-center">
               
               {/* THE HOLOGRAPHIC CONTAINER */}
-              {/* ADAPTED: Border and background colors for the container */}
               <div className="relative w-full h-full max-w-[400px] max-h-[550px] bg-white dark:bg-black/60 backdrop-blur-md rounded-2xl border-2 border-zinc-200 dark:border-green-500/30 p-2 shadow-2xl dark:shadow-[0_0_50px_rgba(34,197,94,0.1)] transition-colors duration-300">
                 
                 {/* Animated Content Switcher */}

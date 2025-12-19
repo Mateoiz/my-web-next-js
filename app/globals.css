@@ -2,9 +2,7 @@
 
 @config "../tailwind.config.ts";
 
-/* Setup for smooth scrolling and animations.
-  The @theme block is how we configure custom values in v4 
-*/
+/* Setup for smooth scrolling and animations. */
 @theme {
   --animate-duration: 300ms;
 }
@@ -13,9 +11,20 @@ html {
   scroll-behavior: smooth;
 }
 
-/* OPTIONAL: If you want to force the scrollbar to look good in dark mode 
-*/
+/* Force selection color to match theme */
 ::selection {
-  background-color: #22c55e; /* Green selection color */
+  background-color: #22c55e; /* Green-500 */
   color: black;
+}
+
+/* --- SPLASH SCREEN LOGIC --- */
+/* This hides specific elements when the "splash-active" class 
+   is added to the <body> tag by page.tsx 
+*/
+body.splash-active nav,                  /* Hides the Navbar */
+body.splash-active .ThemeToggle,        /* Hides the Theme Toggle */
+body.splash-active .MusicPlayer,        /* Hides the Music Player */
+body.splash-active [data-hide-on-splash="true"] /* Hides anything else marked */
+{
+  display: none !important;
 }

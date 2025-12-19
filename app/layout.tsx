@@ -1,41 +1,28 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { Providers } from "./providers"; 
-import ThemeToggle from "./components/ThemeToggle";
-
-// --- COMPONENT IMPORTS ---
-import Footer from "./components/Footer";
-import Navbar from "./components/navbar"; // Note: Ensure casing matches file name (Navbar vs navbar)
-import CircuitCursor from "./components/CircuitCursor"; 
-import FloatingCubes from "./components/FloatingCubes"; 
-import SecretGame from "./components/SecretGame"; 
-import MusicPlayer from "./components/MusicPlayer";
+import { Providers } from "./providers";
+import { LoadingProvider } from "./context/LoadingContext";
+import ClientLayout from "./components/ClientLayout";
 
 export const metadata: Metadata = {
-  title: "JPCS DLSAU", // This is the tab title
-  
-  // 1. CHANGE THIS (Main Google Search Description)
+  title: "JPCS DLSAU",
   description: "The official student organization for Computer Science at De La Salle Araneta University. We empower the next generation of tech innovators.",
-
   openGraph: {
     title: "JPCS DLSAU",
-    // 2. CHANGE THIS (Facebook/Discord Preview)
-    description: "The official student organization for Computer Science at De La Salle Araneta University. We empower the next generation of tech innovators.",
+    description: "The official student organization for Computer Science at De La Salle Araneta University.",
     images: [
       {
-        url: "/public/og-image.jpg",
+        url: "/og-image.jpg", // Fixed path (removed /public)
         width: 1200,
         height: 630,
         alt: "JPCS DLSAU Preview",
       },
     ],
   },
-
   twitter: {
     card: "summary_large_image",
     title: "JPCS DLSAU",
-    // 3. CHANGE THIS (Twitter/X Preview)
-    description: "The official student organization for Computer Science at De La Salle Araneta University. We empower the next generation of tech innovators.",
+    description: "The official student organization for Computer Science at De La Salle Araneta University.",
     images: ["/og-image.png"],
   },
 };
@@ -46,33 +33,21 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    // suppressHydrationWarning is needed for next-themes to work without errors
     <html lang="en" suppressHydrationWarning>
-      <body className="antialiased min-h-screen flex flex-col transition-colors duration-300 bg-white dark:bg-black text-zinc-900 dark:text-white">
+      <body className="antialiased bg-white dark:bg-black text-zinc-900 dark:text-white transition-colors duration-300">
         
-        {/* WRAP EVERYTHING INSIDE PROVIDERS */}
+        {/* 1. Theme Providers */}
         <Providers>
           
-          {/* --- GLOBAL BACKGROUNDS --- */}
-          <FloatingCubes />
-          <CircuitCursor />
+          {/* 2. Loading State Provider */}
+          <LoadingProvider>
+            
+            {/* 3. The Visual Layout (Navbar, Footer, etc.) */}
+            <ClientLayout>
+              {children}
+            </ClientLayout>
 
-          {/* --- GLOBAL NAVIGATION --- */}
-          <Navbar />
-
-          {/* --- MAIN PAGE CONTENT --- */}
-          <main className="grow relative z-10">
-            {children}
-          </main>
-
-          {/* --- FOOTER & TOOLS --- */}
-          <Footer />
-          <ThemeToggle />
-          <MusicPlayer />
-          
-          {/* --- SECRET EASTER EGG --- */}
-          <SecretGame />
-
+          </LoadingProvider>
         </Providers>
 
       </body>

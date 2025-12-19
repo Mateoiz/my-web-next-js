@@ -4,6 +4,10 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { FaMapMarkerAlt, FaEnvelope } from "react-icons/fa";
 
+// 1. IMPORT ANIMATED COMPONENTS
+import FloatingCubes from "../components/FloatingCubes"; 
+import CircuitCursor from "../components/CircuitCursor";
+
 export default function ContactPage() {
   const [formState, setFormState] = useState({ name: "", email: "", message: "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -19,7 +23,6 @@ export default function ContactPage() {
     e.preventDefault();
     setResult(""); 
 
-    // --- Validate Email Format ---
     if (!isValidEmail(formState.email)) {
       setResult("Error: Please enter a valid email address.");
       return; 
@@ -35,10 +38,7 @@ export default function ContactPage() {
           Accept: "application/json",
         },
         body: JSON.stringify({
-          // ---------------------------------------------------------
           access_key: "10785cf2-8db3-4033-805e-f2200df7cdd2", 
-          // ---------------------------------------------------------
-          
           name: formState.name,
           email: formState.email, 
           message: formState.message,
@@ -64,11 +64,18 @@ export default function ContactPage() {
   };
 
   return (
-    // ADAPTED: Theme transition wrapper
     <section className="min-h-screen pt-24 pb-12 px-4 md:px-8 relative overflow-hidden transition-colors duration-300">
       
-      {/* Background Decor - Kept subtle */}
-      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-green-500/10 blur-[120px] rounded-full pointer-events-none" />
+      {/* 2. ADD CIRCUIT CURSOR HERE */}
+      <CircuitCursor />
+
+      {/* 3. ADD FLOATING CUBES BACKGROUND */}
+      <div className="absolute inset-0 z-0">
+         <FloatingCubes />
+      </div>
+
+      {/* Background Decor */}
+      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-green-500/10 blur-[120px] rounded-full pointer-events-none z-0" />
       
       <div className="max-w-7xl mx-auto relative z-10">
         
@@ -78,7 +85,6 @@ export default function ContactPage() {
           animate={{ opacity: 1, y: 0 }}
           className="text-center mb-16"
         >
-          {/* ADAPTED: Text colors */}
           <h1 className="text-4xl md:text-6xl font-bold mb-4 text-zinc-900 dark:text-white transition-colors duration-300">
             Get in <span className="text-green-600 dark:text-green-500">Touch</span>
           </h1>
@@ -97,7 +103,6 @@ export default function ContactPage() {
             className="w-full lg:w-1/2 space-y-8"
           >
             <div className="grid gap-6">
-              {/* ADAPTED: Card styling */}
               <div className="flex items-start gap-4 p-6 bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-green-500/20 rounded-xl backdrop-blur-sm hover:border-green-500/50 shadow-sm dark:shadow-none transition-all duration-300">
                 <div className="p-3 bg-green-100 dark:bg-green-500/10 rounded-lg text-green-600 dark:text-green-400 text-xl transition-colors">
                   <FaMapMarkerAlt />
@@ -131,7 +136,6 @@ export default function ContactPage() {
                  src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3860.200567676776!2d120.9961623148408!3d14.66807608975936!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3397b69bc7d22e3b%3A0x6b40445f53239a06!2sDe%20La%20Salle%20Araneta%20University!5e0!3m2!1sen!2sph!4v1625561234567!5m2!1sen!2sph" 
                  width="100%" 
                  height="100%" 
-                 // ADAPTED: 'dark:invert-[.9]' turns the light map dark only in dark mode
                  className="border-0 dark:invert-[.9] dark:hue-rotate-180 transition-all duration-500"
                  allowFullScreen 
                  loading="lazy" 
@@ -147,7 +151,6 @@ export default function ContactPage() {
             transition={{ delay: 0.4 }}
             className="w-full lg:w-1/2"
           >
-            {/* ADAPTED: Form container background */}
             <form onSubmit={handleSubmit} className="p-8 rounded-2xl bg-white dark:bg-zinc-900/30 border border-zinc-200 dark:border-zinc-800 backdrop-blur-md relative shadow-xl dark:shadow-none transition-colors duration-300">
               <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-green-500 rounded-tl-lg" />
               <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-green-500 rounded-br-lg" />
@@ -162,7 +165,6 @@ export default function ContactPage() {
                     value={formState.name}
                     onChange={(e) => setFormState({...formState, name: e.target.value})}
                     required
-                    // ADAPTED: Input background and text color
                     className="w-full px-4 py-3 bg-zinc-50 dark:bg-black/50 border border-zinc-300 dark:border-zinc-700 rounded-lg focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 transition-all text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-gray-600"
                     placeholder="Enter your name"
                   />
@@ -199,7 +201,6 @@ export default function ContactPage() {
                 <button 
                   type="submit"
                   disabled={isSubmitting}
-                  // ADAPTED: Button Text Color (white works for green bg in both modes)
                   className={`w-full py-4 rounded-lg font-bold text-lg tracking-wide transition-all duration-300 ${
                     isSubmitting 
                       ? "bg-zinc-300 dark:bg-zinc-700 text-zinc-500 dark:text-gray-400 cursor-not-allowed" 

@@ -3,11 +3,15 @@
 import { useRef, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { motion, Variants, useMotionValue, animate } from "framer-motion"; // Added useMotionValue, animate
+import { motion, Variants, useMotionValue, animate } from "framer-motion";
 import { 
   FaFacebook, FaEnvelope, FaCamera, FaPen, FaVideo, FaPaintBrush, FaArrowRight,
-  FaChevronLeft, FaChevronRight // Added Chevron icons
+  FaChevronLeft, FaChevronRight 
 } from "react-icons/fa";
+
+// 1. IMPORT ANIMATED COMPONENTS
+import FloatingCubes from "../components/FloatingCubes";
+import CircuitCursor from "../components/CircuitCursor"; 
 
 // --- 1. MAIN OFFICERS DATA ---
 const officers = [
@@ -137,13 +141,11 @@ const cardVariants: Variants = {
 export default function OfficersPage() {
   const carouselRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
-  const x = useMotionValue(0); // Track horizontal drag position
+  const x = useMotionValue(0); 
 
-  // Recalculate drag limits on window resize
   useEffect(() => {
     const updateWidth = () => {
       if (carouselRef.current) {
-        // Calculate max scrollable width
         const newWidth = carouselRef.current.scrollWidth - carouselRef.current.offsetWidth;
         setWidth(newWidth);
       }
@@ -154,25 +156,31 @@ export default function OfficersPage() {
     return () => window.removeEventListener("resize", updateWidth);
   }, []);
 
-  // --- MANUAL CAROUSEL CONTROLS ---
-  // Approximate width of card (280px) + gap (24px)
   const SCROLL_STEP = 304; 
 
   const scrollLeft = () => {
     const currentX = x.get();
-    const newX = Math.min(currentX + SCROLL_STEP, 0); // Clamp to 0 (start)
+    const newX = Math.min(currentX + SCROLL_STEP, 0); 
     animate(x, newX, { type: "spring", stiffness: 300, damping: 30 });
   };
 
   const scrollRight = () => {
     const currentX = x.get();
-    const newX = Math.max(currentX - SCROLL_STEP, -width); // Clamp to -width (end)
+    const newX = Math.max(currentX - SCROLL_STEP, -width); 
     animate(x, newX, { type: "spring", stiffness: 300, damping: 30 });
   };
 
   return (
     <section className="min-h-screen py-24 px-4 md:px-8 relative overflow-hidden transition-colors duration-300">
       
+      {/* 2. ADD CIRCUIT CURSOR HERE */}
+      <CircuitCursor />
+
+      {/* 3. ADD FLOATING CUBES BACKGROUND HERE */}
+      <div className="absolute inset-0 z-0">
+         <FloatingCubes />
+      </div>
+
       {/* Header Section */}
       <div className="max-w-4xl mx-auto text-center mb-24 relative z-20">
         <motion.h1 
@@ -297,10 +305,9 @@ export default function OfficersPage() {
           <motion.div 
             drag="x" 
             dragConstraints={{ right: 0, left: -width }}
-            style={{ x }} // Bind the motion value here
-            // IMPROVED PHYSICS:
-            dragElastic={0.1} // Adds resistance at edges
-            dragTransition={{ power: 0.3, timeConstant: 200 }} // Makes swipe stop more naturally
+            style={{ x }}
+            dragElastic={0.1}
+            dragTransition={{ power: 0.3, timeConstant: 200 }} 
             className="flex gap-6"
           >
             {multimediaTeam.map((member, index) => (
@@ -363,7 +370,7 @@ export default function OfficersPage() {
         </div>
       </motion.div>
 
-      {/* Background Decor */}
+      {/* Additional Glows */}
       <div className="absolute top-[20%] right-0 w-1/3 h-1/3 bg-green-500/10 blur-[100px] rounded-full z-0 pointer-events-none"></div>
       <div className="absolute bottom-[20%] left-0 w-1/3 h-1/3 bg-green-500/5 blur-[120px] rounded-full z-0 pointer-events-none"></div>
     </section>

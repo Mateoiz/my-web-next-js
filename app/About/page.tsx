@@ -11,6 +11,10 @@ import {
 } from "framer-motion";
 import { FaChevronLeft, FaChevronRight } from "react-icons/fa"; 
 
+// --- IMPORT COMPONENTS ---
+import FloatingCubes from "../components/FloatingCubes"; 
+import CircuitCursor from "../components/CircuitCursor"; // <--- 1. IMPORT CURSOR
+
 // --- STATIC DATA ---
 const VISION_TEXT = [
   "To provide Computer Science students the extra-curricular learning environment that will help them gain more knowledge, more skills and the right attitude that can ensure their preparedness in becoming computing and technology professionals.",
@@ -32,7 +36,6 @@ const AFFILIATES = [
   { 
     name: "De La Salle Araneta University", 
     acronym: "DLSAU", 
-    // Uses a placeholder background color if no image is found
     color: "bg-green-700",
     logo: "/affiliates/dlsau.png",
     description: "De La Salle Araneta University (DLSAU) is a Catholic private Lasallian university in Malabon, Philippines. It is the seventh campus of De La Salle Philippines. It was formerly known as the Araneta Institute of Agriculture (AIA)."
@@ -140,8 +143,16 @@ export default function AboutPage() {
   return (
     <section className="min-h-screen relative overflow-hidden pb-32 transition-colors duration-300">
       
+      {/* 2. ADD CIRCUIT CURSOR HERE */}
+      <CircuitCursor />
+
+      {/* 3. ADD FLOATING CUBES BACKGROUND */}
+      <div className="absolute inset-0 z-0">
+         <FloatingCubes />
+      </div>
+
       {/* Top Gradient Fade */}
-      <div className="absolute top-0 left-0 w-full h-[500px] bg-gradient-to-b from-green-100/40 dark:from-green-900/20 to-transparent pointer-events-none" />
+      <div className="absolute top-0 left-0 w-full h-[500px] bg-gradient-to-b from-green-100/40 dark:from-green-900/20 to-transparent pointer-events-none z-0" />
 
       <div className="container mx-auto px-6 pt-32 relative z-10">
 
@@ -344,8 +355,7 @@ export default function AboutPage() {
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-full bg-green-500/5 blur-3xl rounded-full -z-0 pointer-events-none" />
         </div>
 
-        {/* --- 5. OUR AFFILIATES (NEW LAYOUT) --- */}
-        {/* --- 5. OUR AFFILIATES (IMPROVED DESIGN) --- */}
+        {/* --- 5. OUR AFFILIATES --- */}
         <div className="relative py-20 max-w-6xl mx-auto">
           {/* Section Header */}
           <div className="mb-20 text-center">
@@ -366,13 +376,12 @@ export default function AboutPage() {
                  whileInView={{ opacity: 1, y: 0 }}
                  viewport={{ once: true, margin: "-100px" }}
                  transition={{ delay: index * 0.1, duration: 0.6 }}
-                 // Layout: Flex Row for Desktop, Column for Mobile
                  className={`flex flex-col md:flex-row items-center gap-8 md:gap-16 ${
                     index % 2 === 1 ? "md:flex-row-reverse" : "" // Alternates Left/Right layout
                  }`}
                >
-                  {/* TEXT COLUMN */}
-                  <div className="flex-1 text-center md:text-left relative z-10">
+                 {/* TEXT COLUMN */}
+                 <div className="flex-1 text-center md:text-left relative z-10">
                      {/* Decorative Label */}
                      <span className="inline-block py-1 px-3 rounded-full bg-green-100 dark:bg-green-500/10 text-green-700 dark:text-green-400 text-xs font-mono mb-4 border border-green-500/30">
                         {affiliate.acronym}
@@ -384,14 +393,13 @@ export default function AboutPage() {
                      
                      <div className="p-6 rounded-2xl bg-white/40 dark:bg-zinc-900/40 border-l-4 border-green-500 backdrop-blur-sm shadow-sm">
                         <p className="text-zinc-700 dark:text-zinc-300 text-lg leading-relaxed">
-                            {affiliate.description}
+                           {affiliate.description}
                         </p>
                      </div>
-                  </div>
+                 </div>
 
-                  {/* LOGO COLUMN */}
-                  <div className="relative flex-shrink-0 group cursor-default">
-                     {/* The Logo Box */}
+                 {/* LOGO COLUMN */}
+                 <div className="relative flex-shrink-0 group cursor-default">
                      <div className={`relative w-64 h-64 rounded-3xl bg-white flex items-center justify-center shadow-[0_20px_50px_rgba(0,0,0,0.1)] dark:shadow-[0_0_50px_rgba(34,197,94,0.15)] border-4 border-zinc-100 dark:border-zinc-800 overflow-hidden transform transition-all duration-500 group-hover:scale-105 group-hover:border-green-500`}>
                         
                         {/* Fallback Acronym (Behind Image) */}
@@ -399,21 +407,18 @@ export default function AboutPage() {
                           {affiliate.acronym}
                         </span>
                         
-                        {/* UNCOMMENT THIS when you have the images */}
-                        {
                         <Image 
                           src={affiliate.logo} 
                           alt={affiliate.name} 
                           fill
                           className="object-contain p-8 relative z-10"
                         /> 
-                        }
                      </div>
 
-                     {/* Tech Decor Elements behind the logo */}
+                     {/* Tech Decor Elements */}
                      <div className="absolute -top-6 -right-6 w-24 h-24 border-t-2 border-r-2 border-green-500/30 rounded-tr-3xl -z-10 group-hover:translate-x-2 group-hover:-translate-y-2 transition-transform duration-500" />
                      <div className="absolute -bottom-6 -left-6 w-24 h-24 border-b-2 border-l-2 border-green-500/30 rounded-bl-3xl -z-10 group-hover:-translate-x-2 group-hover:translate-y-2 transition-transform duration-500" />
-                  </div>
+                 </div>
                </motion.div>
              ))}
           </div>
