@@ -119,8 +119,8 @@ export default function Navbar() {
             
             {/* Optimized Text Hiding: Use opacity/translate instead of width to avoid layout reflows */}
             <div className={`flex flex-col leading-tight transition-all duration-300 ${isMobileMenuOpen ? "opacity-0 -translate-x-2 pointer-events-none md:opacity-100 md:translate-x-0 md:pointer-events-auto" : "opacity-100 translate-x-0"}`}>
-              <span className="font-bold text-lg text-zinc-900 dark:text-white tracking-tight group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors">JPCS</span>
-              <span className="text-[9px] font-bold tracking-[0.1em] text-zinc-500 uppercase">DLSAU Chapter</span>
+              <span className="font-bold text-lg text-zinc-900 dark:text-white tracking-tight group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors">Junior Philippines Computer Society</span>
+              <span className="text-[9px] font-bold tracking-[0.1em] text-zinc-500 uppercase">DLSAU</span>
             </div>
           </Link>
 
