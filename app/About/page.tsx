@@ -43,7 +43,7 @@ const AFFILIATES = [
     logo: "/affiliates/dlsau.png",
     facebookUrl: "https://www.facebook.com/dlsauofficial",
     websiteUrl: "https://www.dlsau.edu.ph", // Added Website URL
-    description: "De La Salle Araneta University (DLSAU) is a Catholic private Lasallian university in Malabon, Philippines. It is the seventh campus of De La Salle Philippines. It was formerly known as the Araneta Institute of Agriculture (AIA)."
+    description: "De La Salle Araneta University (DLSAU) is a private Catholic Lasallian institution founded in 1946 by Don Salvador Z. Araneta as the Araneta Institute of Agriculture (AIA), later renamed the Gregorio Araneta University Foundation (GAUF), and relocated to Malabon in 1947 to better serve its community. After a collaborative integration process that began in 1987, it officially became part of the De La Salle System in 2002, joining the network of Lasallian educational institutions committed to holistic formation and academic excellence."
   },
   { 
     name: "College of Arts, Sciences, and Technology", 
@@ -60,7 +60,7 @@ const AFFILIATES = [
     logo: "/affiliates/sampisanan.png",
     facebookUrl: "https://www.facebook.com/sampisanan",
     websiteUrl: null, // No website URL for this one
-    description: "Sampisanan ng mga Mag-aaral ng De La Salle Araneta University (SM-DLSAU) is the highest governing student body of the university. It serves as the voice of the students and acts as a bridge between the student body and the administration."
+    description: "The Samahan ng Pinagkaisang Samahan (SAMPISANAN) is an institutional umbrella organization of De La Salle Araneta University (DLSAU) that fosters the spirit of camaraderie amongst academic and non-academic student organizations, uniting them through collaboration, shared initiatives, and collective student leadership."
   },
 ];
 

@@ -20,7 +20,7 @@ const blogPosts = [
     date: "November 25, 2025",
     author: "Ziankyle Piangco",
     category: "Student Life",
-    image: "/articles/AR1.jpg", 
+    image: "/articles/AR1.JPG", 
     // CONTENT UPDATED TO MATCH YOUR IMAGE TEXT EXACTLY
     content: `
       
