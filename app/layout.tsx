@@ -5,7 +5,7 @@ import { LoadingProvider } from "./context/LoadingContext";
 import ClientLayout from "./components/ClientLayout";
 
 export const metadata: Metadata = {
-  title: "JPCS DLSAU",
+  title: "Junior Philippine Computer Society DLSAU",
   description: "The official student organization for Computer Science at De La Salle Araneta University. We empower the next generation of tech innovators.",
   openGraph: {
     title: "JPCS DLSAU",
