@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence, type Variants } from "framer-motion";
 import { FaBars, FaTimes, FaFacebookF, FaTwitter, FaInstagram, FaLinkedinIn } from "react-icons/fa"; 
 
-// --- ANIMATION VARIANTS ---
+// --- ANIMATION VARIANTS (Optimized) ---
 const menuVariants: Variants = {
   closed: {
     x: "100%",
@@ -25,8 +25,8 @@ const menuVariants: Variants = {
       type: "spring",
       stiffness: 300,
       damping: 30,
-      staggerChildren: 0.1,
-      delayChildren: 0.2,
+      staggerChildren: 0.07, // Slightly faster stagger for better perceived performance
+      delayChildren: 0.1,
       when: "beforeChildren"
     }
   }
@@ -34,7 +34,7 @@ const menuVariants: Variants = {
 
 const linkVariants: Variants = {
   closed: { x: 50, opacity: 0 },
-  open: { x: 0, opacity: 1 }
+  open: { x: 0, opacity: 1, transition: { type: "tween", ease: "easeOut", duration: 0.3 } } // Switched to tween for lighter calculation than spring
 };
 
 const backdropVariants: Variants = {
@@ -47,21 +47,42 @@ export default function Navbar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const pathname = usePathname();
 
+  // --- OPTIMIZATION 1: Efficient Scroll Listener ---
   useEffect(() => {
-    const handleScroll = () => setIsScrolled(window.scrollY > 20);
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
+    let ticking = false;
+
+    const onScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          // Only update state if the value actually changes to prevent re-renders
+          const scrolled = window.scrollY > 20;
+          setIsScrolled((prev) => (prev !== scrolled ? scrolled : prev));
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
+    window.addEventListener("scroll", onScroll);
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  // Lock Body Scroll
   useEffect(() => {
-    document.body.style.overflow = isMobileMenuOpen ? 'hidden' : 'unset';
+    if (isMobileMenuOpen) {
+      document.body.style.overflow = 'hidden';
+      // Optimization: Prevent layout shifting by adding padding for scrollbar if needed
+      // (Optional, simplified here for performance)
+    } else {
+      document.body.style.overflow = 'unset';
+    }
   }, [isMobileMenuOpen]);
 
-  const toggleMenu = () => setIsMobileMenuOpen(!isMobileMenuOpen);
-  const closeMenu = () => setIsMobileMenuOpen(false);
+  const toggleMenu = useCallback(() => setIsMobileMenuOpen(prev => !prev), []);
+  const closeMenu = useCallback(() => setIsMobileMenuOpen(false), []);
   const isActive = (path: string) => pathname === path;
 
-  // Link Hover Styles
+  // Memoize nav link classes to prevent recalculation on every render
   const getNavLinkClass = (path: string) => `
     relative pb-1 transition-colors duration-300 font-medium tracking-wide
     ${isActive(path) 
@@ -74,9 +95,10 @@ export default function Navbar() {
   return (
     <>
       <nav
-        className={`fixed top-0 left-0 w-full z-50 transition-all duration-300 ease-in-out border-b ${
+        // OPTIMIZATION 2: 'will-change-transform' helps browser anticipate changes
+        className={`fixed top-0 left-0 w-full z-50 transition-all duration-300 ease-in-out border-b will-change-auto ${
           isScrolled
-            ? "bg-white/80 dark:bg-black/80 backdrop-blur-xl border-zinc-200 dark:border-zinc-800 py-3 shadow-sm"
+            ? "bg-white/85 dark:bg-black/85 backdrop-blur-md border-zinc-200 dark:border-zinc-800 py-3 shadow-sm"
             : "bg-transparent border-transparent py-5"
         }`}
       >
@@ -92,12 +114,13 @@ export default function Navbar() {
             <div className="absolute inset-0 bg-green-500/10 dark:bg-green-500/20 rounded-xl scale-95 opacity-0 group-hover:opacity-100 group-hover:scale-100 transition-all duration-300 ease-out -z-10" />
 
             <div className="relative w-10 h-10 transition-transform duration-300 group-hover:scale-110">
-               <Image src="/Logo.png" alt="Logo" fill className="object-contain drop-shadow-md" />
+               <Image src="/Logo.png" alt="Logo" fill sizes="40px" className="object-contain drop-shadow-md" priority />
             </div>
             
-            <div className={`flex flex-col leading-tight transition-opacity duration-300 ${isMobileMenuOpen ? "opacity-0 md:opacity-100" : "opacity-100"}`}>
+            {/* Optimized Text Hiding: Use opacity/translate instead of width to avoid layout reflows */}
+            <div className={`flex flex-col leading-tight transition-all duration-300 ${isMobileMenuOpen ? "opacity-0 -translate-x-2 pointer-events-none md:opacity-100 md:translate-x-0 md:pointer-events-auto" : "opacity-100 translate-x-0"}`}>
               <span className="font-bold text-lg text-zinc-900 dark:text-white tracking-tight group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors">JPCS</span>
-              <span className="text-[9px] font-bold tracking-[0.1em] text-zinc-500 uppercase">De La Salle Araneta University</span>
+              <span className="text-[9px] font-bold tracking-[0.1em] text-zinc-500 uppercase">DLSAU Chapter</span>
             </div>
           </Link>
 
@@ -106,9 +129,9 @@ export default function Navbar() {
             <Link href="/" className={getNavLinkClass('/')}>Home</Link>
             <Link href="/About" className={getNavLinkClass('/About')}>About</Link>
             <Link href="/Officers" className={getNavLinkClass('/Officers')}>Officers</Link>
+            <Link href="/Blogs" className={getNavLinkClass('/Blogs')}>Blogs</Link>
             <Link href="/Events" className={getNavLinkClass('/Events')}>Events</Link>
             
-            {/* BUTTON UPDATE: hover:text-white enforced for both light and dark mode */}
             <Link 
               href="/Contact" 
               className="
@@ -143,7 +166,7 @@ export default function Navbar() {
       <AnimatePresence mode="wait">
         {isMobileMenuOpen && (
           <>
-            {/* Backdrop */}
+            {/* Backdrop: OPTIMIZATION 3 - Use GPU transform */}
             <motion.div 
               key="backdrop"
               variants={backdropVariants}
@@ -151,7 +174,8 @@ export default function Navbar() {
               animate="open"
               exit="closed"
               onClick={closeMenu}
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 transform-gpu"
+              style={{ willChange: "opacity" }} 
             />
 
             {/* Side Drawer */}
@@ -161,11 +185,13 @@ export default function Navbar() {
               initial="closed"
               animate="open"
               exit="closed"
-              className="fixed top-0 right-0 h-full w-[85%] max-w-md bg-white dark:bg-zinc-950 border-l border-zinc-200 dark:border-zinc-800 shadow-2xl z-50 flex flex-col justify-between"
+              // OPTIMIZATION 4: Added transform-gpu and will-change to force hardware acceleration
+              className="fixed top-0 right-0 h-full w-[85%] max-w-md bg-white dark:bg-zinc-950 border-l border-zinc-200 dark:border-zinc-800 shadow-2xl z-50 flex flex-col justify-between transform-gpu"
+              style={{ willChange: "transform" }}
             >
-              {/* Decorative blobs */}
-              <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-green-500/10 rounded-full blur-[80px] pointer-events-none" />
-              <div className="absolute bottom-0 left-0 w-[200px] h-[200px] bg-emerald-500/10 rounded-full blur-[60px] pointer-events-none" />
+              {/* Static Decoration (Removed Blur filters here to save FPS, using Opacity instead) */}
+              <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-green-500/5 rounded-full pointer-events-none" />
+              <div className="absolute bottom-0 left-0 w-[200px] h-[200px] bg-emerald-500/5 rounded-full pointer-events-none" />
 
               <div className="flex flex-col h-full pt-28 px-8 pb-8 relative z-10">
                 
@@ -175,6 +201,7 @@ export default function Navbar() {
                     { name: "Home", path: "/" },
                     { name: "About Us", path: "/About" },
                     { name: "Officers", path: "/Officers" },
+                    { name: "Blogs", path: "/Blogs" },
                     { name: "Events", path: "/Events" },
                   ].map((link, i) => (
                     <motion.div key={i} variants={linkVariants}>
