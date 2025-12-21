@@ -104,7 +104,7 @@ export default function Navbar() {
       >
         <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
           
-          {/* --- LOGO SECTION --- */}
+{/* --- LOGO SECTION --- */}
           <Link 
             href="/" 
             className="flex items-center gap-3 group relative px-3 py-2 z-50"
@@ -113,14 +113,19 @@ export default function Navbar() {
             {/* HOVER HIGHLIGHTER */}
             <div className="absolute inset-0 bg-green-500/10 dark:bg-green-500/20 rounded-xl scale-95 opacity-0 group-hover:opacity-100 group-hover:scale-100 transition-all duration-300 ease-out -z-10" />
 
-            <div className="relative w-10 h-10 transition-transform duration-300 group-hover:scale-110">
+            <div className="relative w-10 h-10 transition-transform duration-300 group-hover:scale-110 shrink-0">
                <Image src="/Logo.png" alt="Logo" fill sizes="40px" className="object-contain drop-shadow-md" priority />
             </div>
             
-            {/* Optimized Text Hiding: Use opacity/translate instead of width to avoid layout reflows */}
+            {/* Optimized Text Hiding */}
             <div className={`flex flex-col leading-tight transition-all duration-300 ${isMobileMenuOpen ? "opacity-0 -translate-x-2 pointer-events-none md:opacity-100 md:translate-x-0 md:pointer-events-auto" : "opacity-100 translate-x-0"}`}>
-              <span className="font-bold text-lg text-zinc-900 dark:text-white tracking-tight group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors">Junior Philippines Computer Society</span>
-              <span className="text-[9px] font-bold tracking-[0.1em] text-zinc-500 uppercase">DLSAU</span>
+              {/* UPDATED: Added whitespace-nowrap and responsive text sizes */}
+              <span className="font-bold text-sm md:text-base lg:text-lg text-zinc-900 dark:text-white tracking-tight group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors whitespace-nowrap">
+                Junior Philippine Computer Society
+              </span>
+              <span className="text-[9px] font-bold tracking-[0.1em] text-zinc-500 uppercase">
+                DLSAU
+              </span>
             </div>
           </Link>
 
@@ -247,7 +252,7 @@ export default function Navbar() {
                   </Link>
 
                   <div className="flex gap-4 justify-center">
-                    {[FaFacebookF, FaTwitter, FaInstagram, FaLinkedinIn].map((Icon, idx) => (
+                    {[FaFacebookF,FaInstagram,].map((Icon, idx) => (
                       <a 
                         key={idx}
                         href="#" 

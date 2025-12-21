@@ -1,113 +1,180 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { motion, AnimatePresence, useDragControls } from "framer-motion";
+import { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-import { FaCalendarAlt, FaTimes, FaArrowRight } from "react-icons/fa";
+import { FaCalendarAlt, FaMapMarkerAlt, FaChevronRight, FaMicrochip, FaTimes } from "react-icons/fa";
 
 const NEXT_EVENT = {
   id: 1,
   title: "General Assembly 2026",
-  date: "February",
-  location: "DLSAU Osmeña Hall",
+  date: "FEB",
+  location: "TBA",
   link: "/Events"
 };
 
-export default function UpcomingEventToast() {
-  const [isVisible, setIsVisible] = useState(false);
+export default function HolographicEventTab() {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
+  // Close when clicking outside (Desktop strategy)
   useEffect(() => {
-    const timer = setTimeout(() => setIsVisible(true), 2500);
-    return () => clearTimeout(timer);
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   return (
-    <AnimatePresence>
-      {isVisible && (
-        <motion.div
-          // 1. Mobile-friendly animation: Slide Up instead of Slide Right
-          initial={{ y: 100, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          exit={{ y: 100, opacity: 0, scale: 0.95 }}
-          
-          // 2. Add Swipe-to-Dismiss functionality
-          drag="x"
-          dragConstraints={{ left: 0, right: 0 }}
-          onDragEnd={(event, info) => {
-            // If dragged more than 100px, close it
-            if (Math.abs(info.offset.x) > 100) {
-              setIsVisible(false);
-            }
-          }}
-          
-          transition={{ type: "spring", stiffness: 100, damping: 20 }}
-          
-          // 3. Responsive Layout Classes
-          // Mobile: Fixed bottom, left/right margins (centered), z-50
-          // Desktop: Fixed bottom-left, specific width
-          className="fixed bottom-4 left-4 right-4 z-50 md:bottom-6 md:left-6 md:right-auto md:w-full md:max-w-sm cursor-grab active:cursor-grabbing"
+    <>
+      {/* --- MOBILE BACKDROP (Dims screen when open) --- */}
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setIsOpen(false)}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden"
+          />
+        )}
+      </AnimatePresence>
+
+      {/* --- MAIN WIDGET CONTAINER --- */}
+      <div className="fixed top-1/2 -translate-y-1/2 left-0 z-50 h-auto pointer-events-none">
+        
+        {/* Wrapper for Pointer Events & Ref */}
+        <motion.div 
+          ref={containerRef}
+          initial={{ x: "-100%" }} 
+          animate={{ x: isOpen ? "0%" : "-100%" }}
+          transition={{ type: "spring", stiffness: 200, damping: 25 }}
+          className="pointer-events-auto relative flex items-start"
         >
-          {/* Container Style: 
-            - Added 'backdrop-blur-xl' for better text readability on messy mobile backgrounds
-            - Added 'shadow-lg' for depth
-          */}
-          <div className="relative bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl border-l-[6px] border-green-500 shadow-2xl rounded-lg p-5 overflow-hidden ring-1 ring-black/5 dark:ring-white/10">
+          
+          {/* --- 1. THE DATA PANEL (The Drawer) --- */}
+          {/* Mobile: w-[85vw] | Desktop: w-80 */}
+          <div className="relative w-[85vw] max-w-xs md:w-80 bg-zinc-900/95 border-r-2 border-green-500/50 backdrop-blur-xl shadow-[0_0_40px_rgba(34,197,94,0.15)] overflow-hidden rounded-r-sm">
             
-            {/* Close Button - Larger Touch Target */}
-            <button 
-              onClick={() => setIsVisible(false)}
-              className="absolute top-0 right-0 p-4 text-zinc-400 hover:text-red-500 transition-colors"
-              aria-label="Close reminder"
-            >
-              <FaTimes size={16} />
-            </button>
+            {/* Cyberpunk Grid Background */}
+            <div className="absolute inset-0 bg-[linear-gradient(rgba(34,197,94,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(34,197,94,0.05)_1px,transparent_1px)] bg-[size:20px_20px]" />
+            
+            {/* Animated Scanline */}
+            <div className="absolute top-0 left-0 w-full h-1 bg-green-500/30 animate-[scan_4s_linear_infinite]" />
 
-            <div className="flex flex-col gap-1 pr-6">
-                {/* Label */}
-                <div className="flex items-center gap-2 text-green-600 dark:text-green-400 text-[10px] font-extrabold uppercase tracking-widest">
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+            <div className="relative z-10 p-6 flex flex-col gap-4">
+              
+              {/* Header Data */}
+              <div className="flex justify-between items-end border-b border-green-500/30 pb-2">
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-mono text-green-500/80 tracking-widest uppercase mb-1">
+                    <FaMicrochip className="inline mr-1" /> System_Alert
                   </span>
-                  Upcoming Event
+                  <span className="text-white font-bold text-lg leading-none">UPCOMING</span>
                 </div>
+                {/* Mobile Close Button (Visible only when open on mobile) */}
+                <button 
+                  onClick={() => setIsOpen(false)}
+                  className="md:hidden text-zinc-500 hover:text-white transition-colors"
+                >
+                  <FaTimes />
+                </button>
+                {/* Desktop Status (Hidden on small mobile if tight, usually fits) */}
+                <div className="hidden md:block text-right">
+                  <span className="block text-[10px] font-mono text-zinc-500 uppercase">Status</span>
+                  <span className="text-green-400 font-bold text-xs animate-pulse">● LIVE</span>
+                </div>
+              </div>
 
-                {/* Event Title */}
-                <h3 className="text-zinc-900 dark:text-white font-bold text-lg leading-tight mt-1">
+              {/* Event Details */}
+              <div>
+                <h3 className="text-xl md:text-2xl font-black text-white uppercase leading-tight mb-2">
                   {NEXT_EVENT.title}
                 </h3>
+                
+                <div className="space-y-3 mt-4">
+                  <div className="flex items-center gap-3 text-zinc-400">
+                    <div className="w-8 h-8 rounded bg-zinc-800 flex items-center justify-center text-green-500 border border-green-500/20 shrink-0">
+                      <FaCalendarAlt size={14} />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[10px] uppercase tracking-wide text-zinc-500">Date Log</span>
+                      <span className="text-sm font-mono text-white font-bold">{NEXT_EVENT.date}</span>
+                    </div>
+                  </div>
 
-                {/* Event Details */}
-                <div className="flex items-center gap-3 text-sm text-zinc-600 dark:text-gray-400 mt-2">
-                  <span className="flex items-center gap-2 bg-zinc-100 dark:bg-zinc-800/50 px-2.5 py-1 rounded-md text-xs font-medium">
-                    <FaCalendarAlt className="text-green-500" />
-                    {NEXT_EVENT.date}
-                  </span>
+                  <div className="flex items-center gap-3 text-zinc-400">
+                    <div className="w-8 h-8 rounded bg-zinc-800 flex items-center justify-center text-green-500 border border-green-500/20 shrink-0">
+                      <FaMapMarkerAlt size={14} />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[10px] uppercase tracking-wide text-zinc-500">Location</span>
+                      <span className="text-sm font-mono text-white font-bold line-clamp-1">{NEXT_EVENT.location}</span>
+                    </div>
+                  </div>
                 </div>
+              </div>
 
-                {/* Action Link - Full width tap area on mobile feels better, 
-                    but here we keep it inline with a large hit area */}
-                <div className="mt-3">
-                    <Link 
-                    href={NEXT_EVENT.link}
-                    className="inline-flex items-center gap-2 text-sm font-bold text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 transition-colors py-1"
-                    >
-                    View Details <FaArrowRight size={12} className="group-hover:translate-x-1 transition-transform" />
-                    </Link>
-                </div>
+              {/* Action Button */}
+              <Link 
+                href={NEXT_EVENT.link}
+                className="group mt-2 relative w-full bg-green-600 hover:bg-green-500 text-black font-bold py-3 px-4 text-center uppercase tracking-wider text-xs transition-colors overflow-hidden rounded-sm"
+              >
+                <span className="relative z-10 flex items-center justify-center gap-2">
+                  Details <FaChevronRight size={10} />
+                </span>
+                {/* Button Glitch Effect */}
+                <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-500" />
+              </Link>
+
+            </div>
+          </div>
+
+          {/* --- 2. THE VERTICAL TAB (Trigger) --- */}
+          <button
+            onClick={() => setIsOpen(!isOpen)}
+            className="absolute right-[-48px] top-0 flex flex-col items-center bg-zinc-900 border-y-2 border-r-2 border-green-500/50 text-green-500 py-4 w-12 shadow-[0_0_15px_rgba(34,197,94,0.3)] hover:bg-green-900/20 transition-colors active:scale-95"
+            style={{ 
+              clipPath: "polygon(0 0, 100% 0, 100% 85%, 0% 100%)", 
+              borderTopRightRadius: "4px"
+            }}
+          >
+            {/* Arrow Indicator */}
+            <motion.div
+              animate={{ rotate: isOpen ? 180 : 0 }}
+              className="mb-4"
+            >
+              <FaChevronRight size={14} />
+            </motion.div>
+
+            {/* Vertical Text */}
+            <div className="flex flex-col gap-1 font-mono font-bold text-xs tracking-widest select-none">
+              <span>E</span>
+              <span>V</span>
+              <span>E</span>
+              <span>N</span>
+              <span>T</span>
+              <span>S</span>
             </div>
 
-            {/* Decorative Background Glow - Subtler for mobile performance */}
-            <div className="absolute -right-6 -bottom-10 w-32 h-32 bg-green-500/10 blur-[50px] rounded-full pointer-events-none" />
-          </div>
-          
-          {/* Mobile Hint (Optional): Visual cue that you can swipe */}
-          <div className="md:hidden flex justify-center mt-2">
-             <div className="w-10 h-1 bg-zinc-300/50 rounded-full" /> 
-          </div>
+            {/* Decorative Dot */}
+            <div className="mt-4 w-1.5 h-1.5 bg-green-500 rounded-full animate-ping" />
+          </button>
 
         </motion.div>
-      )}
-    </AnimatePresence>
+
+        {/* Global CSS for the scanline animation */}
+        <style jsx global>{`
+          @keyframes scan {
+            0% { transform: translateY(0); opacity: 0; }
+            50% { opacity: 1; }
+            100% { transform: translateY(400px); opacity: 0; }
+          }
+        `}</style>
+      </div>
+    </>
   );
 }
