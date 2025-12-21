@@ -1,7 +1,8 @@
 "use client";
 
 import { useRef, useEffect, useState, ReactNode } from "react";
-import Image from "next/image";
+// Image import removed as it is replaced by the placeholder
+// import Image from "next/image"; 
 import { 
   motion, 
   useMotionValue, 
@@ -10,8 +11,8 @@ import {
   useInView,
   AnimatePresence 
 } from "framer-motion";
-// Added FaGlobe to imports
-import { FaChevronLeft, FaChevronRight, FaFacebook, FaGlobe } from "react-icons/fa"; 
+// Added FaSatelliteDish and FaLock
+import { FaChevronLeft, FaChevronRight, FaFacebook, FaGlobe, FaSatelliteDish, FaLock } from "react-icons/fa"; 
 
 // --- IMPORT COMPONENTS ---
 import FloatingCubes from "../components/FloatingCubes"; 
@@ -28,10 +29,10 @@ const VISION_TEXT = [
 const MISSION_TEXT = "As an organization that is actively involved in Information and Communication Technology-related concerns of education, industry, business, and government, Junior Philippine Computer Society is pleased to collaborate with its officers and members in helping the university in developing world-class Computer Science students that have leadership, integrity, faith and excellence.";
 
 const CAROUSEL_ITEMS = [
-  { src: "/about/CS2.JPG", title: "Workshops", subtitle: "Skill Building" },
-  { src: "/about/CS1.JPG", title: "Community", subtitle: "Stronger Together" },
-  { src: "/about/CS3.JPG", title: "Innovation", subtitle: "Future Ready" },
-  { src: "/about/CS4.JPG", title: "Leadership", subtitle: "Leading the Way" },
+  { title: "Workshops", subtitle: "Skill Building" },
+  { title: "Community", subtitle: "Stronger Together" },
+  { title: "Innovation", subtitle: "Future Ready" },
+  { title: "Leadership", subtitle: "Leading the Way" },
 ];
 
 // --- UPDATED AFFILIATES DATA ---
@@ -42,7 +43,7 @@ const AFFILIATES = [
     color: "bg-green-700",
     logo: "/affiliates/dlsau.png",
     facebookUrl: "https://www.facebook.com/dlsauofficial",
-    websiteUrl: "https://www.dlsau.edu.ph", // Added Website URL
+    websiteUrl: "https://www.dlsau.edu.ph",
     description: "De La Salle Araneta University (DLSAU) is a private Catholic Lasallian institution founded in 1946 by Don Salvador Z. Araneta as the Araneta Institute of Agriculture (AIA), later renamed the Gregorio Araneta University Foundation (GAUF), and relocated to Malabon in 1947 to better serve its community. After a collaborative integration process that began in 1987, it officially became part of the De La Salle System in 2002, joining the network of Lasallian educational institutions committed to holistic formation and academic excellence."
   },
   { 
@@ -59,10 +60,43 @@ const AFFILIATES = [
     color: "bg-yellow-500",
     logo: "/affiliates/sampisanan.png",
     facebookUrl: "https://www.facebook.com/sampisanan",
-    websiteUrl: null, // No website URL for this one
+    websiteUrl: null,
     description: "The Samahan ng Pinagkaisang Samahan (SAMPISANAN) is an institutional umbrella organization of De La Salle Araneta University (DLSAU) that fosters the spirit of camaraderie amongst academic and non-academic student organizations, uniting them through collaboration, shared initiatives, and collective student leadership."
   },
 ];
+
+// --- COMPONENT: THEMED PLACEHOLDER ---
+// This replaces the images in the carousel
+const ComingSoonPlaceholder = ({ title }: { title: string }) => (
+  <div className="absolute inset-0 w-full h-full flex flex-col items-center justify-center bg-zinc-100 dark:bg-zinc-900 overflow-hidden group">
+    
+    {/* Tech Grid Background */}
+    <div className="absolute inset-0 opacity-[0.05] dark:opacity-[0.2]" 
+         style={{ backgroundImage: 'linear-gradient(#22c55e 1px, transparent 1px), linear-gradient(90deg, #22c55e 1px, transparent 1px)', backgroundSize: '30px 30px' }}>
+    </div>
+
+    {/* Animated Scanline */}
+    <div className="absolute inset-0 bg-linear-to-b from-transparent via-green-500/10 to-transparent h-[10%] w-full animate-[scan_3s_linear_infinite] pointer-events-none" />
+
+    {/* Icon */}
+    <div className="relative z-10 mb-4 p-4 rounded-full border-2 border-zinc-300 dark:border-green-500/30 bg-zinc-200 dark:bg-black/50 text-zinc-400 dark:text-green-500 transform group-hover:scale-110 transition-transform duration-500">
+      <FaSatelliteDish className="text-3xl md:text-5xl animate-pulse" />
+    </div>
+
+    {/* Text */}
+    <h3 className="relative z-10 text-xl font-black uppercase text-zinc-400 dark:text-white tracking-widest mb-1">
+      Visuals Pending
+    </h3>
+    <div className="relative z-10 flex items-center gap-2 text-xs font-mono text-zinc-500 dark:text-green-500/70 bg-zinc-200 dark:bg-green-900/20 px-2 py-1 rounded">
+      <FaLock size={10} />
+      <span>{title.substring(0, 10).toUpperCase()}_LOCKED</span>
+    </div>
+
+    {/* Corner Accents */}
+    <div className="absolute top-4 left-4 w-2 h-2 border-t-2 border-l-2 border-zinc-400 dark:border-green-500" />
+    <div className="absolute bottom-4 right-4 w-2 h-2 border-b-2 border-r-2 border-zinc-400 dark:border-green-500" />
+  </div>
+);
 
 // --- SUB-COMPONENT: ANIMATED COUNTER ---
 const Counter = ({ value }: { value: number }) => {
@@ -130,10 +164,12 @@ const Tooltip = ({ text }: { text: string }) => (
   </motion.div>
 );
 
+import Image from "next/image"; // Re-importing Image for other sections (Affiliates, Identity)
+
 export default function AboutPage() {
   const carouselRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
-  const [hoveredSocial, setHoveredSocial] = useState<string | null>(null); // Tooltip state
+  const [hoveredSocial, setHoveredSocial] = useState<string | null>(null);
   const x = useMotionValue(0); 
 
   useEffect(() => {
@@ -345,17 +381,14 @@ export default function AboutPage() {
                   whileHover={{ scale: 1.02, zIndex: 10 }}
                   transition={{ duration: 0.3 }}
                 >
-                  <Image 
-                    src={item.src} 
-                    alt={item.title} 
-                    fill 
-                    sizes="(max-width: 768px) 100vw, 33vw"
-                    className="object-cover transition-transform duration-700 group-hover:scale-110 opacity-80 group-hover:opacity-100" 
-                  />
-                  <div className="absolute inset-0 bg-linear-to-t from-black via-black/20 to-transparent opacity-90" />
-                  <div className="absolute inset-4 border border-white/10 group-hover:border-green-500/50 transition-colors duration-300 rounded-xl" />
                   
-                  <div className="absolute bottom-0 left-0 w-full p-8 translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
+                  {/* --- REPLACED IMAGE WITH COMING SOON PLACEHOLDER --- */}
+                  <ComingSoonPlaceholder title={item.title} />
+
+                  <div className="absolute inset-0 bg-linear-to-t from-black via-black/20 to-transparent opacity-90 pointer-events-none" />
+                  <div className="absolute inset-4 border border-white/10 group-hover:border-green-500/50 transition-colors duration-300 rounded-xl pointer-events-none" />
+                  
+                  <div className="absolute bottom-0 left-0 w-full p-8 translate-y-2 group-hover:translate-y-0 transition-transform duration-300 pointer-events-none">
                       <span className="text-green-400 font-mono text-xs tracking-widest uppercase mb-2 block">
                         Event_0{index + 1}
                       </span>
@@ -466,7 +499,7 @@ export default function AboutPage() {
                  </div>
 
                  {/* LOGO COLUMN */}
-                 <div className="relative shrink-0 group cursor-default">
+                 <div className="relative flex-shrink-0 group cursor-default">
                      <div className={`relative w-64 h-64 rounded-3xl bg-white flex items-center justify-center shadow-[0_20px_50px_rgba(0,0,0,0.1)] dark:shadow-[0_0_50px_rgba(34,197,94,0.15)] border-4 border-zinc-100 dark:border-zinc-800 overflow-hidden transform transition-all duration-500 group-hover:scale-105 group-hover:border-green-500`}>
                         
                         <span className="text-6xl font-black text-zinc-100 absolute select-none">
@@ -490,6 +523,14 @@ export default function AboutPage() {
         </div>
 
       </div>
+      
+      {/* CSS Animation for the scanline effect */}
+      <style jsx global>{`
+        @keyframes scan {
+          0% { top: -10%; }
+          100% { top: 110%; }
+        }
+      `}</style>
     </section>
   );
 }
