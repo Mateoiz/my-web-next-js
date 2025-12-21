@@ -17,7 +17,7 @@ const blogPosts = [
     date: "November 25, 2025",
     author: "Ziankyle Piangco",
     excerpt: "The Junior Philippine Computer Society (JPCS) in collaboration with the LACES organization recently hosted a highly successful Techquizbee event at the DLSAU Auditorium. The event saw enthusiastic participation from students across various departments, showcasing their knowledge and skills in technology and computer science...",
-    image: "/articles/AR1.jpg", 
+    image: "/articles/AR1.JPG", 
     slug: "JPCS-x-LACES-successful-techquizbee-event",
   },
 ];
