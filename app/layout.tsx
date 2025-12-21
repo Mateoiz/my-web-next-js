@@ -3,6 +3,8 @@ import "./globals.css";
 import { Providers } from "./providers";
 import { LoadingProvider } from "./context/LoadingContext";
 import ClientLayout from "./components/ClientLayout";
+// ✅ Import the theme (ensure export default is used in the component file)
+import HolidayTheme from "./components/HolidayTheme";
 
 export const metadata: Metadata = {
   title: "Junior Philippine Computer Society DLSAU",
@@ -12,7 +14,7 @@ export const metadata: Metadata = {
     description: "The official student organization for Computer Science at De La Salle Araneta University.",
     images: [
       {
-        url: "/og-image.jpg", // Fixed path (removed /public)
+        url: "/og-image.jpg",
         width: 1200,
         height: 630,
         alt: "JPCS DLSAU Preview",
@@ -36,9 +38,12 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className="antialiased bg-white dark:bg-black text-zinc-900 dark:text-white transition-colors duration-300">
         
-        {/* 1. Theme Providers */}
+        {/* 1. Theme Providers (Wrap everything) */}
         <Providers>
           
+          {/* ✅ HOLIDAY THEME: Placed inside Providers to access Dark Mode context */}
+          <HolidayTheme />
+
           {/* 2. Loading State Provider */}
           <LoadingProvider>
             
@@ -46,7 +51,7 @@ export default function RootLayout({
             <ClientLayout>
               {children}
             </ClientLayout>
-
+            
           </LoadingProvider>
         </Providers>
 

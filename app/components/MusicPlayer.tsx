@@ -5,15 +5,13 @@ import { FaMusic, FaSlash } from "react-icons/fa";
 
 export default function MusicPlayer() {
   const [isPlaying, setIsPlaying] = useState(false);
-  // 1. ADD THIS STATE
   const [mounted, setMounted] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
-    // 2. SET MOUNTED TO TRUE ON LOAD
     setMounted(true);
 
-    audioRef.current = new Audio("/bg-music.mp3");
+    audioRef.current = new Audio("/bg-music1.mp3");
     
     if (audioRef.current) {
       audioRef.current.loop = true;
@@ -42,8 +40,6 @@ export default function MusicPlayer() {
     }
   };
 
-  // 3. PREVENT RENDERING UNTIL MOUNTED
-  // This ensures Math.random() only runs on the browser, preventing the mismatch
   if (!mounted) return null;
 
   return (
@@ -57,9 +53,13 @@ export default function MusicPlayer() {
         {[...Array(20)].map((_, i) => (
           <div
             key={i}
-            className="w-2 md:w-3 bg-zinc-800 dark:bg-green-500/50 rounded-t-sm transition-all duration-300"
+            // CHANGED HERE: Alternating Red and Green colors
+            className={`w-2 md:w-3 rounded-t-sm transition-all duration-300 ${
+                i % 2 === 0 
+                ? "bg-red-500/60 dark:bg-red-500/80"   // Even: RED
+                : "bg-green-500/60 dark:bg-green-500/80" // Odd: GREEN
+            }`}
             style={{
-              // Math.random() is now safe because we are strictly on the client
               animation: isPlaying ? `musicWave 1s ease-in-out infinite` : "none",
               animationDelay: `${Math.random() * 0.5}s`,
               height: isPlaying ? `${Math.random() * 40 + 10}%` : "10px", 

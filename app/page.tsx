@@ -11,7 +11,6 @@ import SecretGame from "./components/SecretGame";
 import FloatingCubes from "./components/FloatingCubes"; 
 import CircuitCursor from "./components/CircuitCursor"; 
 
-// --- ANIMATION VARIANTS ---
 const letterContainerVariants = {
   hidden: { opacity: 0 },
   visible: {
@@ -23,18 +22,11 @@ const letterContainerVariants = {
   },
 };
 
-const letterVariants = {
-  hidden: { opacity: 0, y: 10 },
-  visible: { opacity: 1, y: 0 },
-};
-
 export default function Home() {
   const [maskPosition, setMaskPosition] = useState({ x: 0, y: 0 });
   const [isHovered, setIsHovered] = useState(false);
   const textRef = useRef<HTMLDivElement>(null);
 
-  // --- MOUSE & TOUCH TRACKING ---
-  // We combine logic so the spotlight works on touch drag too
   const updateMask = (clientX: number, clientY: number) => {
     if (!textRef.current) return;
     const rect = textRef.current.getBoundingClientRect();
@@ -49,7 +41,6 @@ export default function Home() {
   };
 
   const handleTouchMove = (e: TouchEvent<HTMLDivElement>) => {
-    // Prevent scrolling while "shining" the light on the text
     const touch = e.touches[0];
     updateMask(touch.clientX, touch.clientY);
   };
@@ -62,7 +53,6 @@ export default function Home() {
          <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none" />
          <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-green-500/20 rounded-full blur-[120px] mix-blend-screen dark:mix-blend-lighten animate-pulse duration-[10s]" />
          <div className="absolute bottom-[-10%] right-[-10%] w-[600px] h-[600px] bg-emerald-500/10 rounded-full blur-[120px] mix-blend-screen dark:mix-blend-lighten animate-pulse duration-[12s] delay-1000" />
-         {/* Hidden on very small screens to improve performance and readability */}
          <div className="hidden sm:block">
             <FloatingCubes />
          </div>
@@ -109,26 +99,38 @@ export default function Home() {
             onTouchStart={() => setIsHovered(true)}
             onTouchEnd={() => setIsHovered(false)}
           >
-            {/* MOBILE FIX: 
-              Using text-[22vw] creates a fluid font size that is always 22% of the screen width.
-              This guarantees it never cuts off, regardless of device size.
-            */}
-            <h1 className="text-[22vw] md:text-[10rem] font-extrabold tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-zinc-300 to-zinc-500 dark:from-zinc-600 dark:to-zinc-900 leading-none transition-all duration-300 group-hover:blur-[2px] group-hover:opacity-50">
-              JPCS
-            </h1>
+            {/* BASE TEXT (Gray Gradient) */}
+            <div className="flex justify-center items-center relative">
+                {/* SNOW CAP OVERLAY (CSS Effect) - Kept this */}
+                <div className="absolute inset-0 w-full h-full pointer-events-none z-20 mix-blend-overlay bg-[url('https://www.transparenttextures.com/patterns/snow.png')] opacity-30 animate-[snow_10s_linear_infinite]" />
+
+                {["J", "P", "C", "S"].map((char, index) => (
+                    <div key={index} className="relative">
+                        {/* SANTA HAT REMOVED FROM HERE */}
+                        
+                        <span className="text-[22vw] md:text-[10rem] font-extrabold tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-zinc-300 to-zinc-500 dark:from-zinc-600 dark:to-zinc-900 leading-none transition-all duration-300 group-hover:blur-[2px] group-hover:opacity-50">
+                            {char}
+                        </span>
+                    </div>
+                ))}
+            </div>
             
-            <h1 
-              className="absolute top-4 md:top-4 left-0 w-full text-center text-[22vw] md:text-[10rem] font-extrabold tracking-tighter text-green-500 dark:text-green-400 pointer-events-none transition-opacity duration-200 leading-none"
+            {/* SPOTLIGHT TEXT (Green Overlay) */}
+            <div 
+              className="absolute top-4 md:top-4 left-0 w-full flex justify-center pointer-events-none transition-opacity duration-200 leading-none"
               style={{
                 opacity: isHovered ? 1 : 0,
-                // Make the spotlight larger on mobile so it's easier to see under a thumb
                 maskImage: `radial-gradient(circle 180px at ${maskPosition.x}px ${maskPosition.y}px, black, transparent)`,
                 WebkitMaskImage: `radial-gradient(circle 180px at ${maskPosition.x}px ${maskPosition.y}px, black, transparent)`,
                 textShadow: "0 0 30px rgba(34,197,94,0.5)"
               }}
             >
-              JPCS
-            </h1>
+               {["J", "P", "C", "S"].map((char, index) => (
+                    <span key={index} className="text-[22vw] md:text-[10rem] font-extrabold tracking-tighter text-green-500 dark:text-green-400">
+                        {char}
+                    </span>
+                ))}
+            </div>
           </div>
 
           {/* --- SUBTITLE --- */}
@@ -136,12 +138,9 @@ export default function Home() {
              variants={letterContainerVariants}
              initial="hidden"
              animate="visible"
-             // MOBILE FIX: whitespace-normal allows wrapping, md:whitespace-nowrap forces single line on desktop
              className="w-full px-2"
           >
             <h3 className="text-xs sm:text-sm md:text-lg font-bold uppercase text-zinc-500 dark:text-zinc-400 tracking-[0.2em] md:tracking-[0.5em] text-center border-b border-zinc-200 dark:border-zinc-800/50 pb-6 mb-6 leading-relaxed">
-              {/* On mobile, we might just want the string to wrap naturally instead of individual span animations causing layout shifts, 
-                  but we'll keep the effect for cool factor, just ensuring the container handles it. */}
               Junior Philippine Computer Society
             </h3>
           </motion.div>
@@ -173,17 +172,16 @@ export default function Home() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 1.4, duration: 0.5 }}
-          // MOBILE FIX: flex-col (vertical stack) on mobile, flex-row (side-by-side) on sm+
           className="mt-12 md:mt-16 flex flex-col sm:flex-row gap-4 w-full max-w-md sm:max-w-none justify-center px-4"
         >
           <Link 
             href="/About"
             className="group relative w-full sm:w-auto px-8 py-4 bg-zinc-900 dark:bg-white text-white dark:text-black font-bold rounded-full overflow-hidden transition-all active:scale-95 hover:scale-105 hover:shadow-[0_0_40px_rgba(34,197,94,0.3)] flex justify-center items-center"
           >
-             <div className="absolute inset-0 bg-gradient-to-r from-green-500 to-emerald-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-             <span className="relative flex items-center gap-2 group-hover:text-white transition-colors">
-               Learn more <FaArrowRight className="group-hover:translate-x-1 transition-transform" />
-             </span>
+              <div className="absolute inset-0 bg-gradient-to-r from-green-500 to-emerald-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <span className="relative flex items-center gap-2 group-hover:text-white transition-colors">
+                Learn more <FaArrowRight className="group-hover:translate-x-1 transition-transform" />
+              </span>
           </Link>
 
           <Link 
@@ -194,6 +192,14 @@ export default function Home() {
           </Link>
         </motion.div>
       </section>
+      
+      {/* CSS Animation for Snow Texture */}
+      <style jsx global>{`
+        @keyframes snow {
+            0% { background-position: 0 0; }
+            100% { background-position: 100px 100px; }
+        }
+      `}</style>
     </main>
   );
 }
