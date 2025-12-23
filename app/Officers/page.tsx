@@ -486,7 +486,7 @@ export default function OfficersPage() {
            </p>
            
            <Link 
-             href="https://docs.google.com/forms/d/e/1FAIpQLScqZdimJAZDOsH3ksLFjyvUBV4ru5iXy2WFWImtabTu7-ku3Q/viewform" 
+             href="https://forms.cloud.microsoft/r/yiHAiG5bHt" 
              target="_blank"
              rel="noopener noreferrer"
              className="inline-flex items-center gap-3 px-8 py-4 bg-green-600 hover:bg-green-500 text-white font-bold text-lg rounded-full shadow-[0_0_20px_rgba(34,197,94,0.3)] hover:shadow-[0_0_35px_rgba(34,197,94,0.6)] transition-all transform hover:scale-105"

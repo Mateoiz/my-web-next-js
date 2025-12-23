@@ -193,6 +193,7 @@ function GradeCalculator() {
               <GradeRow label="Class Standing" values={classStanding} setValues={setClassStanding} type="direct" />
             </div>
 
+            {/* BUTTONS - REFERENCE DESIGN */}
             <div className="flex gap-4 mt-8">
               <button onClick={calculateGrade} className="flex-1 bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2">
                 Compute Grade <FaArrowRight size={12} />
@@ -313,8 +314,8 @@ function GWACalculator() {
       if (isNaN(rawScore)) continue;
       
       if (rawScore > 100 || rawScore < 0) {
-         setError(`Invalid score: ${rawScore}. Must be between 0 and 100.`);
-         return;
+          setError(`Invalid score: ${rawScore}. Must be between 0 and 100.`);
+          return;
       }
 
       // Automatically convert RAW SCORE (e.g. 95) to EQUIVALENT (e.g. 3.5)
@@ -424,9 +425,14 @@ function GWACalculator() {
               <FaPlus /> Add Subject
             </button>
 
-            <div className="flex gap-4 mt-6">
-              <button onClick={calculateGWA} className="flex-1 bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-xl shadow-lg transition-all active:scale-95">Calculate Average</button>
-              <button onClick={reset} className="px-4 bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-red-500 transition-colors active:scale-95"><FaEraser /></button>
+            {/* BUTTONS - FIXED TO MATCH */}
+            <div className="flex gap-4 mt-8">
+              <button onClick={calculateGWA} className="flex-1 bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2">
+                Calculate Average <FaArrowRight size={12} />
+              </button>
+              <button onClick={reset} className="px-4 bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-red-500 transition-colors active:scale-95">
+                <FaEraser />
+              </button>
             </div>
 
             {error && <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="mt-4 text-center text-red-500 text-xs font-bold">{error}</motion.div>}

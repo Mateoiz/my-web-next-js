@@ -1,34 +1,114 @@
 "use client";
 
-import { useState } from "react";
-import { motion } from "framer-motion";
-import { FaMapMarkerAlt, FaEnvelope } from "react-icons/fa";
+import { useState, FormEvent, memo } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { 
+  FaPaperPlane, FaTerminal, FaCheckCircle, FaExclamationCircle, 
+  FaBug, FaLightbulb, FaCommentDots, FaUser, FaEnvelope, 
+  FaMapMarkerAlt, FaTag
+} from "react-icons/fa";
 
-// 1. IMPORT ANIMATED COMPONENTS
-import FloatingCubes from "../components/FloatingCubes"; 
+// --- IMPORT COMPONENTS ---
+import FloatingCubes from "../components/FloatingCubes";
 import CircuitCursor from "../components/CircuitCursor";
 
+// --- 1. MEMOIZED BACKGROUND ---
+const BackgroundLayer = memo(() => (
+  <div className="absolute inset-0 z-0 pointer-events-none">
+     <CircuitCursor />
+     <div className="absolute inset-0 opacity-80">
+        <FloatingCubes />
+     </div>
+     <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-green-500/10 rounded-full blur-3xl opacity-30" />
+     <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-emerald-500/10 rounded-full blur-3xl opacity-30" />
+  </div>
+));
+
+BackgroundLayer.displayName = "BackgroundLayer";
+
+// --- 2. MAIN PAGE COMPONENT ---
 export default function ContactPage() {
-  const [formState, setFormState] = useState({ name: "", email: "", message: "" });
+  return (
+    <section className="min-h-screen py-24 px-4 md:px-8 relative overflow-hidden bg-zinc-50 dark:bg-black font-sans selection:bg-green-500/30">
+      <BackgroundLayer />
+      
+      <div className="max-w-6xl mx-auto relative z-10">
+        <div className="text-center mb-16 space-y-4">
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-green-500/30 bg-green-500/5 backdrop-blur-md text-xs font-mono text-green-700 dark:text-green-400 mb-4"
+          >
+            <FaTerminal /> System Uplink
+          </motion.div>
+          
+          <motion.h1 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="text-4xl md:text-6xl font-extrabold tracking-tight text-zinc-900 dark:text-white"
+          >
+            Transmit <span className="text-green-600 dark:text-green-500">Feedback</span>
+          </motion.h1>
+          <motion.p 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.2 }}
+            className="text-zinc-600 dark:text-zinc-400 max-w-2xl mx-auto text-lg"
+          >
+            Encountered a bug? Have an idea? Or just want to say hello?
+            <br />Establish a connection with the development team.
+          </motion.p>
+        </div>
+
+        <div className="flex flex-col lg:flex-row gap-8 lg:gap-12">
+          <ContactInfo />
+          <ContactForm />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// --- 3. FORM COMPONENT ---
+function ContactForm() {
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    type: "general",
+    subject: "", 
+    message: ""
+  });
+  
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [result, setResult] = useState(""); 
 
-  // --- Email Validation Helper ---
-  const isValidEmail = (email: string) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setResult(""); 
 
-    if (!isValidEmail(formState.email)) {
-      setResult("Error: Please enter a valid email address.");
-      return; 
+    // --- MANUAL VALIDATION CHECK ---
+    // This ensures fields are filled even if HTML5 validation is bypassed
+    if (!formData.name.trim() || !formData.email.trim() || !formData.message.trim()) {
+        setResult("Error: Please fill in all required fields.");
+        return;
     }
 
+    // Specific check for the Conditional Subject Field
+    if (formData.type === "general" && !formData.subject.trim()) {
+        setResult("Error: Subject is required for General inquiries.");
+        return;
+    }
+    // -------------------------------
+
     setIsSubmitting(true);
+
+    // Subject Line Logic
+    let finalSubject = "";
+    if (formData.type === "general") {
+      finalSubject = `[GENERAL] ${formData.subject}`;
+    } else {
+      finalSubject = `[${formData.type.toUpperCase()}] Message from ${formData.name}`;
+    }
 
     try {
       const response = await fetch("https://api.web3forms.com/submit", {
@@ -39,10 +119,10 @@ export default function ContactPage() {
         },
         body: JSON.stringify({
           access_key: "10785cf2-8db3-4033-805e-f2200df7cdd2", 
-          name: formState.name,
-          email: formState.email, 
-          message: formState.message,
-          subject: `New Message from ${formState.name} (JPCS Website)`,
+          name: formData.name,
+          email: formData.email,
+          subject: finalSubject,
+          message: `Type: ${formData.type}\n\n${formData.message}`,
         }),
       });
 
@@ -50,186 +130,262 @@ export default function ContactPage() {
 
       if (response.status === 200) {
         setResult("Message Transmitted Successfully.");
-        setFormState({ name: "", email: "", message: "" }); 
+        setFormData({ name: "", email: "", type: "general", subject: "", message: "" }); 
       } else {
-        setResult(json.message);
+        setResult(json.message || "Transmission Error");
       }
     } catch (error) {
       console.log(error);
-      setResult("Transmission Failed. Please try again.");
+      setResult("Transmission Failed. Please check your connection.");
     } finally {
       setIsSubmitting(false);
-      setTimeout(() => setResult(""), 5000);
+      if(result.includes("Success")) {
+          setTimeout(() => setResult(""), 5000);
+      }
     }
   };
 
   return (
-    <section className="min-h-screen pt-24 pb-12 px-4 md:px-8 relative overflow-hidden transition-colors duration-300">
-      
-      {/* 2. ADD CIRCUIT CURSOR HERE */}
-      <CircuitCursor />
-
-      {/* 3. ADD FLOATING CUBES BACKGROUND */}
-      <div className="absolute inset-0 z-0">
-         <FloatingCubes />
-      </div>
-
-      {/* Background Decor */}
-      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-green-500/10 blur-[120px] rounded-full pointer-events-none z-0" />
-      
-      <div className="max-w-7xl mx-auto relative z-10">
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.4 }}
+      className="w-full lg:w-2/3 flex flex-col"
+    >
+      <div className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl border border-zinc-200 dark:border-green-500/30 rounded-2xl p-6 md:p-10 shadow-2xl relative overflow-hidden flex-grow">
         
-        {/* Header */}
-        <motion.div 
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-16"
-        >
-          <h1 className="text-4xl md:text-6xl font-bold mb-4 text-zinc-900 dark:text-white transition-colors duration-300">
-            Get in <span className="text-green-600 dark:text-green-500">Touch</span>
-          </h1>
-          <p className="text-zinc-600 dark:text-gray-400 text-lg transition-colors duration-300">
-            Have a question or want to collaborate? Send us a signal.
-          </p>
-        </motion.div>
+        {/* Top Decorative Bar */}
+        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-green-500 via-emerald-400 to-green-500" />
 
-        <div className="flex flex-col lg:flex-row gap-12">
+        <form onSubmit={handleSubmit} className="space-y-8 h-full flex flex-col">
           
-          {/* --- LEFT COLUMN: INFO & MAP --- */}
-          <motion.div 
-            initial={{ opacity: 0, x: -50 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.2 }}
-            className="w-full lg:w-1/2 space-y-8"
-          >
-            <div className="grid gap-6">
-              <div className="flex items-start gap-4 p-6 bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-green-500/20 rounded-xl backdrop-blur-sm hover:border-green-500/50 shadow-sm dark:shadow-none transition-all duration-300">
-                <div className="p-3 bg-green-100 dark:bg-green-500/10 rounded-lg text-green-600 dark:text-green-400 text-xl transition-colors">
-                  <FaMapMarkerAlt />
-                </div>
-                <div>
-                  <h3 className="font-bold text-lg mb-1 text-zinc-900 dark:text-white transition-colors">Visit HQ</h3>
-                  <p className="text-zinc-600 dark:text-gray-400 text-sm leading-relaxed transition-colors">
-                    Salvador Araneta Campus, 303 Victoneta Ave,<br />
-                    Malabon, 1475 Metro Manila, Philippines
-                  </p>
-                </div>
-              </div>
+          {/* 1. SIGNAL SELECTOR */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <TypeOption 
+              icon={<FaCommentDots />} 
+              label="General" 
+              selected={formData.type === "general"} 
+              onClick={() => setFormData({ ...formData, type: "general" })} 
+            />
+            <TypeOption 
+              icon={<FaBug />} 
+              label="Bug Report" 
+              selected={formData.type === "bug"} 
+              onClick={() => setFormData({ ...formData, type: "bug" })} 
+            />
+            <TypeOption 
+              icon={<FaLightbulb />} 
+              label="Suggestion" 
+              selected={formData.type === "feature"} 
+              onClick={() => setFormData({ ...formData, type: "feature" })} 
+            />
+          </div>
 
-              <div className="flex items-start gap-4 p-6 bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-green-500/20 rounded-xl backdrop-blur-sm hover:border-green-500/50 shadow-sm dark:shadow-none transition-all duration-300">
-                <div className="p-3 bg-green-100 dark:bg-green-500/10 rounded-lg text-green-600 dark:text-green-400 text-xl transition-colors">
-                  <FaEnvelope />
-                </div>
-                <div>
-                  <h3 className="font-bold text-lg mb-1 text-zinc-900 dark:text-white transition-colors">Email Us</h3>
-                  <p className="text-zinc-600 dark:text-gray-400 text-sm transition-colors">
-                    jpcs.dlsau@edu.ph
-                  </p>
-                </div>
-              </div>
+          {/* 2. IDENTITY FIELDS */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <Label icon={<FaUser size={10} />} text="User Identity" required />
+              <input 
+                type="text" 
+                placeholder="Your Name"
+                required
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                className="w-full bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-zinc-900 dark:text-white outline-none focus:border-green-500 transition-colors"
+              />
             </div>
-
-            {/* Google Map */}
-            <div className="w-full h-[300px] rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-800 relative group shadow-lg dark:shadow-none transition-all duration-300">
-               <div className="absolute inset-0 border-4px border-transparent group-hover:border-green-500/20 transition-all z-10 pointer-events-none rounded-xl" />
-               <iframe 
-                 src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3860.200567676776!2d120.9961623148408!3d14.66807608975936!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3397b69bc7d22e3b%3A0x6b40445f53239a06!2sDe%20La%20Salle%20Araneta%20University!5e0!3m2!1sen!2sph!4v1625561234567!5m2!1sen!2sph" 
-                 width="100%" 
-                 height="100%" 
-                 className="border-0 dark:invert-[.9] dark:hue-rotate-180 transition-all duration-500"
-                 allowFullScreen 
-                 loading="lazy" 
-                 referrerPolicy="no-referrer-when-downgrade"
-               />
+            <div className="space-y-2">
+              <Label icon={<FaEnvelope size={10} />} text="Return Frequency" required />
+              <input 
+                type="email" 
+                placeholder="Email Address"
+                required
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                className="w-full bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-zinc-900 dark:text-white outline-none focus:border-green-500 transition-colors"
+              />
             </div>
-          </motion.div>
+          </div>
 
-          {/* --- RIGHT COLUMN: FORM --- */}
-          <motion.div 
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.4 }}
-            className="w-full lg:w-1/2"
-          >
-            <form onSubmit={handleSubmit} className="p-8 rounded-2xl bg-white dark:bg-zinc-900/30 border border-zinc-200 dark:border-zinc-800 backdrop-blur-md relative shadow-xl dark:shadow-none transition-colors duration-300">
-              <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-green-500 rounded-tl-lg" />
-              <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-green-500 rounded-br-lg" />
+          {/* 3. SUBJECT FIELD (Conditional) */}
+          <AnimatePresence mode="popLayout">
+            {formData.type === "general" && (
+              <motion.div
+                initial={{ opacity: 0, height: 0, overflow: 'hidden' }}
+                animate={{ opacity: 1, height: 'auto', overflow: 'visible' }}
+                exit={{ opacity: 0, height: 0, overflow: 'hidden' }}
+                transition={{ duration: 0.2 }}
+                className="space-y-2"
+              >
+                <Label icon={<FaTag size={10} />} text="Transmission Subject" required />
+                <input 
+                  type="text" 
+                  placeholder="What is this regarding?"
+                  required={formData.type === "general"}
+                  value={formData.subject}
+                  onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
+                  className="w-full bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-zinc-900 dark:text-white outline-none focus:border-green-500 transition-colors"
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-              <div className="space-y-6">
-                <div>
-                  <label htmlFor="name" className="block text-sm font-medium text-zinc-700 dark:text-gray-400 mb-2 transition-colors">Name</label>
-                  <input 
-                    type="text" 
-                    id="name"
-                    name="name"
-                    value={formState.name}
-                    onChange={(e) => setFormState({...formState, name: e.target.value})}
-                    required
-                    className="w-full px-4 py-3 bg-zinc-50 dark:bg-black/50 border border-zinc-300 dark:border-zinc-700 rounded-lg focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 transition-all text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-gray-600"
-                    placeholder="Enter your name"
-                  />
-                </div>
-                
-                <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-zinc-700 dark:text-gray-400 mb-2 transition-colors">Email</label>
-                  <input 
-                    type="email" 
-                    id="email"
-                    name="email"
-                    value={formState.email}
-                    onChange={(e) => setFormState({...formState, email: e.target.value})}
-                    required
-                    className="w-full px-4 py-3 bg-zinc-50 dark:bg-black/50 border border-zinc-300 dark:border-zinc-700 rounded-lg focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 transition-all text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-gray-600"
-                    placeholder="Enter your email"
-                  />
-                </div>
+          {/* 4. MESSAGE AREA */}
+          <div className="flex-grow space-y-2 flex flex-col">
+            <Label icon={<FaTerminal size={10} />} text="Data Packet" required />
+            
+            <div className="relative group flex-grow h-full">
+              <textarea 
+                rows={formData.type === "general" ? 5 : 8} 
+                placeholder="Enter your message transmission here..."
+                required
+                value={formData.message}
+                onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+                className="w-full h-full bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-4 text-zinc-900 dark:text-white outline-none focus:border-green-500 transition-colors resize-none"
+              />
+              <div className="absolute bottom-3 right-3 w-3 h-3 border-b-2 border-r-2 border-zinc-300 dark:border-zinc-600 group-focus-within:border-green-500 transition-colors" />
+            </div>
+          </div>
 
-                <div>
-                  <label htmlFor="message" className="block text-sm font-medium text-zinc-700 dark:text-gray-400 mb-2 transition-colors">Message</label>
-                  <textarea 
-                    id="message"
-                    name="message"
-                    rows={5}
-                    value={formState.message}
-                    onChange={(e) => setFormState({...formState, message: e.target.value})}
-                    required
-                    className="w-full px-4 py-3 bg-zinc-50 dark:bg-black/50 border border-zinc-300 dark:border-zinc-700 rounded-lg focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 transition-all text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-gray-600 resize-none"
-                    placeholder="How can we help?"
-                  />
-                </div>
+          {/* 5. SUBMIT BUTTON */}
+          <div className="space-y-4 pt-4">
+            <button 
+              type="submit"
+              disabled={isSubmitting}
+              className={`w-full group relative overflow-hidden font-bold py-4 rounded-xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-3 ${
+                isSubmitting 
+                  ? "bg-zinc-300 dark:bg-zinc-800 text-zinc-500 cursor-not-allowed" 
+                  : "bg-green-600 hover:bg-green-500 text-white dark:text-black"
+              }`}
+            >
+              {isSubmitting ? (
+                <>
+                  <span className="w-4 h-4 border-2 border-zinc-500 border-t-zinc-800 rounded-full animate-spin" />
+                  <span>Transmitting...</span>
+                </>
+              ) : (
+                <>
+                  <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-500" />
+                  <span>Execute Transmission</span>
+                  <FaPaperPlane className="group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+                </>
+              )}
+            </button>
 
-                <button 
-                  type="submit"
-                  disabled={isSubmitting}
-                  className={`w-full py-4 rounded-lg font-bold text-lg tracking-wide transition-all duration-300 ${
-                    isSubmitting 
-                      ? "bg-zinc-300 dark:bg-zinc-700 text-zinc-500 dark:text-gray-400 cursor-not-allowed" 
-                      : "bg-green-600 hover:bg-green-500 text-white dark:text-black shadow-lg hover:shadow-xl dark:shadow-[0_0_20px_rgba(34,197,94,0.4)]"
+            {/* Status Message */}
+            <AnimatePresence>
+              {result && (
+                <motion.div 
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className={`flex items-center justify-center gap-2 p-3 rounded-lg text-sm font-bold border ${
+                    result.includes("Success") 
+                      ? "bg-green-100 dark:bg-green-500/10 text-green-700 dark:text-green-400 border-green-300 dark:border-green-500/30" 
+                      : "bg-red-100 dark:bg-red-500/10 text-red-700 dark:text-red-400 border-red-300 dark:border-red-500/30"
                   }`}
                 >
-                  {isSubmitting ? "Transmitting..." : "Send Message"}
-                </button>
+                  {result.includes("Success") ? <FaCheckCircle /> : <FaExclamationCircle />}
+                  {result}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
 
-                {/* --- FEEDBACK MESSAGE --- */}
-                {result && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className={`text-center p-3 rounded-md text-sm font-bold border ${
-                      result.includes("Success") 
-                        ? "bg-green-100 dark:bg-green-500/10 text-green-700 dark:text-green-400 border-green-300 dark:border-green-500/30" 
-                        : "bg-red-100 dark:bg-red-500/10 text-red-700 dark:text-red-400 border-red-300 dark:border-red-500/30"
-                    }`}
-                  >
-                    {result}
-                  </motion.div>
-                )}
-              </div>
-            </form>
-          </motion.div>
-
-        </div>
+        </form>
       </div>
-    </section>
+    </motion.div>
   );
 }
+
+// --- 4. STATIC INFO COMPONENT ---
+const ContactInfo = memo(() => (
+  <motion.div 
+    initial={{ opacity: 0, x: -20 }}
+    animate={{ opacity: 1, x: 0 }}
+    transition={{ delay: 0.3 }}
+    className="w-full lg:w-1/3 space-y-6"
+  >
+     {/* Info Cards */}
+     <div className="space-y-4">
+        <div className="flex items-start gap-4 p-5 bg-white/80 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-xl backdrop-blur-sm hover:border-green-500/50 transition-all group">
+          <div className="p-3 bg-green-100 dark:bg-green-500/10 rounded-lg text-green-600 dark:text-green-400 text-xl group-hover:scale-110 transition-transform">
+            <FaMapMarkerAlt />
+          </div>
+          <div>
+            <h3 className="font-bold text-zinc-900 dark:text-white">Visit HQ</h3>
+            <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
+              Salvador Araneta Campus, 303 Victoneta Ave, Malabon, Philippines
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-start gap-4 p-5 bg-white/80 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-xl backdrop-blur-sm hover:border-green-500/50 transition-all group">
+          <div className="p-3 bg-green-100 dark:bg-green-500/10 rounded-lg text-green-600 dark:text-green-400 text-xl group-hover:scale-110 transition-transform">
+            <FaEnvelope />
+          </div>
+          <div>
+            <h3 className="font-bold text-zinc-900 dark:text-white">Email Us</h3>
+            <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
+              jpcs.dlsau@edu.ph
+            </p>
+          </div>
+        </div>
+     </div>
+
+     {/* Map */}
+     <div className="w-full h-[250px] lg:h-[300px] rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-800 relative group shadow-lg">
+        <div className="absolute inset-0 border-4 border-transparent group-hover:border-green-500/20 transition-all z-10 pointer-events-none rounded-xl" />
+        <iframe 
+          src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3859.957647247764!2d120.99377407590457!3d14.663365975661158!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3397b69a2399201f%3A0xc3564993aee02931!2sDe%20La%20Salle%20Araneta%20University!5e0!3m2!1sen!2sph!4v1709628422471!5m2!1sen!2sph" 
+          width="100%" 
+          height="100%" 
+          className="border-0 dark:invert-[.85] dark:hue-rotate-180 dark:contrast-[1.1] transition-all duration-500"
+          allowFullScreen 
+          loading="lazy" 
+          referrerPolicy="no-referrer-when-downgrade"
+        />
+     </div>
+  </motion.div>
+));
+
+ContactInfo.displayName = "ContactInfo";
+
+// --- HELPER COMPONENTS ---
+
+// UPDATED LABEL COMPONENT WITH RED ASTERISK FOR REQUIRED FIELDS
+const Label = ({ icon, text, required = false }: { icon: any, text: string, required?: boolean }) => (
+  <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider flex items-center gap-2 mb-1">
+    {icon} {text} {required && <span className="text-red-500">*</span>}
+  </label>
+);
+
+interface TypeOptionProps {
+  icon: any;
+  label: string;
+  selected: boolean;
+  onClick: () => void;
+}
+
+const TypeOption = ({ icon, label, selected, onClick }: TypeOptionProps) => (
+  <div 
+    onClick={onClick}
+    className={`cursor-pointer relative p-4 rounded-xl border-2 transition-all duration-300 flex flex-col items-center gap-3 text-center group
+      ${selected 
+        ? "bg-green-500/10 border-green-500 text-green-700 dark:text-green-400 shadow-[0_0_20px_rgba(34,197,94,0.2)]" 
+        : "bg-zinc-50 dark:bg-zinc-900/50 border-transparent hover:border-zinc-300 dark:hover:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+      }`}
+  >
+    <div className={`text-2xl ${selected ? "scale-110" : "group-hover:scale-110"} transition-transform duration-300`}>
+      {icon}
+    </div>
+    <span className="text-sm font-bold uppercase tracking-wider">{label}</span>
+    
+    {selected && (
+      <motion.div 
+        layoutId="selected-marker"
+        className="absolute top-2 right-2 w-2 h-2 bg-green-500 rounded-full animate-pulse"
+      />
+    )}
+  </div>
+);
