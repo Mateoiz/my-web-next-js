@@ -298,7 +298,7 @@ function ContactForm() {
   );
 }
 
-// --- 4. STATIC INFO COMPONENT ---
+// --- 4. STATIC INFO COMPONENT (Redesigned for Space & Clarity) ---
 const ContactInfo = memo(() => (
   <motion.div 
     initial={{ opacity: 0, x: -20 }}
@@ -306,38 +306,61 @@ const ContactInfo = memo(() => (
     transition={{ delay: 0.3 }}
     className="w-full lg:w-1/3 space-y-6"
   >
-     {/* Info Cards */}
-     <div className="space-y-4">
-        <div className="flex items-start gap-4 p-5 bg-white/80 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-xl backdrop-blur-sm hover:border-green-500/50 transition-all group">
-          <div className="p-3 bg-green-100 dark:bg-green-500/10 rounded-lg text-green-600 dark:text-green-400 text-xl group-hover:scale-110 transition-transform">
-            <FaMapMarkerAlt />
+     <div className="space-y-6"> {/* Increased vertical spacing */}
+        
+        {/* VISIT HQ CARD - NEW LAYOUT */}
+        <div className="p-6 bg-white/80 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-2xl backdrop-blur-sm shadow-sm hover:border-green-500/50 transition-all group">
+          
+          {/* Header */}
+          <div className="flex items-center gap-3 mb-4">
+             <div className="p-3 bg-green-100 dark:bg-green-500/10 rounded-xl text-green-600 dark:text-green-400 text-xl group-hover:scale-110 transition-transform">
+               <FaMapMarkerAlt />
+             </div>
+             <h3 className="font-bold text-lg text-zinc-900 dark:text-white">Visit HQ</h3>
           </div>
-          <div>
-            <h3 className="font-bold text-zinc-900 dark:text-white">Visit HQ</h3>
-            <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
-              Salvador Araneta Campus, 303 Victoneta Ave, Malabon, Philippines
-            </p>
+
+          <div className="space-y-4">
+             {/* Section 1: Street Address */}
+             <div>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-1 block">Campus Location</span>
+                <p className="text-zinc-600 dark:text-zinc-300 leading-snug">
+                  302 Victoneta Avenue, Potrero<br />
+                  Malabon City 1475, Philippines
+                </p>
+             </div>
+
+             {/* Section 2: Boxed Office Detail (Fixes the cramped feeling) */}
+             <div className="bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-700/50 rounded-xl p-4 relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-1 h-full bg-green-500" /> {/* Accent Line */}
+                <span className="text-[10px] font-bold uppercase tracking-widest text-green-600 dark:text-green-400 mb-1 block">Specific Office</span>
+                <p className="font-bold text-zinc-800 dark:text-zinc-100 text-sm">
+                  Life Science Building, 4th Floor
+                </p>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed">
+                  Dept. of Technology<br/>
+                  College of Arts, Sciences, & Tech
+                </p>
+             </div>
           </div>
         </div>
 
-        <div className="flex items-start gap-4 p-5 bg-white/80 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-xl backdrop-blur-sm hover:border-green-500/50 transition-all group">
-          <div className="p-3 bg-green-100 dark:bg-green-500/10 rounded-lg text-green-600 dark:text-green-400 text-xl group-hover:scale-110 transition-transform">
+        {/* EMAIL US CARD */}
+        <div className="flex items-center gap-4 p-6 bg-white/80 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-2xl backdrop-blur-sm shadow-sm hover:border-green-500/50 transition-all group">
+          <div className="p-3 bg-green-100 dark:bg-green-500/10 rounded-xl text-green-600 dark:text-green-400 text-xl group-hover:scale-110 transition-transform shrink-0">
             <FaEnvelope />
           </div>
           <div>
-            <h3 className="font-bold text-zinc-900 dark:text-white">Email Us</h3>
-            <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
-              jpcs.dlsau@edu.ph
-            </p>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-0.5 block">Direct Line</span>
+            <h3 className="font-bold text-lg text-zinc-900 dark:text-white">jpcs@dlsau.edu.ph</h3>
           </div>
         </div>
      </div>
 
-     {/* Map */}
-     <div className="w-full h-[250px] lg:h-[300px] rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-800 relative group shadow-lg">
-        <div className="absolute inset-0 border-4 border-transparent group-hover:border-green-500/20 transition-all z-10 pointer-events-none rounded-xl" />
+     {/* Map - Added slightly more height for balance */}
+     <div className="w-full h-[280px] lg:h-[320px] rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 relative group shadow-lg">
+        <div className="absolute inset-0 border-4 border-transparent group-hover:border-green-500/20 transition-all z-10 pointer-events-none rounded-2xl" />
         <iframe 
-          src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3859.957647247764!2d120.99377407590457!3d14.663365975661158!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3397b69a2399201f%3A0xc3564993aee02931!2sDe%20La%20Salle%20Araneta%20University!5e0!3m2!1sen!2sph!4v1709628422471!5m2!1sen!2sph" 
+          src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3859.7310431334804!2d120.99598627574215!3d14.67119897534308!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3397b6a2b78fd96f%3A0xf64909861b56b1b9!2sDe%20La%20Salle%20Araneta%20University!5e0!3m2!1sen!2sph!4v1766485397075!5m2!1sen!2sph"
           width="100%" 
           height="100%" 
           className="border-0 dark:invert-[.85] dark:hue-rotate-180 dark:contrast-[1.1] transition-all duration-500"
