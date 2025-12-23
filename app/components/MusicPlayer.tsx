@@ -11,7 +11,7 @@ export default function MusicPlayer() {
   useEffect(() => {
     setMounted(true);
 
-    audioRef.current = new Audio("/bg-music1.mp3");
+    audioRef.current = new Audio("/bg-music2.mp3");
     
     if (audioRef.current) {
       audioRef.current.loop = true;
