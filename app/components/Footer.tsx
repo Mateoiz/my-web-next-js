@@ -24,7 +24,7 @@ export default function Footer() {
   ];
 
   return (
-    <footer className="relative bg-black text-white py-8 mt-auto overflow-hidden border-t border-zinc-800">
+   <footer className="relative z-[10] bg-black text-white py-8 mt-auto overflow-hidden border-t border-zinc-800">
       
       {/* --- 1. DIGITAL SNOW CAP (Top Border Effect) --- */}
       <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-white/50 to-transparent blur-[1px]" />

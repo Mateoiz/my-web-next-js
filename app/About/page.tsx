@@ -12,7 +12,7 @@ import {
   AnimatePresence 
 } from "framer-motion";
 // Added FaSatelliteDish and FaLock
-import { FaChevronLeft, FaChevronRight, FaFacebook, FaGlobe, FaSatelliteDish, FaLock } from "react-icons/fa"; 
+import { FaChevronLeft, FaChevronRight, FaFacebook, FaGlobe, FaSatelliteDish, FaLock, FaUserPlus } from "react-icons/fa"; 
 
 // --- IMPORT COMPONENTS ---
 import FloatingCubes from "../components/FloatingCubes"; 
@@ -280,31 +280,61 @@ export default function AboutPage() {
         </div>
 
         {/* --- STATS --- */}
-        <div className="flex justify-center mb-40">
+       <div className="flex justify-center mb-40 px-4">
             <motion.div 
-              initial={{ opacity: 0, scale: 0.9 }}
-              whileInView={{ opacity: 1, scale: 1 }}
+              initial={{ opacity: 0, y: 50 }}
+              whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              className="relative group"
+              className="relative w-full max-w-4xl"
             >
-              <div className="absolute inset-0 bg-green-500/20 blur-3xl rounded-full -z-10 group-hover:bg-green-500/30 transition-all duration-500" />
-              <div className="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-green-500/30 px-12 py-8 rounded-2xl shadow-xl backdrop-blur-sm flex flex-col items-center gap-2 min-w-[300px]">
-                  <div className="flex items-center gap-2 mb-2">
-                     <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                     <span className="text-xs font-mono text-zinc-500 dark:text-green-400 tracking-widest uppercase">
-                        System_Status: Online
-                     </span>
+              {/* Glowing Backdrop */}
+              <div className="absolute inset-0 bg-green-500/20 blur-3xl rounded-full -z-10 animate-pulse" />
+              
+              {/* The "Bubble" Container */}
+              <div className="relative bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl border border-zinc-200 dark:border-green-500/30 rounded-3xl p-8 md:p-12 shadow-2xl flex flex-col md:flex-row items-center gap-8 md:gap-12 overflow-hidden">
+                  
+                  {/* LEFT: COUNTER */}
+                  <div className="flex-1 text-center md:text-right flex flex-col items-center md:items-end">
+                      <div className="flex items-center gap-2 mb-1">
+                          <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                          <span className="text-[10px] font-mono text-zinc-400 dark:text-green-400/70 tracking-widest uppercase">
+                            System_Online
+                          </span>
+                      </div>
+                      <div className="text-7xl md:text-8xl font-black text-zinc-800 dark:text-white tracking-tighter leading-none">
+                          <Counter value={107} />
+                      </div>
+                      <div className="text-zinc-500 dark:text-zinc-400 font-bold text-sm uppercase tracking-wide mt-2">
+                        Registered Members
+                      </div>
                   </div>
-                  <div className="text-7xl md:text-8xl font-black text-zinc-800 dark:text-white tracking-tighter">
-                     <Counter value={107} />
+
+                  {/* CENTER: DIVIDER (Hidden on mobile) */}
+                  <div className="hidden md:block w-px h-24 bg-gradient-to-b from-transparent via-zinc-300 dark:via-zinc-700 to-transparent" />
+
+                  {/* RIGHT: TEXT & ACTION */}
+                  <div className="flex-1 text-center md:text-left flex flex-col items-center md:items-start gap-4">
+                      <p className="text-lg text-zinc-700 dark:text-zinc-300 font-medium leading-relaxed max-w-xs">
+                        Be part of the innovation. <br/>
+                        Join our growing community and make a difference.
+                      </p>
+                      
+                      <a 
+                        href="http://docs.google.com/forms/d/e/1FAIpQLScFVuq3CROhb52lvS_g10kuAZEywv54HXT8YUydlg4TeSjlYw/viewform"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="group relative inline-flex items-center gap-3 px-8 py-3 bg-zinc-900 dark:bg-green-600 text-white font-bold rounded-full transition-all duration-300 shadow-lg hover:shadow-green-500/40 hover:-translate-y-1 active:scale-95"
+                      >
+                        <span>Enroll Now</span>
+                        <div className="bg-white/20 rounded-full p-1 group-hover:translate-x-1 transition-transform">
+                           <FaUserPlus size={12} />
+                        </div>
+                      </a>
                   </div>
-                  <div className="text-zinc-600 dark:text-zinc-400 font-medium text-lg uppercase tracking-wide">
-                    Registered Members
-                  </div>
-                  <div className="absolute top-0 left-0 w-3 h-3 border-t border-l border-green-500 opacity-50" />
-                  <div className="absolute top-0 right-0 w-3 h-3 border-t border-r border-green-500 opacity-50" />
-                  <div className="absolute bottom-0 left-0 w-3 h-3 border-b border-l border-green-500 opacity-50" />
-                  <div className="absolute bottom-0 right-0 w-3 h-3 border-b border-r border-green-500 opacity-50" />
+
+                  {/* Decorative Corners */}
+                  <div className="absolute top-4 left-4 w-4 h-4 border-t-2 border-l-2 border-zinc-300 dark:border-green-500/50 rounded-tl-lg" />
+                  <div className="absolute bottom-4 right-4 w-4 h-4 border-b-2 border-r-2 border-zinc-300 dark:border-green-500/50 rounded-br-lg" />
               </div>
             </motion.div>
         </div>
@@ -321,14 +351,14 @@ export default function AboutPage() {
           </InfoCard>
 
           <InfoCard title="MISSION" delay={0.2} hasDecoration={true}>
-             <p className="border-l-2 border-green-500/30 pl-4 mb-6">
+              <p className="border-l-2 border-green-500/30 pl-4 mb-6">
                 {MISSION_TEXT}
-             </p>
-             <div className="inline-block mt-4">
-                 <span className="text-green-700 dark:text-green-300 font-bold bg-green-500/10 px-3 py-1 rounded-full text-sm border border-green-500/20">
-                   Leadership • Integrity • Faith • Excellence
-                 </span>
-             </div>
+              </p>
+              <div className="inline-block mt-4">
+                  <span className="text-green-700 dark:text-green-300 font-bold bg-green-500/10 px-3 py-1 rounded-full text-sm border border-green-500/20">
+                    Leadership • Integrity • Faith • Excellence
+                  </span>
+              </div>
           </InfoCard>
         </div>
 
@@ -428,7 +458,7 @@ export default function AboutPage() {
                  viewport={{ once: true, margin: "-100px" }}
                  transition={{ delay: index * 0.1, duration: 0.6 }}
                  className={`flex flex-col md:flex-row items-center gap-8 md:gap-16 ${
-                    index % 2 === 1 ? "md:flex-row-reverse" : "" 
+                   index % 2 === 1 ? "md:flex-row-reverse" : "" 
                  }`}
                >
                  {/* TEXT COLUMN */}

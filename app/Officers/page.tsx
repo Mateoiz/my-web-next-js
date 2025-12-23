@@ -6,8 +6,8 @@ import Link from "next/link";
 import { motion, Variants, useMotionValue, animate } from "framer-motion";
 import { 
   FaFacebook, FaEnvelope, FaCamera, FaPen, FaVideo, FaPaintBrush, FaArrowRight,
-  FaChevronLeft, FaChevronRight 
-} from "react-icons/fa";
+  FaChevronLeft, FaChevronRight, FaStar 
+} from "react-icons/fa"; 
 
 // 1. IMPORT ANIMATED COMPONENTS
 import FloatingCubes from "../components/FloatingCubes";
@@ -56,14 +56,6 @@ const officers = [
     socials: { facebook: "https://www.facebook.com/reynalyn.morbo", email: "#" }
   },
   {
-    id: 6,
-    name: "Joshua Enriquez",
-    role: "Assistant Secretary",
-    bio: "Supporting the secretary in all administrative tasks and ensuring effective communication within the team.",
-    image: "/officers/ASEC.JPG",
-    socials: { facebook: "https://www.facebook.com/joshua.enriquez.5891", email: "#" }
-  },
-  {
     id: 7,
     name: "Iris Caryl Chua",
     role: "Treasurer",
@@ -81,8 +73,46 @@ const officers = [
   },
 ];
 
-// --- 2. MULTIMEDIA TEAM DATA ---
-const multimediaTeam = [
+// --- 2. EXECUTIVE ASSOCIATES DATA ---
+const executives = [
+  { 
+    name: "Joshua Enriquez", 
+    role: "Assistant Secretary", 
+    icon: <FaStar />,
+    image: "/officers/ASEC.JPG" 
+  },
+];
+
+// --- 3. YEAR REPRESENTATIVES DATA ---
+const yearReps = [
+  { 
+    id: 1,
+    year: "1st Year",
+    number: "01",
+    name: "Bernadette Basco", 
+    image: "/officers/YR1.png", 
+    quote: "The voice of the fresh minds."
+  },
+  { 
+    id: 2,
+    year: "2nd Year",
+    number: "02",
+    name: "Carlos Alcantara", 
+    image: "/officers/YR2.png", 
+    quote: "Bridging the gap for sophomores."
+  },
+  { 
+    id: 3,
+    year: "3rd Year",
+    number: "03",
+    name: "Synellign Bautista", 
+    image: "/officers/REP3.JPG", 
+    quote: "Guiding the juniors to excellence."
+  },
+];
+
+// --- 4. CREATIVE TEAM DATA ---
+const creativeTeam = [
   { 
     name: "Jhenelle Fern Refuerzo", 
     role: "Graphic Designer", 
@@ -127,7 +157,7 @@ const multimediaTeam = [
   },
 ];
 
-// --- 3. ANIMATION VARIANTS ---
+// --- 5. ANIMATION VARIANTS ---
 const cardVariants: Variants = {
   hidden: { opacity: 0, y: 100, scale: 0.9 },
   visible: { 
@@ -173,15 +203,13 @@ export default function OfficersPage() {
   return (
     <section className="min-h-screen py-24 px-4 md:px-8 relative overflow-hidden transition-colors duration-300">
       
-      {/* 2. ADD CIRCUIT CURSOR HERE */}
       <CircuitCursor />
 
-      {/* 3. ADD FLOATING CUBES BACKGROUND HERE */}
       <div className="absolute inset-0 z-0">
          <FloatingCubes />
       </div>
 
-      {/* Header Section */}
+      {/* --- HEADER --- */}
       <div className="max-w-4xl mx-auto text-center mb-24 relative z-20">
         <motion.h1 
           initial={{ opacity: 0, y: -20 }}
@@ -200,11 +228,10 @@ export default function OfficersPage() {
         </motion.p>
       </div>
 
-      {/* --- MAIN OFFICERS LIST --- */}
+      {/* --- SECTION 1: MAIN OFFICERS LIST --- */}
       <div className="max-w-6xl mx-auto flex flex-col gap-24 relative z-20 mb-32">
         {officers.map((officer, index) => {
           const isEven = index % 2 === 0;
-
           return (
             <motion.div
               key={officer.id}
@@ -214,12 +241,9 @@ export default function OfficersPage() {
               viewport={{ once: true, amount: 0.3 }}
               className={`flex flex-col ${isEven ? 'md:flex-row' : 'md:flex-row-reverse'} items-center gap-8 md:gap-16`}
             >
-              
-              {/* Image Section */}
               <div className="w-full md:w-1/2 flex justify-center">
                 <div className="relative group">
                   <div className="absolute inset-0 bg-green-500 blur-[20px] opacity-20 group-hover:opacity-40 transition-opacity duration-500 rounded-xl"></div>
-                  
                   <div className="relative h-[350px] w-[300px] md:h-[400px] md:w-[350px] rounded-xl overflow-hidden border-2 border-green-500/30 bg-white dark:bg-zinc-900 shadow-xl z-10 transition-colors duration-300">
                     <Image
                       src={officer.image}
@@ -231,21 +255,16 @@ export default function OfficersPage() {
                   </div>
                 </div>
               </div>
-
-              {/* Text Section */}
               <div className={`w-full md:w-1/2 flex flex-col ${isEven ? 'md:items-start text-left' : 'md:items-end text-right'}`}>
                 <span className="inline-block py-1 px-3 rounded-full bg-green-100 dark:bg-green-500/10 text-green-700 dark:text-green-400 text-sm font-mono mb-4 border border-green-500/30 transition-colors duration-300">
                   {officer.role}
                 </span>
-                
                 <h2 className="text-3xl md:text-4xl font-bold text-zinc-900 dark:text-white mb-4 transition-colors duration-300">
                   {officer.name}
                 </h2>
-                
                 <p className="text-zinc-600 dark:text-gray-300 text-lg leading-relaxed mb-8 max-w-xl transition-colors duration-300">
                   {officer.bio}
                 </p>
-
                 <div className="flex gap-4 text-2xl text-zinc-400 dark:text-gray-400">
                   {officer.socials.facebook && (
                     <a href={officer.socials.facebook} target="_blank" rel="noopener noreferrer" className="hover:text-green-600 dark:hover:text-green-500 transition-colors">
@@ -259,22 +278,129 @@ export default function OfficersPage() {
                   )}
                 </div>
               </div>
-
             </motion.div>
           );
         })}
       </div>
 
-      {/* --- MULTIMEDIA TEAM CAROUSEL --- */}
+      {/* --- SECTION 2: YEAR REPRESENTATIVES --- */}
+      <div className="max-w-7xl mx-auto relative z-20 mt-32 mb-32 px-4">
+        <div className="text-center mb-16">
+          <h2 className="text-3xl md:text-5xl font-bold mb-2 text-zinc-900 dark:text-white transition-colors duration-300">
+            Year <span className="text-green-600 dark:text-green-500">Representatives</span>
+          </h2>
+          <p className="text-zinc-600 dark:text-gray-400 transition-colors duration-300">
+            The Voice of the Student Body
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {yearReps.map((rep, index) => (
+            <motion.div
+              key={rep.id}
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: index * 0.1 }}
+              className="group relative h-[450px] bg-white dark:bg-zinc-900 rounded-2xl overflow-hidden border border-zinc-200 dark:border-green-500/20 shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-2"
+            >
+              {/* Background Big Number */}
+              <div className="absolute -top-10 -right-6 text-[12rem] font-black text-zinc-100 dark:text-zinc-800/50 select-none transition-colors duration-300 group-hover:text-green-500/10">
+                {rep.number}
+              </div>
+
+              {/* Image Container */}
+              <div className="relative h-3/5 w-full overflow-hidden">
+                <Image
+                  src={rep.image}
+                  alt={rep.name}
+                  fill
+                  // REMOVED grayscale, added subtle green tint overlay below instead
+                  className="object-cover transition-transform duration-700 group-hover:scale-110"
+                />
+                
+                {/* NEW: Subtle Green/Dark Tint Overlay that fades on hover */}
+                <div className="absolute inset-0 bg-zinc-900/20 dark:bg-green-900/30 transition-opacity duration-700 group-hover:opacity-0 pointer-events-none" />
+
+                {/* Gradient for text readability */}
+                <div className="absolute inset-0 bg-gradient-to-t from-white via-transparent to-transparent dark:from-zinc-900 dark:via-transparent dark:to-transparent opacity-100 pointer-events-none" />
+              </div>
+
+              {/* Info Content */}
+              <div className="absolute bottom-0 left-0 w-full p-8 flex flex-col justify-end h-full pointer-events-none">
+                <div className="relative z-10">
+                  <span className="inline-block px-3 py-1 mb-3 text-xs font-bold tracking-widest text-white bg-green-600 rounded-full">
+                    {rep.year} REP
+                  </span>
+                  <h3 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2 group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors">
+                    {rep.name}
+                  </h3>
+                  <p className="text-sm text-zinc-500 dark:text-zinc-400 italic border-l-2 border-green-500 pl-3">
+                    "{rep.quote}"
+                  </p>
+                </div>
+              </div>
+
+              {/* Hover Decorative Line */}
+              <div className="absolute bottom-0 left-0 w-0 h-1 bg-green-500 transition-all duration-500 group-hover:w-full" />
+            </motion.div>
+          ))}
+        </div>
+      </div>
+
+      {/* --- SECTION 3: THE ASSOCIATES (Executive) --- */}
+      <div className="max-w-7xl mx-auto relative z-20 mt-32 mb-32">
+        <div className="text-center mb-12">
+          <h2 className="text-3xl md:text-5xl font-bold mb-2 text-zinc-900 dark:text-white transition-colors duration-300">
+            The <span className="text-green-600 dark:text-green-500">Associates</span>
+          </h2>
+          <p className="text-zinc-600 dark:text-gray-400 transition-colors duration-300">
+            Executive Leadership Support
+          </p>
+        </div>
+
+        <div className="flex flex-wrap justify-center gap-8 px-4">
+          {executives.map((member, index) => (
+            <motion.div 
+              key={index}
+              initial={{ opacity: 0, y: 50 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              className="min-w-[280px] h-[350px] relative rounded-2xl overflow-hidden bg-white dark:bg-zinc-900 border-2 border-green-500/20 group hover:border-green-500/60 shadow-lg dark:shadow-none transition-all duration-300"
+            >
+              <div className="relative h-2/3 w-full bg-zinc-100 dark:bg-zinc-800">
+                  <Image
+                    src={member.image} 
+                    alt={member.name}
+                    fill
+                    className="object-cover opacity-90 group-hover:opacity-100 transition-opacity"
+                  />
+                  <div className="absolute top-4 right-4 p-2 bg-yellow-500/10 backdrop-blur-md rounded-full text-yellow-600 dark:text-yellow-400 border border-yellow-500/30 shadow-sm animate-pulse">
+                    {member.icon}
+                  </div>
+              </div>
+              <div className="h-1/3 p-6 flex flex-col justify-center bg-white dark:bg-gradient-to-t dark:from-black dark:to-zinc-900 transition-colors duration-300">
+                <h3 className="text-xl font-bold text-zinc-800 dark:text-white group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors">
+                  {member.name}
+                </h3>
+                <p className="text-sm text-zinc-500 dark:text-gray-400 uppercase tracking-wider font-semibold mt-1">
+                  {member.role}
+                </p>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+
+      {/* --- SECTION 4: THE CREATIVES --- */}
       <div className="max-w-7xl mx-auto relative z-20 mt-32 pb-12">
-        {/* Header with Buttons */}
         <div className="flex flex-col md:flex-row items-center justify-between mb-12 px-4">
           <div className="text-center md:text-left mb-6 md:mb-0">
             <h2 className="text-3xl md:text-5xl font-bold mb-2 text-zinc-900 dark:text-white transition-colors duration-300">
               The <span className="text-green-600 dark:text-green-500">Creatives</span>
             </h2>
             <p className="text-zinc-600 dark:text-gray-400 transition-colors duration-300">
-              Our Multimedia Team making magic happen.
+              Multimedia Arts & Design Team
             </p>
           </div>
 
@@ -310,7 +436,7 @@ export default function OfficersPage() {
             dragTransition={{ power: 0.3, timeConstant: 200 }} 
             className="flex gap-6"
           >
-            {multimediaTeam.map((member, index) => (
+            {creativeTeam.map((member, index) => (
               <motion.div 
                 key={index} 
                 className="min-w-[280px] h-[350px] relative rounded-2xl overflow-hidden bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-green-500/20 group hover:border-green-500/50 shadow-lg dark:shadow-none transition-all duration-300"

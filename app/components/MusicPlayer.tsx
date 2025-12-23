@@ -42,11 +42,11 @@ export default function MusicPlayer() {
 
   if (!mounted) return null;
 
-  return (
+return (
     <>
-      {/* --- 1. THE VISUALIZER OVERLAY --- */}
       <div 
-        className={`fixed bottom-0 left-0 w-full h-32 z-30 pointer-events-none flex items-end justify-center gap-1 md:gap-2 px-4 transition-opacity duration-1000 ${
+        // FIX: Z-Index set to z-[40] (Below the button)
+        className={`fixed bottom-0 left-0 w-full h-32 z-[40] pointer-events-none flex items-end justify-center gap-1 md:gap-2 px-4 transition-opacity duration-1000 ${
           isPlaying ? "opacity-100" : "opacity-0"
         }`}
       >
@@ -72,7 +72,7 @@ export default function MusicPlayer() {
       <button
         onClick={toggleMusic}
         className={`
-          fixed bottom-24 right-6 z-[9999]
+          fixed bottom-24 right-6 z-[50]
           w-10 h-10 flex items-center justify-center
           rounded-full shadow-lg border-2
           transition-all duration-300 ease-in-out

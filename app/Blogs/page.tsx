@@ -39,9 +39,12 @@ export default function BlogPage() {
       
       {/* BACKGROUND */}
       <div className="fixed inset-0 z-0 pointer-events-none">
-        <div className="hidden sm:block absolute inset-0">
+        {/* FIX: Removed 'hidden sm:block'. Now it renders on all screens. */}
+        {/* Added opacity-50 for mobile so text remains readable */}
+        <div className="absolute inset-0 opacity-50 sm:opacity-100">
              <FloatingCubes />
         </div>
+        
         <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-green-500/5 rounded-full blur-[100px]" />
         <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-emerald-500/5 rounded-full blur-[100px]" />
       </div>

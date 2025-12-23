@@ -95,8 +95,8 @@ export default function Navbar() {
   return (
     <>
       <nav
-        // OPTIMIZATION 2: 'will-change-transform' helps browser anticipate changes
-        className={`fixed top-0 left-0 w-full z-50 transition-all duration-300 ease-in-out border-b will-change-auto ${
+        // FIX: Z-Index set to z-[100]
+        className={`fixed top-0 left-0 w-full z-[100] transition-all duration-300 ease-in-out border-b will-change-auto ${
           isScrolled
             ? "bg-white/85 dark:bg-black/85 backdrop-blur-md border-zinc-200 dark:border-zinc-800 py-3 shadow-sm"
             : "bg-transparent border-transparent py-5"
@@ -179,7 +179,7 @@ export default function Navbar() {
               animate="open"
               exit="closed"
               onClick={closeMenu}
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 transform-gpu"
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[101] transform-gpu"
               style={{ willChange: "opacity" }} 
             />
 
@@ -191,7 +191,7 @@ export default function Navbar() {
               animate="open"
               exit="closed"
               // OPTIMIZATION 4: Added transform-gpu and will-change to force hardware acceleration
-              className="fixed top-0 right-0 h-full w-[85%] max-w-md bg-white dark:bg-zinc-950 border-l border-zinc-200 dark:border-zinc-800 shadow-2xl z-50 flex flex-col justify-between transform-gpu"
+             className="fixed top-0 right-0 h-full w-[85%] max-w-md bg-white dark:bg-zinc-950 border-l border-zinc-200 dark:border-zinc-800 shadow-2xl z-[102] flex flex-col justify-between transform-gpu"
               style={{ willChange: "transform" }}
             >
               {/* Static Decoration (Removed Blur filters here to save FPS, using Opacity instead) */}

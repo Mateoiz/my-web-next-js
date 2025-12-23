@@ -44,7 +44,8 @@ export default function HolographicEventTab() {
       </AnimatePresence>
 
       {/* --- MAIN WIDGET CONTAINER --- */}
-      <div className="fixed top-1/2 -translate-y-1/2 left-0 z-50 h-auto pointer-events-none">
+      {/* Adjusted z-index to ensure it sits above most things but below critical modals if any */}
+      <div className="fixed top-1/2 -translate-y-1/2 left-0 z-[60] h-auto pointer-events-none">
         
         {/* Wrapper for Pointer Events & Ref */}
         <motion.div 
@@ -56,8 +57,8 @@ export default function HolographicEventTab() {
         >
           
           {/* --- 1. THE DATA PANEL (The Drawer) --- */}
-          {/* Mobile: w-[85vw] | Desktop: w-80 */}
-          <div className="relative w-[85vw] max-w-xs md:w-80 bg-zinc-900/95 border-r-2 border-green-500/50 backdrop-blur-xl shadow-[0_0_40px_rgba(34,197,94,0.15)] overflow-hidden rounded-r-sm">
+          {/* OPTIMIZATION: Reduced width on mobile (w-[75vw] max-w-[260px]) */}
+          <div className="relative w-[75vw] max-w-[260px] md:w-80 bg-zinc-900/95 border-r-2 border-green-500/50 backdrop-blur-xl shadow-[0_0_40px_rgba(34,197,94,0.15)] overflow-hidden rounded-r-sm">
             
             {/* Cyberpunk Grid Background */}
             <div className="absolute inset-0 bg-[linear-gradient(rgba(34,197,94,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(34,197,94,0.05)_1px,transparent_1px)] bg-[size:20px_20px]" />
@@ -65,24 +66,25 @@ export default function HolographicEventTab() {
             {/* Animated Scanline */}
             <div className="absolute top-0 left-0 w-full h-1 bg-green-500/30 animate-[scan_4s_linear_infinite]" />
 
-            <div className="relative z-10 p-6 flex flex-col gap-4">
+            {/* OPTIMIZATION: Reduced padding (p-4 mobile, p-6 desktop) and gap */}
+            <div className="relative z-10 p-4 md:p-6 flex flex-col gap-3 md:gap-4">
               
               {/* Header Data */}
               <div className="flex justify-between items-end border-b border-green-500/30 pb-2">
                 <div className="flex flex-col">
-                  <span className="text-[10px] font-mono text-green-500/80 tracking-widest uppercase mb-1">
+                  <span className="text-[9px] md:text-[10px] font-mono text-green-500/80 tracking-widest uppercase mb-0.5 md:mb-1">
                     <FaMicrochip className="inline mr-1" /> System_Alert
                   </span>
-                  <span className="text-white font-bold text-lg leading-none">UPCOMING</span>
+                  <span className="text-white font-bold text-base md:text-lg leading-none">UPCOMING</span>
                 </div>
-                {/* Mobile Close Button (Visible only when open on mobile) */}
+                {/* Mobile Close Button */}
                 <button 
                   onClick={() => setIsOpen(false)}
-                  className="md:hidden text-zinc-500 hover:text-white transition-colors"
+                  className="md:hidden text-zinc-500 hover:text-white transition-colors p-1"
                 >
-                  <FaTimes />
+                  <FaTimes size={14} />
                 </button>
-                {/* Desktop Status (Hidden on small mobile if tight, usually fits) */}
+                {/* Desktop Status */}
                 <div className="hidden md:block text-right">
                   <span className="block text-[10px] font-mono text-zinc-500 uppercase">Status</span>
                   <span className="text-green-400 font-bold text-xs animate-pulse">● LIVE</span>
@@ -91,28 +93,29 @@ export default function HolographicEventTab() {
 
               {/* Event Details */}
               <div>
-                <h3 className="text-xl md:text-2xl font-black text-white uppercase leading-tight mb-2">
+                {/* OPTIMIZATION: Smaller text sizes for mobile */}
+                <h3 className="text-lg md:text-2xl font-black text-white uppercase leading-tight mb-2 md:mb-2 line-clamp-2">
                   {NEXT_EVENT.title}
                 </h3>
                 
-                <div className="space-y-3 mt-4">
-                  <div className="flex items-center gap-3 text-zinc-400">
-                    <div className="w-8 h-8 rounded bg-zinc-800 flex items-center justify-center text-green-500 border border-green-500/20 shrink-0">
-                      <FaCalendarAlt size={14} />
+                <div className="space-y-2 md:space-y-3 mt-2 md:mt-4">
+                  <div className="flex items-center gap-2 md:gap-3 text-zinc-400">
+                    <div className="w-6 h-6 md:w-8 md:h-8 rounded bg-zinc-800 flex items-center justify-center text-green-500 border border-green-500/20 shrink-0">
+                      <FaCalendarAlt className="text-xs md:text-sm" />
                     </div>
                     <div className="flex flex-col">
-                      <span className="text-[10px] uppercase tracking-wide text-zinc-500">Date Log</span>
-                      <span className="text-sm font-mono text-white font-bold">{NEXT_EVENT.date}</span>
+                      <span className="text-[9px] md:text-[10px] uppercase tracking-wide text-zinc-500">Date Log</span>
+                      <span className="text-xs md:text-sm font-mono text-white font-bold">{NEXT_EVENT.date}</span>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3 text-zinc-400">
-                    <div className="w-8 h-8 rounded bg-zinc-800 flex items-center justify-center text-green-500 border border-green-500/20 shrink-0">
-                      <FaMapMarkerAlt size={14} />
+                  <div className="flex items-center gap-2 md:gap-3 text-zinc-400">
+                    <div className="w-6 h-6 md:w-8 md:h-8 rounded bg-zinc-800 flex items-center justify-center text-green-500 border border-green-500/20 shrink-0">
+                      <FaMapMarkerAlt className="text-xs md:text-sm" />
                     </div>
                     <div className="flex flex-col">
-                      <span className="text-[10px] uppercase tracking-wide text-zinc-500">Location</span>
-                      <span className="text-sm font-mono text-white font-bold line-clamp-1">{NEXT_EVENT.location}</span>
+                      <span className="text-[9px] md:text-[10px] uppercase tracking-wide text-zinc-500">Location</span>
+                      <span className="text-xs md:text-sm font-mono text-white font-bold line-clamp-1">{NEXT_EVENT.location}</span>
                     </div>
                   </div>
                 </div>
@@ -121,7 +124,7 @@ export default function HolographicEventTab() {
               {/* Action Button */}
               <Link 
                 href={NEXT_EVENT.link}
-                className="group mt-2 relative w-full bg-green-600 hover:bg-green-500 text-black font-bold py-3 px-4 text-center uppercase tracking-wider text-xs transition-colors overflow-hidden rounded-sm"
+                className="group mt-1 md:mt-2 relative w-full bg-green-600 hover:bg-green-500 text-black font-bold py-2 md:py-3 px-4 text-center uppercase tracking-wider text-[10px] md:text-xs transition-colors overflow-hidden rounded-sm"
               >
                 <span className="relative z-10 flex items-center justify-center gap-2">
                   Details <FaChevronRight size={10} />
@@ -134,9 +137,10 @@ export default function HolographicEventTab() {
           </div>
 
           {/* --- 2. THE VERTICAL TAB (Trigger) --- */}
+          {/* OPTIMIZATION: Reduced tab width and vertical padding on mobile */}
           <button
             onClick={() => setIsOpen(!isOpen)}
-            className="absolute right-[-48px] top-0 flex flex-col items-center bg-zinc-900 border-y-2 border-r-2 border-green-500/50 text-green-500 py-4 w-12 shadow-[0_0_15px_rgba(34,197,94,0.3)] hover:bg-green-900/20 transition-colors active:scale-95"
+            className="absolute right-[-36px] md:right-[-48px] top-0 flex flex-col items-center bg-zinc-900 border-y-2 border-r-2 border-green-500/50 text-green-500 py-3 md:py-4 w-9 md:w-12 shadow-[0_0_15px_rgba(34,197,94,0.3)] hover:bg-green-900/20 transition-colors active:scale-95"
             style={{ 
               clipPath: "polygon(0 0, 100% 0, 100% 85%, 0% 100%)", 
               borderTopRightRadius: "4px"
@@ -145,13 +149,13 @@ export default function HolographicEventTab() {
             {/* Arrow Indicator */}
             <motion.div
               animate={{ rotate: isOpen ? 180 : 0 }}
-              className="mb-4"
+              className="mb-2 md:mb-4"
             >
-              <FaChevronRight size={14} />
+              <FaChevronRight className="text-xs md:text-sm" />
             </motion.div>
 
             {/* Vertical Text */}
-            <div className="flex flex-col gap-1 font-mono font-bold text-xs tracking-widest select-none">
+            <div className="flex flex-col gap-0.5 md:gap-1 font-mono font-bold text-[10px] md:text-xs tracking-widest select-none">
               <span>E</span>
               <span>V</span>
               <span>E</span>
@@ -161,7 +165,7 @@ export default function HolographicEventTab() {
             </div>
 
             {/* Decorative Dot */}
-            <div className="mt-4 w-1.5 h-1.5 bg-green-500 rounded-full animate-ping" />
+            <div className="mt-2 md:mt-4 w-1 h-1 md:w-1.5 md:h-1.5 bg-green-500 rounded-full animate-ping" />
           </button>
 
         </motion.div>

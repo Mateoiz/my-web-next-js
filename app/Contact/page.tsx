@@ -110,8 +110,8 @@ export default function ContactPage() {
                 <div>
                   <h3 className="font-bold text-lg mb-1 text-zinc-900 dark:text-white transition-colors">Visit HQ</h3>
                   <p className="text-zinc-600 dark:text-gray-400 text-sm leading-relaxed transition-colors">
-                    De La Salle Araneta University<br />
-                    Victoneta Ave, Potrero, Malabon, Metro Manila
+                    Salvador Araneta Campus, 303 Victoneta Ave,<br />
+                    Malabon, 1475 Metro Manila, Philippines
                   </p>
                 </div>
               </div>
