@@ -131,11 +131,11 @@ export default function Navbar() {
 
           {/* --- DESKTOP NAVIGATION --- */}
           <div className="hidden md:flex items-center gap-8">
-            <Link href="/" className={getNavLinkClass('/')}>Home</Link>
             <Link href="/About" className={getNavLinkClass('/About')}>About</Link>
             <Link href="/Officers" className={getNavLinkClass('/Officers')}>Officers</Link>
             <Link href="/Blogs" className={getNavLinkClass('/Blogs')}>Blogs</Link>
             <Link href="/Events" className={getNavLinkClass('/Events')}>Events</Link>
+            <Link href="/Tools" className={getNavLinkClass('/Tools')}>Tools</Link>
             
             <Link 
               href="/Contact" 
@@ -203,11 +203,11 @@ export default function Navbar() {
                 {/* Navigation Links */}
                 <div className="flex flex-col gap-6">
                   {[
-                    { name: "Home", path: "/" },
                     { name: "About Us", path: "/About" },
                     { name: "Officers", path: "/Officers" },
                     { name: "Blogs", path: "/Blogs" },
                     { name: "Events", path: "/Events" },
+                    { name: "Tools", path: "/Tools" },
                   ].map((link, i) => (
                     <motion.div key={i} variants={linkVariants}>
                       <Link 
