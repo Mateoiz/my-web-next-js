@@ -14,7 +14,7 @@ export const metadata: Metadata = {
     description: "The official student organization for Computer Science at De La Salle Araneta University.",
     images: [
       {
-        url: "/og-image.jpg",
+        url: "/og/og-image.jpg",
         width: 1200,
         height: 630,
         alt: "JPCS DLSAU Preview",
