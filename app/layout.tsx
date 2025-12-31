@@ -41,8 +41,6 @@ export default function RootLayout({
         {/* 1. Theme Providers (Wrap everything) */}
         <Providers>
           
-          {/* ✅ HOLIDAY THEME: Placed inside Providers to access Dark Mode context */}
-          <HolidayTheme />
 
           {/* 2. Loading State Provider */}
           <LoadingProvider>

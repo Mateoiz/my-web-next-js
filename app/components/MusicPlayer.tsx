@@ -11,7 +11,7 @@ export default function MusicPlayer() {
   useEffect(() => {
     setMounted(true);
 
-    audioRef.current = new Audio("/bg-music2.mp3");
+    audioRef.current = new Audio("/bg-music.mp3");
     
     if (audioRef.current) {
       audioRef.current.loop = true;
@@ -42,10 +42,10 @@ export default function MusicPlayer() {
 
   if (!mounted) return null;
 
-return (
+  return (
     <>
+      {/* --- 1. THE VISUALIZER WAVES --- */}
       <div 
-        // FIX: Z-Index set to z-[40] (Below the button)
         className={`fixed bottom-0 left-0 w-full h-32 z-[40] pointer-events-none flex items-end justify-center gap-1 md:gap-2 px-4 transition-opacity duration-1000 ${
           isPlaying ? "opacity-100" : "opacity-0"
         }`}
@@ -53,14 +53,11 @@ return (
         {[...Array(20)].map((_, i) => (
           <div
             key={i}
-            // CHANGED HERE: Alternating Red and Green colors
-            className={`w-2 md:w-3 rounded-t-sm transition-all duration-300 ${
-                i % 2 === 0 
-                ? "bg-red-500/60 dark:bg-red-500/80"   // Even: RED
-                : "bg-green-500/60 dark:bg-green-500/80" // Odd: GREEN
-            }`}
+            // CHANGED: Removed alternating colors, set to pure Green
+            className="w-2 md:w-3 rounded-t-sm transition-all duration-300 bg-green-500/60 dark:bg-green-500/80"
             style={{
               animation: isPlaying ? `musicWave 1s ease-in-out infinite` : "none",
+              // Random delays make the wave look organic
               animationDelay: `${Math.random() * 0.5}s`,
               height: isPlaying ? `${Math.random() * 40 + 10}%` : "10px", 
             }}
