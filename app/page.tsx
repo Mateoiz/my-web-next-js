@@ -9,6 +9,10 @@ import UpcomingEventToast from "./components/UpcomingEventToast";
 import SecretGame from "./components/SecretGame"; 
 import FloatingCubes from "./components/FloatingCubes"; 
 import CircuitCursor from "./components/CircuitCursor"; 
+import DailyDecrypt from "./components/DailyDecrypt"; // Now renders the floating button
+
+// If you created the TechMarquee from the previous step, uncomment these:
+// import TechMarquee from "./components/TechMarquee"; 
 
 export default function Home() {
   return (
@@ -32,9 +36,13 @@ export default function Home() {
       <div className="hidden md:block">
         <CircuitCursor />
       </div>
-      <SecretGame />
 
-      {/* --- MAIN CONTENT --- */}
+      {/* --- GLOBAL WIDGETS --- */}
+      {/* These sit on top of everything else */}
+      <SecretGame />
+      <DailyDecrypt /> {/* This now renders the floating key button in bottom-right */}
+
+      {/* --- MAIN HERO CONTENT --- */}
       <section className="min-h-screen flex flex-col justify-center items-center text-center px-4 relative z-10 py-12 md:py-0">
         <UpcomingEventToast />
 
@@ -123,6 +131,11 @@ export default function Home() {
           </Link>
         </motion.div>
       </section>
+
+      {/* --- INFINITE TECH MARQUEE (Optional) --- */}
+      {/* <div className="relative z-10">
+        <TechMarquee />
+      </div> */}
       
       <style jsx global>{`
         /* --- INTENSE CONSTANT GLITCH EFFECT --- */

@@ -9,29 +9,40 @@ export default function Footer() {
     { 
       icon: <FaFacebook />, 
       href: 'https://www.facebook.com/JPCSDLSAU',
-      color: "hover:text-green-500 hover:drop-shadow-[0_0_10px_rgba(34,197,94,0.8)]" // Cyber Green
+      // Kept your original hover color, it works well
+      color: "hover:text-green-500 hover:drop-shadow-[0_0_10px_rgba(34,197,94,0.8)]" 
     },
     { 
       icon: <FaInstagram />, 
       href: 'https://www.instagram.com/jpcs_dlsau?igsh=YXo5emdqNTNpaDd6',
-      color: "hover:text-red-500 hover:drop-shadow-[0_0_10px_rgba(34,197,94,0.8)]" // Cyber Red
+      // Changed Instagram to green to match the new "leaking hue" theme better, 
+      // but feel free to change back to red if preferred.
+      color: "hover:text-green-500 hover:drop-shadow-[0_0_10px_rgba(34,197,94,0.8)]" 
     },
     { 
       icon: <FaYoutube />, 
       href: 'https://youtube.com',
-      color: "hover:text-green-500 hover:drop-shadow-[0_0_10px_rgba(34,197,94,0.8)]" // Cyber Green
+      color: "hover:text-green-500 hover:drop-shadow-[0_0_10px_rgba(34,197,94,0.8)]" 
     },
   ];
 
   return (
-   <footer className="relative z-[10] bg-black text-white py-8 mt-auto overflow-hidden border-t border-zinc-800">
+    <footer className="relative z-[10] bg-black text-white py-8 mt-auto border-t border-zinc-900 
+      {/* CHANGE 1: overflow-visible allows the shadow to 'leak' out */}
+      overflow-visible 
+      {/* CHANGE 2: The Upward Green Leak Effect */}
+      shadow-[0_-20px_60px_-15px_rgba(34,197,94,0.5)]
+    ">
       
-      {/* --- 1. DIGITAL SNOW CAP (Top Border Effect) --- */}
-      <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-white/50 to-transparent blur-[1px]" />
-      <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-white to-transparent opacity-50" />
+      {/* --- CYBER BORDER EFFECT (Changed from white to green) --- */}
+      <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-transparent via-green-500/50 to-transparent blur-[2px]" />
+      <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-green-400 to-transparent opacity-80" />
       
-      {/* Background Glow (Subtle Christmas vibe) */}
-      <div className="absolute inset-0 bg-gradient-to-b from-green-900/5 to-red-900/5 pointer-events-none" />
+      {/* --- CHANGE 3: Internal Radioactive Atmosphere --- */}
+      {/* This creates a glow from the bottom center upwards inside the footer */}
+      <div className="absolute inset-0 pointer-events-none blur-2xl
+        bg-[radial-gradient(ellipse_at_bottom,_var(--tw-gradient-stops))] from-green-700/30 via-zinc-900/10 to-transparent" 
+      />
 
       <div className="relative z-10 container mx-auto flex flex-col items-center gap-6 px-4">
         
@@ -43,17 +54,15 @@ export default function Footer() {
               href={link.href}
               target="_blank" 
               rel="noopener noreferrer"
-              className={`text-2xl text-zinc-400 transition-all duration-300 transform hover:scale-110 ${link.color}`}
+              className={`text-2xl text-zinc-500 transition-all duration-500 transform hover:scale-110 hover:-translate-y-1 ${link.color}`}
             >
               {link.icon}
             </Link>
           ))}
         </div>
 
-        {/* Decorative Divider */}
-
         {/* Copyright Section with Logo */}
-        <div className="flex flex-col md:flex-row items-center gap-3 text-sm md:text-base text-zinc-500">
+        <div className="flex flex-col md:flex-row items-center gap-3 text-sm md:text-base text-zinc-500 font-mono">
           
           <div className="flex items-center gap-3">
             <Image 
@@ -61,7 +70,8 @@ export default function Footer() {
               alt="La Salle Computer Society Logo" 
               width={30} 
               height={30} 
-              className="h-8 w-auto grayscale opacity-80 hover:grayscale-0 hover:opacity-100 transition-all duration-500"
+              // Added a green drop shadow on hover to match the theme
+              className="h-8 w-auto grayscale opacity-60 hover:grayscale-0 hover:opacity-100 hover:drop-shadow-[0_0_5px_rgba(34,197,94,0.5)] transition-all duration-500"
             />
             <p>
               &copy; {currentYear} Junior Philippine Computer Society DLSAU.

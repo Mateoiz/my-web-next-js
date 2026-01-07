@@ -13,7 +13,7 @@ import {
 import FloatingCubes from "../components/FloatingCubes";
 import CircuitCursor from "../components/CircuitCursor"; 
 
-// --- 1. MAIN OFFICERS DATA ---
+// --- 1. MAIN OFFICERS DATA (UPDATED WITH EMAILS) ---
 const officers = [
   {
     id: 1,
@@ -21,7 +21,7 @@ const officers = [
     role: "President",
     bio: "Leading the vision for JPCS with a passion for innovation and community building. Focused on creating impactful workshops this year.",
     image: "/officers/PR.JPG", 
-    socials: { facebook: "https://www.facebook.com/justine.lloyd.garma#", email: "#" }
+    socials: { facebook: "https://www.facebook.com/justine.lloyd.garma#", email: "justine.garma@dlsau.edu.ph" }
   },
   {
     id: 2,
@@ -29,7 +29,7 @@ const officers = [
     role: "Vice President - Operations",
     bio: "Ensuring smooth operations within the organization and managing member engagement. A backend development enthusiast.",
     image: "/officers/VPO.JPG",
-    socials: { facebook: "https://www.facebook.com/icyy.teo/", email: "#" }
+    socials: { facebook: "https://www.facebook.com/icyy.teo/", email: "ice.ramirez@dlsau.edu.ph" }
   },
   {
     id: 3,
@@ -37,7 +37,7 @@ const officers = [
     role: "Vice President - External",
     bio: "Building bridges with other organizations and industry partners. Expert in networking and corporate relations.",
     image: "/officers/VPE.JPG",
-    socials: { facebook: "https://www.facebook.com/luwi.111093", email: "#" }
+    socials: { facebook: "https://www.facebook.com/luwi.111093", email: "louievince.laguidao@dlsau.edu.ph" }
   },
   {
     id: 4,
@@ -45,7 +45,7 @@ const officers = [
     role: "Vice President - Internal",
     bio: "Ensuring Internal Operations are fluid and are optimized for efficiency.",
     image: "/officers/VPI.JPG",
-    socials: { facebook: "https://www.facebook.com/antonette.melon", email: "#" }
+    socials: { facebook: "https://www.facebook.com/antonette.melon", email: "antonette.melon@dlsau.edu.ph" }
   },
   {
     id: 5,
@@ -53,7 +53,7 @@ const officers = [
     role: "Secretary",
     bio: "Keeping the organization organized and on track with meticulous record-keeping and scheduling.",
     image: "/officers/SEC.JPG",
-    socials: { facebook: "https://www.facebook.com/reynalyn.morbo", email: "#" }
+    socials: { facebook: "https://www.facebook.com/reynalyn.morbo", email: "reynalyn.morbo@dlsau.edu.ph" }
   },
   {
     id: 7,
@@ -69,7 +69,7 @@ const officers = [
     role: "Auditor",
     bio: "Keeping the organization organized and on track with meticulous record-keeping and scheduling.",
     image: "/officers/AUD.JPG",
-    socials: { facebook: "https://www.facebook.com/rodricyr", email: "#" }
+    socials: { facebook: "https://www.facebook.com/rodricyr", email: "cyril.rodriguez@dlsau.edu.ph" }
   },
 ];
 
@@ -272,9 +272,22 @@ export default function OfficersPage() {
                     </a>
                   )}
                   {officer.socials.email && (
-                    <a href={officer.socials.email} className="hover:text-green-600 dark:hover:text-green-500 transition-colors">
-                      <FaEnvelope />
-                    </a>
+                    // --- UPDATED EMAIL TOOLTIP LOGIC ---
+                    <div className="relative group/email">
+                        {/* Tooltip Content */}
+                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 hidden group-hover/email:block">
+                            <div className="bg-zinc-800 text-white text-xs px-3 py-2 rounded-lg whitespace-nowrap shadow-lg border border-zinc-700 relative z-50">
+                                {officer.socials.email}
+                                {/* Tiny arrow pointing down */}
+                                <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-zinc-800 border-b border-r border-zinc-700 rotate-45"></div>
+                            </div>
+                        </div>
+
+                        {/* Icon Trigger */}
+                        <a href={`mailto:${officer.socials.email}`} className="hover:text-green-600 dark:hover:text-green-500 transition-colors">
+                            <FaEnvelope />
+                        </a>
+                    </div>
                   )}
                 </div>
               </div>
@@ -315,11 +328,10 @@ export default function OfficersPage() {
                   src={rep.image}
                   alt={rep.name}
                   fill
-                  // REMOVED grayscale, added subtle green tint overlay below instead
                   className="object-cover transition-transform duration-700 group-hover:scale-110"
                 />
                 
-                {/* NEW: Subtle Green/Dark Tint Overlay that fades on hover */}
+                {/* Subtle Green/Dark Tint Overlay that fades on hover */}
                 <div className="absolute inset-0 bg-zinc-900/20 dark:bg-green-900/30 transition-opacity duration-700 group-hover:opacity-0 pointer-events-none" />
 
                 {/* Gradient for text readability */}
