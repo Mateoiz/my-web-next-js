@@ -279,16 +279,23 @@ const GradeRow = ({ label, values, setValues, type }: GradeRowProps) => (
 );
 
 // --- TOOL 2: GWA & HONORS CALCULATOR (EXPANDABLE) ---
+// --- TOOL 2: GWA & HONORS CALCULATOR (UPDATED WITH UNITS) ---
 function GWACalculator() {
-  const [isExpanded, setIsExpanded] = useState(false); // Default: Folded
+  const [isExpanded, setIsExpanded] = useState(false);
 
-  const [subjects, setSubjects] = useState([{ id: 1, raw: "" }, { id: 2, raw: "" }, { id: 3, raw: "" }]);
+  // Added 'units' to the state object, defaulting to 3
+  const [subjects, setSubjects] = useState([
+    { id: 1, raw: "", units: "3" }, 
+    { id: 2, raw: "", units: "3" }, 
+    { id: 3, raw: "", units: "3" }
+  ]);
+  
   const [gwa, setGwa] = useState<number | null>(null);
   const [honorTitle, setHonorTitle] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const addSubject = () => {
-    setSubjects([...subjects, { id: Date.now(), raw: "" }]);
+    setSubjects([...subjects, { id: Date.now(), raw: "", units: "3" }]);
   };
 
   const removeSubject = (id: number) => {
@@ -297,41 +304,57 @@ function GWACalculator() {
     }
   };
 
-  const updateSubject = (id: number, value: string) => {
-    setSubjects(subjects.map(s => s.id === id ? { ...s, raw: value } : s));
+  // Updated to handle changing both Raw Score and Units
+  const updateSubject = (id: number, field: "raw" | "units", value: string) => {
+    setSubjects(subjects.map(s => s.id === id ? { ...s, [field]: value } : s));
   };
 
   const calculateGWA = () => {
     setError(null);
-    let totalPoints = 0;
-    let subjectCount = 0;
+    let totalWeightedPoints = 0; // Sum of (Grade * Units)
+    let totalUnits = 0;          // Sum of Units
+
+    // 
 
     for (const s of subjects) {
-      if (!s.raw) continue;
+      // Skip empty rows
+      if (!s.raw || !s.units) continue;
       
       const rawScore = parseFloat(s.raw);
+      const unitValue = parseFloat(s.units);
 
-      if (isNaN(rawScore)) continue;
+      if (isNaN(rawScore) || isNaN(unitValue)) continue;
       
       if (rawScore > 100 || rawScore < 0) {
           setError(`Invalid score: ${rawScore}. Must be between 0 and 100.`);
           return;
       }
 
-      // Automatically convert RAW SCORE (e.g. 95) to EQUIVALENT (e.g. 3.5)
+      if (unitValue <= 0) {
+        setError(`Invalid unit: ${unitValue}. Must be greater than 0.`);
+        return;
+      }
+
+      // 1. Convert Raw Score (e.g., 95) to GPA Point (e.g., 4.0)
       const equivalent = getGpaFromScore(rawScore);
-      totalPoints += equivalent;
-      subjectCount += 1;
+      
+      // 2. Multiply Grade by Units
+      totalWeightedPoints += (equivalent * unitValue);
+      
+      // 3. Add to Total Units
+      totalUnits += unitValue;
     }
 
-    if (subjectCount === 0) {
-      setError("Please enter at least one valid raw score.");
+    if (totalUnits === 0) {
+      setError("Please enter valid scores and units.");
       return;
     }
 
-    const computedGWA = totalPoints / subjectCount;
+    // 4. Divide Total Weighted Points by Total Units
+    const computedGWA = totalWeightedPoints / totalUnits;
     setGwa(computedGWA);
 
+    // Honors Logic (Adjust based on your school's specific GWA cutoffs)
     if (computedGWA >= 3.7) setHonorTitle("With Highest Honors");
     else if (computedGWA >= 3.4) setHonorTitle("With High Honors");
     else if (computedGWA >= 3.0) setHonorTitle("With Honors");
@@ -339,7 +362,7 @@ function GWACalculator() {
   };
 
   const reset = () => {
-    setSubjects([{ id: 1, raw: "" }, { id: 2, raw: "" }, { id: 3, raw: "" }]);
+    setSubjects([{ id: 1, raw: "", units: "3" }, { id: 2, raw: "", units: "3" }, { id: 3, raw: "", units: "3" }]);
     setGwa(null);
     setHonorTitle(null);
     setError(null);
@@ -366,7 +389,7 @@ function GWACalculator() {
           </div>
           <div>
             <h2 className="text-xl font-bold text-zinc-900 dark:text-white">GWA Calculator</h2>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Honors Eligibility</p>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Weighted Average</p>
           </div>
         </div>
         <div className="text-zinc-400 dark:text-zinc-500">
@@ -384,29 +407,45 @@ function GWACalculator() {
             className="overflow-hidden"
           >
             <div className="pt-8 space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+              {/* UPDATED GRID HEADER */}
               <div className="grid grid-cols-12 gap-2 text-xs font-bold text-zinc-400 uppercase tracking-widest px-1">
-                <span className="col-span-3 text-center">Subject</span>
-                <span className="col-span-7 text-center">Raw Score (0-100)</span>
-                <span className="col-span-2 text-center">Action</span>
+                <span className="col-span-2 text-center">Subj</span>
+                <span className="col-span-5 text-center">Raw Score</span>
+                <span className="col-span-3 text-center">Units</span>
+                <span className="col-span-2 text-center">Act</span>
               </div>
 
               {subjects.map((sub, index) => {
                 const previewGPA = sub.raw ? getGpaFromScore(parseFloat(sub.raw)).toFixed(1) : "-.-";
                 return (
                   <div key={sub.id} className="grid grid-cols-12 gap-2 items-center" onClick={(e) => e.stopPropagation()}>
-                    <div className="col-span-3 text-center text-xs font-mono text-zinc-500">#{index + 1}</div>
-                    <div className="col-span-7 relative group">
+                    <div className="col-span-2 text-center text-xs font-mono text-zinc-500">#{index + 1}</div>
+                    
+                    {/* RAW SCORE INPUT */}
+                    <div className="col-span-5 relative group">
                       <input
                         type="number"
-                        placeholder="e.g. 95"
+                        placeholder="0-100"
                         value={sub.raw}
-                        onChange={(e) => updateSubject(sub.id, e.target.value)}
+                        onChange={(e) => updateSubject(sub.id, "raw", e.target.value)}
                         className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-2 text-center font-mono text-sm outline-none focus:border-green-500 transition-colors"
                       />
                       <div className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-green-600 dark:text-green-400 pointer-events-none opacity-50 group-focus-within:opacity-100 transition-opacity">
                         {sub.raw && !isNaN(parseFloat(sub.raw)) ? `≈ ${previewGPA}` : ""}
                       </div>
                     </div>
+
+                    {/* UNITS INPUT (NEW) */}
+                    <div className="col-span-3">
+                       <input
+                        type="number"
+                        placeholder="Unit"
+                        value={sub.units}
+                        onChange={(e) => updateSubject(sub.id, "units", e.target.value)}
+                        className="w-full bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-2 text-center font-mono text-sm outline-none focus:border-green-500 transition-colors text-zinc-600 dark:text-zinc-300"
+                      />
+                    </div>
+
                     <div className="col-span-2 text-center">
                       <button 
                         onClick={() => removeSubject(sub.id)}
@@ -425,10 +464,9 @@ function GWACalculator() {
               <FaPlus /> Add Subject
             </button>
 
-            {/* BUTTONS - FIXED TO MATCH */}
             <div className="flex gap-4 mt-8">
               <button onClick={calculateGWA} className="flex-1 bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2">
-                Calculate Average <FaArrowRight size={12} />
+                Calculate GWA <FaArrowRight size={12} />
               </button>
               <button onClick={reset} className="px-4 bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-red-500 transition-colors active:scale-95">
                 <FaEraser />
@@ -436,9 +474,10 @@ function GWACalculator() {
             </div>
 
             {error && <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="mt-4 text-center text-red-500 text-xs font-bold">{error}</motion.div>}
+            
             {gwa !== null && (
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mt-6 pt-6 border-t border-zinc-200 dark:border-zinc-700 text-center">
-                <span className="text-xs font-bold uppercase text-zinc-500 tracking-widest">Average GWA</span>
+                <span className="text-xs font-bold uppercase text-zinc-500 tracking-widest">Weighted Average (GWA)</span>
                 <div className={`text-5xl font-black my-2 tracking-tighter ${gwa >= 3.0 ? "text-green-500" : "text-zinc-700 dark:text-white"}`}>{gwa.toFixed(4)}</div>
                 {honorTitle ? (
                   <div className="inline-flex items-center gap-2 px-4 py-2 bg-yellow-500/10 border border-yellow-500/30 rounded-full text-yellow-600 dark:text-yellow-400 text-sm font-bold uppercase tracking-wide animate-pulse">
