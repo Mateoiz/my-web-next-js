@@ -7,7 +7,7 @@ import {
 } from "react-icons/fa";
 import { SiReact, SiPython, SiTensorflow, SiUnity, SiFigma, SiKalilinux, SiUnrealengine, SiTypescript } from "react-icons/si";
 
-// --- EXPANDED PATHS DATA ---
+// --- EXPANDED PATHS DATA (THEME AWARE COLORS) ---
 const PATHS = [
   {
     id: "build",
@@ -20,8 +20,9 @@ const PATHS = [
   return <World status={future} />;
 }`,
     output: "> App compiled successfully.\n> Deploying to global_network...\n> Status: LIVE 🟢",
-    color: "text-blue-400",
-    bg: "bg-blue-500/10",
+    // Light Mode: Darker Text / Lighter Bg || Dark Mode: Lighter Text / Darker Bg
+    color: "text-blue-600 dark:text-blue-400",
+    bg: "bg-blue-50 dark:bg-blue-500/10",
     border: "border-blue-500/50",
     tools: [<SiReact key="1"/>, <SiTypescript key="2"/>]
   },
@@ -36,8 +37,8 @@ model.train(dataset)
 prediction = model.think(new_data)
 print(f"Confidence: {prediction}%")`,
     output: "> Training Epoch 1... [=====>] 20%\n> Training Epoch 50... [==========] 100%\n> Prediction: 99.8% Accuracy 🧠",
-    color: "text-purple-400",
-    bg: "bg-purple-500/10",
+    color: "text-purple-600 dark:text-purple-400",
+    bg: "bg-purple-50 dark:bg-purple-500/10",
     border: "border-purple-500/50",
     tools: [<SiPython key="1"/>, <SiTensorflow key="2"/>]
   },
@@ -53,9 +54,9 @@ print(f"Confidence: {prediction}%")`,
   encrypt(payload);
 }`,
     output: "> ALERT: Intrusion Detected.\n> Rerouting traffic...\n> Threat Neutralized. System Secure. 🛡️",
-    color: "text-green-400",
-    bg: "bg-green-500/10",
-    border: "border-green-500/50",
+    color: "text-emerald-600 dark:text-emerald-400",
+    bg: "bg-emerald-50 dark:bg-emerald-500/10",
+    border: "border-emerald-500/50",
     tools: [<SiKalilinux key="1"/>, <FaTerminal key="2"/>]
   },
   {
@@ -71,8 +72,8 @@ print(f"Confidence: {prediction}%")`,
   }
 }`,
     output: "> Engine Initialized.\n> Physics: ON\n> Rendering 60 FPS... Ready Player One. 🎮",
-    color: "text-orange-400",
-    bg: "bg-orange-500/10",
+    color: "text-orange-600 dark:text-orange-400",
+    bg: "bg-orange-50 dark:bg-orange-500/10",
     border: "border-orange-500/50",
     tools: [<SiUnity key="1"/>, <SiUnrealengine key="2"/>]
   },
@@ -88,8 +89,8 @@ print(f"Confidence: {prediction}%")`,
   box-shadow: 0 0 50px rgba(0,255,0,0.2);
 }`,
     output: "> Styles Applied.\n> Animation: Smooth\n> UX Score: 100/100 ✨",
-    color: "text-pink-400",
-    bg: "bg-pink-500/10",
+    color: "text-pink-600 dark:text-pink-400",
+    bg: "bg-pink-50 dark:bg-pink-500/10",
     border: "border-pink-500/50",
     tools: [<SiFigma key="1"/>, <FaPaintBrush key="2"/>]
   }
@@ -109,7 +110,6 @@ export default function CSExploration() {
     }, 1500); // 1.5s simulated loading time
   };
 
-  // Reset output when switching tabs
   const handleTabClick = (path: typeof PATHS[0]) => {
     setActivePath(path);
     setShowOutput(false);
@@ -117,9 +117,11 @@ export default function CSExploration() {
   };
 
   return (
-    <section className="py-24 relative z-10 overflow-hidden bg-zinc-950">
-      {/* Background Grid */}
-      <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:40px_40px] pointer-events-none" />
+    // Light: White BG, Dark: Zinc-950 BG
+    <section className="py-24 relative z-10 overflow-hidden bg-zinc-50 dark:bg-zinc-950 transition-colors duration-300">
+      
+      {/* Background Grid - Adaptive Opacity */}
+      <div className="absolute inset-0 bg-[linear-gradient(rgba(0,0,0,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(0,0,0,0.05)_1px,transparent_1px)] dark:bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:40px_40px] pointer-events-none" />
 
       <div className="max-w-7xl mx-auto px-4">
         
@@ -129,7 +131,7 @@ export default function CSExploration() {
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className="inline-block p-2 px-4 rounded-full bg-zinc-900 border border-zinc-800 text-xs font-mono text-zinc-400 mb-4"
+            className="inline-block p-2 px-4 rounded-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs font-mono text-zinc-500 dark:text-zinc-400 mb-4 shadow-sm"
           >
             INITIALIZE_SEQUENCE: CHOOSE_YOUR_PATH
           </motion.div>
@@ -138,16 +140,16 @@ export default function CSExploration() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ delay: 0.1 }}
-            className="text-3xl md:text-5xl font-bold text-white mb-4"
+            className="text-3xl md:text-5xl font-bold text-zinc-900 dark:text-white mb-4"
           >
-            What will you <span className="text-green-500">Create?</span>
+            What will you <span className="text-green-600 dark:text-green-500">Create?</span>
           </motion.h2>
           <motion.p 
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
             viewport={{ once: true }}
             transition={{ delay: 0.2 }}
-            className="text-zinc-400 max-w-2xl mx-auto text-lg"
+            className="text-zinc-600 dark:text-zinc-400 max-w-2xl mx-auto text-lg"
           >
             Computer Science is the closest thing to magic we have. 
             Select a specialized path below to initialize your journey.
@@ -157,7 +159,7 @@ export default function CSExploration() {
         {/* --- INTERACTIVE INTERFACE --- */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
           
-          {/* LEFT: CONTROLS (4 Columns) */}
+          {/* LEFT: CONTROLS (List of Paths) */}
           <div className="lg:col-span-4 flex flex-col gap-3">
             {PATHS.map((path) => (
               <button
@@ -165,37 +167,37 @@ export default function CSExploration() {
                 onClick={() => handleTabClick(path)}
                 className={`w-full text-left p-4 rounded-xl border transition-all duration-300 group relative overflow-hidden ${
                   activePath.id === path.id 
-                    ? `${path.bg} ${path.border} shadow-[0_0_20px_rgba(0,0,0,0.2)] translate-x-2` 
-                    : "bg-zinc-900/50 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900"
+                    ? `${path.bg} ${path.border} shadow-md dark:shadow-[0_0_20px_rgba(0,0,0,0.2)] translate-x-2` 
+                    : "bg-white dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-900"
                 }`}
               >
                 <div className="flex items-center justify-between relative z-10">
                   <div className="flex items-center gap-4">
-                    <div className={`text-xl ${activePath.id === path.id ? path.color : "text-zinc-500 group-hover:text-white"}`}>
+                    <div className={`text-xl ${activePath.id === path.id ? path.color : "text-zinc-400 dark:text-zinc-500 group-hover:text-zinc-900 dark:group-hover:text-white"}`}>
                       {path.icon}
                     </div>
                     <div>
-                      <h3 className={`text-sm md:text-base font-bold uppercase tracking-wider ${activePath.id === path.id ? "text-white" : "text-zinc-400 group-hover:text-white"}`}>
+                      <h3 className={`text-sm md:text-base font-bold uppercase tracking-wider ${activePath.id === path.id ? "text-zinc-900 dark:text-white" : "text-zinc-500 dark:text-zinc-400 group-hover:text-zinc-900 dark:group-hover:text-white"}`}>
                         {path.label}
                       </h3>
                     </div>
                   </div>
-                  <FaChevronRight className={`text-xs transition-transform duration-300 ${activePath.id === path.id ? "text-white opacity-100" : "text-zinc-600 opacity-0 group-hover:opacity-100"}`} />
+                  <FaChevronRight className={`text-xs transition-transform duration-300 ${activePath.id === path.id ? "text-zinc-900 dark:text-white opacity-100" : "text-zinc-400 opacity-0 group-hover:opacity-100"}`} />
                 </div>
               </button>
             ))}
           </div>
 
-          {/* RIGHT: VISUALIZATION WINDOW (8 Columns) */}
-          <div className="lg:col-span-8 relative h-[500px] w-full bg-black rounded-2xl border border-zinc-800 overflow-hidden shadow-2xl flex flex-col">
+          {/* RIGHT: VISUALIZATION WINDOW */}
+          <div className="lg:col-span-8 relative h-[500px] w-full bg-zinc-900 dark:bg-black rounded-2xl border border-zinc-300 dark:border-zinc-800 overflow-hidden shadow-2xl flex flex-col">
             
             {/* Window Header */}
-            <div className="flex items-center justify-between px-4 py-3 bg-zinc-900 border-b border-zinc-800 shrink-0">
+            <div className="flex items-center justify-between px-4 py-3 bg-zinc-100 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 shrink-0 transition-colors duration-300">
               <div className="flex items-center gap-4">
                 <div className="flex gap-1.5">
-                  <div className="w-3 h-3 rounded-full bg-red-500/50" />
-                  <div className="w-3 h-3 rounded-full bg-yellow-500/50" />
-                  <div className="w-3 h-3 rounded-full bg-green-500/50" />
+                  <div className="w-3 h-3 rounded-full bg-red-500/80" />
+                  <div className="w-3 h-3 rounded-full bg-yellow-500/80" />
+                  <div className="w-3 h-3 rounded-full bg-green-500/80" />
                 </div>
                 <div className="flex items-center gap-2 text-xs font-mono text-zinc-500">
                   <FaTerminal />
@@ -208,15 +210,15 @@ export default function CSExploration() {
                 onClick={handleRun}
                 disabled={isRunning}
                 className={`flex items-center gap-2 px-3 py-1 rounded text-xs font-bold font-mono transition-all
-                  ${isRunning ? "bg-zinc-800 text-zinc-500 cursor-wait" : "bg-green-600 hover:bg-green-500 text-black"}
+                  ${isRunning ? "bg-zinc-200 dark:bg-zinc-800 text-zinc-500 cursor-wait" : "bg-green-600 hover:bg-green-500 text-white dark:text-black"}
                 `}
               >
                 <FaPlay size={10} /> {isRunning ? "COMPILING..." : "RUN CODE"}
               </button>
             </div>
 
-            {/* Content Area */}
-            <div className="p-6 md:p-8 flex-1 relative overflow-y-auto custom-scrollbar flex flex-col">
+            {/* Content Area - Always Dark for Terminal Feel, but adaptable */}
+            <div className="p-6 md:p-8 flex-1 relative overflow-y-auto custom-scrollbar flex flex-col bg-zinc-950 dark:bg-black transition-colors duration-300">
               <AnimatePresence mode="wait">
                 <motion.div
                   key={activePath.id}
@@ -245,7 +247,7 @@ export default function CSExploration() {
                     </div>
                   </div>
 
-                  {/* Code Mockup */}
+                  {/* Code Mockup (Always Dark BG for Code) */}
                   <div className="bg-zinc-900/50 rounded-lg p-4 border border-zinc-800 font-mono text-xs md:text-sm overflow-hidden relative group shadow-inner">
                     <pre className="text-zinc-300 relative z-10">
                       <code>
@@ -282,8 +284,8 @@ export default function CSExploration() {
                 </motion.div>
               </AnimatePresence>
 
-              {/* Scanlines Overlay */}
-              <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] z-[5] bg-[length:100%_2px,3px_100%] opacity-20" />
+              {/* Scanlines Overlay - Only visible in Dark Mode for aesthetic */}
+              <div className="hidden dark:block absolute inset-0 pointer-events-none bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] z-[5] bg-[length:100%_2px,3px_100%] opacity-20" />
             </div>
           </div>
 
