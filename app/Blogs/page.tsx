@@ -5,22 +5,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { FaUser, FaCalendarAlt, FaArrowRight } from "react-icons/fa";
 
-// --- IMPORT YOUR THEME COMPONENTS ---
+// --- IMPORT SHARED DATA ---
+import { BLOG_POSTS } from "../constants/blog"; // <--- NEW IMPORT
+
 import FloatingCubes from "../components/FloatingCubes"; 
 import CircuitCursor from "../components/CircuitCursor"; 
-
-// --- MOCK DATA ---
-const blogPosts = [
-  {
-    id: 1,
-    title: "JPCS x LACES Successful Techquizbee Event",
-    date: "November 25, 2025",
-    author: "Ziankyle Piangco",
-    excerpt: "The Junior Philippine Computer Society (JPCS) in collaboration with the LACES organization recently hosted a highly successful Techquizbee event at the DLSAU Auditorium. The event saw enthusiastic participation from students across various departments, showcasing their knowledge and skills in technology and computer science...",
-    image: "/articles/AR1.JPG", 
-    slug: "JPCS-x-LACES-successful-techquizbee-event",
-  },
-];
 
 // --- ANIMATIONS ---
 const containerVariants: Variants = {
@@ -39,12 +28,9 @@ export default function BlogPage() {
       
       {/* BACKGROUND */}
       <div className="fixed inset-0 z-0 pointer-events-none">
-        {/* FIX: Removed 'hidden sm:block'. Now it renders on all screens. */}
-        {/* Added opacity-50 for mobile so text remains readable */}
         <div className="absolute inset-0 opacity-50 sm:opacity-100">
              <FloatingCubes />
         </div>
-        
         <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-green-500/5 rounded-full blur-[100px]" />
         <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-emerald-500/5 rounded-full blur-[100px]" />
       </div>
@@ -69,7 +55,7 @@ export default function BlogPage() {
           animate="visible"
           className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
         >
-          {blogPosts.map((post) => (
+          {BLOG_POSTS.map((post) => (
             <BlogCard key={post.id} post={post} />
           ))}
         </motion.div>
@@ -112,9 +98,11 @@ function BlogCard({ post }: { post: any }) {
         </p>
 
         <div className="mt-auto pt-4 border-t border-zinc-100 dark:border-zinc-800 flex justify-end">
-          {/* LINK TO THE INDIVIDUAL PAGE */}
+          {/* If you don't have individual pages yet, this link will 404.
+             For now, you can make it link to the main Blogs page or just '#'
+          */}
           <Link 
-            href={`/Blogs/${post.slug}`}
+            href={`/Blogs/${post.slug}`} // Or "/Blogs" if no individual pages exist yet
             className="inline-flex items-center gap-2 text-sm font-bold text-green-600 dark:text-green-500 hover:text-green-700 dark:hover:text-green-400 transition-colors"
           >
             Read More <FaArrowRight />
