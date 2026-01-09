@@ -1,8 +1,7 @@
 "use client";
 
 import { useRef, useEffect, useState, ReactNode } from "react";
-// Image import removed as it is replaced by the placeholder
-// import Image from "next/image"; 
+import Image from "next/image"; 
 import { 
   motion, 
   useMotionValue, 
@@ -11,8 +10,7 @@ import {
   useInView,
   AnimatePresence 
 } from "framer-motion";
-// Added FaSatelliteDish and FaLock
-import { FaChevronLeft, FaChevronRight, FaFacebook, FaGlobe, FaSatelliteDish, FaLock, FaUserPlus } from "react-icons/fa"; 
+import { FaChevronLeft, FaChevronRight, FaFacebook, FaGlobe, FaUserPlus } from "react-icons/fa"; 
 
 // --- IMPORT COMPONENTS ---
 import FloatingCubes from "../components/FloatingCubes"; 
@@ -28,28 +26,35 @@ const VISION_TEXT = [
 
 const MISSION_TEXT = "As an organization that is actively involved in Information and Communication Technology-related concerns of education, industry, business, and government, Junior Philippine Computer Society is pleased to collaborate with its officers and members in helping the university in developing world-class Computer Science students that have leadership, integrity, faith and excellence.";
 
+// --- CAROUSEL DATA ---
 const CAROUSEL_ITEMS = [
-  { title: "Workshops", subtitle: "Skill Building" },
-  { title: "Community", subtitle: "Stronger Together" },
-  { title: "Innovation", subtitle: "Future Ready" },
-  { title: "Leadership", subtitle: "Leading the Way" },
+  { title: "Workshops", subtitle: "Skill Building", image: "/about/CC1.jpg" },
+  { title: "Community", subtitle: "Stronger Together", image: "/about/CC2.JPG" },
+  { title: "Innovation", subtitle: "Future Ready", image: "/about/CC3.jpg" },
+  { title: "Leadership", subtitle: "Leading the Way", image: "/about/CC4.JPG" },
 ];
 
-// --- UPDATED AFFILIATES DATA ---
+// --- AFFILIATES DATA (Colors removed for uniformity) ---
 const AFFILIATES = [
   { 
     name: "De La Salle Araneta University", 
     acronym: "DLSAU", 
-    color: "bg-green-700",
     logo: "/affiliates/dlsau.png",
     facebookUrl: "https://www.facebook.com/dlsauofficial",
     websiteUrl: "https://www.dlsau.edu.ph",
-    description: "De La Salle Araneta University (DLSAU) is a private Catholic Lasallian institution founded in 1946 by Don Salvador Z. Araneta as the Araneta Institute of Agriculture (AIA), later renamed the Gregorio Araneta University Foundation (GAUF), and relocated to Malabon in 1947 to better serve its community. After a collaborative integration process that began in 1987, it officially became part of the De La Salle System in 2002, joining the network of Lasallian educational institutions committed to holistic formation and academic excellence."
+    description: "De La Salle Araneta University (DLSAU) is a private Catholic Lasallian institution founded in 1946 by Don Salvador Z. Araneta. It formally became part of the De La Salle System in 2002, joining the network of Lasallian educational institutions committed to holistic formation and academic excellence."
+  },
+    { 
+    name: "Junior Philippine Computer Society", 
+    acronym: "JPCS", 
+    logo: "/affiliates/jpcs.png", 
+    facebookUrl: "https://www.facebook.com/philippinecomputersociety",
+    websiteUrl: "https://www.philippinecomputersociety.org",
+    description: "The Philippine Computer Society (PCS) is the longest-running professional association of computing and information technology professionals in the country. It is dedicated to the advancement of Information and Communications Technology (ICT) and the professional development of its practitioners."
   },
   { 
     name: "College of Arts, Sciences, and Technology", 
     acronym: "CAST", 
-    color: "bg-blue-600",
     logo: "/affiliates/cast.png",
     facebookUrl: "https://www.facebook.com/CSCCASTDLSAU",
     description: "The College of Arts, Sciences, and Technology (CAST) is dedicated to providing a holistic education that equips students with the knowledge, skills, and values necessary to thrive in a rapidly evolving world."
@@ -57,46 +62,13 @@ const AFFILIATES = [
   { 
     name: "Samahan ng Pinagkaisang Samahan", 
     acronym: "SAMPISANAN", 
-    color: "bg-yellow-500",
     logo: "/affiliates/sampisanan.png",
     facebookUrl: "https://www.facebook.com/sampisanan",
     websiteUrl: null,
-    description: "The Samahan ng Pinagkaisang Samahan (SAMPISANAN) is an institutional umbrella organization of De La Salle Araneta University (DLSAU) that fosters the spirit of camaraderie amongst academic and non-academic student organizations, uniting them through collaboration, shared initiatives, and collective student leadership."
+    description: "The Samahan ng Pinagkaisang Samahan (SAMPISANAN) is an institutional umbrella organization of De La Salle Araneta University (DLSAU) that fosters the spirit of camaraderie amongst academic and non-academic student organizations."
   },
+
 ];
-
-// --- COMPONENT: THEMED PLACEHOLDER ---
-// This replaces the images in the carousel
-const ComingSoonPlaceholder = ({ title }: { title: string }) => (
-  <div className="absolute inset-0 w-full h-full flex flex-col items-center justify-center bg-zinc-100 dark:bg-zinc-900 overflow-hidden group">
-    
-    {/* Tech Grid Background */}
-    <div className="absolute inset-0 opacity-[0.05] dark:opacity-[0.2]" 
-         style={{ backgroundImage: 'linear-gradient(#22c55e 1px, transparent 1px), linear-gradient(90deg, #22c55e 1px, transparent 1px)', backgroundSize: '30px 30px' }}>
-    </div>
-
-    {/* Animated Scanline */}
-    <div className="absolute inset-0 bg-linear-to-b from-transparent via-green-500/10 to-transparent h-[10%] w-full animate-[scan_3s_linear_infinite] pointer-events-none" />
-
-    {/* Icon */}
-    <div className="relative z-10 mb-4 p-4 rounded-full border-2 border-zinc-300 dark:border-green-500/30 bg-zinc-200 dark:bg-black/50 text-zinc-400 dark:text-green-500 transform group-hover:scale-110 transition-transform duration-500">
-      <FaSatelliteDish className="text-3xl md:text-5xl animate-pulse" />
-    </div>
-
-    {/* Text */}
-    <h3 className="relative z-10 text-xl font-black uppercase text-zinc-400 dark:text-white tracking-widest mb-1">
-      Visuals Pending
-    </h3>
-    <div className="relative z-10 flex items-center gap-2 text-xs font-mono text-zinc-500 dark:text-green-500/70 bg-zinc-200 dark:bg-green-900/20 px-2 py-1 rounded">
-      <FaLock size={10} />
-      <span>{title.substring(0, 10).toUpperCase()}_LOCKED</span>
-    </div>
-
-    {/* Corner Accents */}
-    <div className="absolute top-4 left-4 w-2 h-2 border-t-2 border-l-2 border-zinc-400 dark:border-green-500" />
-    <div className="absolute bottom-4 right-4 w-2 h-2 border-b-2 border-r-2 border-zinc-400 dark:border-green-500" />
-  </div>
-);
 
 // --- SUB-COMPONENT: ANIMATED COUNTER ---
 const Counter = ({ value }: { value: number }) => {
@@ -163,8 +135,6 @@ const Tooltip = ({ text }: { text: string }) => (
     <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-zinc-900 dark:border-t-zinc-100" />
   </motion.div>
 );
-
-import Image from "next/image"; // Re-importing Image for other sections (Affiliates, Identity)
 
 export default function AboutPage() {
   const carouselRef = useRef<HTMLDivElement>(null);
@@ -412,13 +382,21 @@ export default function AboutPage() {
                   transition={{ duration: 0.3 }}
                 >
                   
-                  {/* --- REPLACED IMAGE WITH COMING SOON PLACEHOLDER --- */}
-                  <ComingSoonPlaceholder title={item.title} />
+                  {/* --- REAL IMAGES WITH POPPING EFFECT --- */}
+                  <Image
+                    src={item.image}
+                    alt={item.title}
+                    fill
+                    className="object-cover transition-transform duration-700 group-hover:scale-110 brightness-90 saturate-90 group-hover:brightness-110 group-hover:saturate-110"
+                  />
 
-                  <div className="absolute inset-0 bg-linear-to-t from-black via-black/20 to-transparent opacity-90 pointer-events-none" />
-                  <div className="absolute inset-4 border border-white/10 group-hover:border-green-500/50 transition-colors duration-300 rounded-xl pointer-events-none" />
+                  {/* Gradient & Overlay for Blending */}
+                  <div className="absolute inset-0 bg-green-900/10 mix-blend-overlay z-10 pointer-events-none" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-zinc-900 via-zinc-900/40 to-transparent opacity-90 z-10 pointer-events-none" />
                   
-                  <div className="absolute bottom-0 left-0 w-full p-8 translate-y-2 group-hover:translate-y-0 transition-transform duration-300 pointer-events-none">
+                  <div className="absolute inset-4 border border-white/10 group-hover:border-green-500/50 transition-colors duration-300 rounded-xl pointer-events-none z-20" />
+                  
+                  <div className="absolute bottom-0 left-0 w-full p-8 translate-y-2 group-hover:translate-y-0 transition-transform duration-300 pointer-events-none z-20">
                       <span className="text-green-400 font-mono text-xs tracking-widest uppercase mb-2 block">
                         Event_0{index + 1}
                       </span>
@@ -464,12 +442,13 @@ export default function AboutPage() {
                  {/* TEXT COLUMN */}
                  <div className="flex-1 text-center md:text-left relative z-10">
                      <div className="flex items-center justify-center md:justify-start gap-4 mb-4">
+                        {/* UNIFORM BADGE STYLE */}
                         <span className="inline-block py-1 px-3 rounded-full bg-green-100 dark:bg-green-500/10 text-green-700 dark:text-green-400 text-xs font-mono border border-green-500/30">
                            {affiliate.acronym}
                         </span>
 
                         <div className="flex items-center gap-3">
-                           {/* FACEBOOK BUTTON WITH HOVER TOOLTIP */}
+                           {/* FACEBOOK BUTTON */}
                            <div className="relative">
                              <motion.a 
                                href={affiliate.facebookUrl}
@@ -479,7 +458,8 @@ export default function AboutPage() {
                                onMouseLeave={() => setHoveredSocial(null)}
                                whileHover={{ scale: 1.15, y: -2 }}
                                whileTap={{ scale: 0.9 }}
-                               className="text-zinc-400 hover:text-[#1877F2] dark:text-zinc-500 dark:hover:text-[#1877F2] transition-colors duration-300 relative z-20"
+                               // Standardized Green Hover for Everyone
+                               className="text-zinc-400 hover:text-green-600 dark:text-zinc-500 dark:hover:text-green-400 transition-colors duration-300 relative z-20"
                                aria-label={`Visit ${affiliate.acronym} on Facebook`}
                              >
                                <FaFacebook size={24} />
@@ -491,7 +471,7 @@ export default function AboutPage() {
                              </AnimatePresence>
                            </div>
 
-                           {/* WEBSITE BUTTON WITH HOVER TOOLTIP (Check if URL exists) */}
+                           {/* WEBSITE BUTTON */}
                            {affiliate.websiteUrl && (
                              <div className="relative">
                                <motion.a 
@@ -502,6 +482,7 @@ export default function AboutPage() {
                                  onMouseLeave={() => setHoveredSocial(null)}
                                  whileHover={{ scale: 1.15, y: -2 }}
                                  whileTap={{ scale: 0.9 }}
+                                 // Standardized Green Hover for Everyone
                                  className="text-zinc-400 hover:text-green-600 dark:text-zinc-500 dark:hover:text-green-400 transition-colors duration-300 relative z-20"
                                  aria-label={`Visit ${affiliate.acronym} website`}
                                >
@@ -530,18 +511,19 @@ export default function AboutPage() {
 
                  {/* LOGO COLUMN */}
                  <div className="relative flex-shrink-0 group cursor-default">
+                     {/* UNIFORM BORDER COLOR (Zinc-100/800) AND HOVER BORDER (Green-500) */}
                      <div className={`relative w-64 h-64 rounded-3xl bg-white flex items-center justify-center shadow-[0_20px_50px_rgba(0,0,0,0.1)] dark:shadow-[0_0_50px_rgba(34,197,94,0.15)] border-4 border-zinc-100 dark:border-zinc-800 overflow-hidden transform transition-all duration-500 group-hover:scale-105 group-hover:border-green-500`}>
-                        
-                        <span className="text-6xl font-black text-zinc-100 absolute select-none">
-                          {affiliate.acronym}
-                        </span>
-                        
-                        <Image 
-                          src={affiliate.logo} 
-                          alt={affiliate.name} 
-                          fill
-                          className="object-contain p-8 relative z-10"
-                        /> 
+                       
+                       <span className="text-6xl font-black text-zinc-100 absolute select-none">
+                         {affiliate.acronym}
+                       </span>
+                       
+                       <Image 
+                         src={affiliate.logo} 
+                         alt={affiliate.name} 
+                         fill
+                         className="object-contain p-8 relative z-10"
+                       /> 
                      </div>
 
                      <div className="absolute -top-6 -right-6 w-24 h-24 border-t-2 border-r-2 border-green-500/30 rounded-tr-3xl -z-10 group-hover:translate-x-2 group-hover:-translate-y-2 transition-transform duration-500" />
