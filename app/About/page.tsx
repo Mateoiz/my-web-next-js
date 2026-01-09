@@ -47,7 +47,7 @@ const AFFILIATES = [
     { 
     name: "Junior Philippine Computer Society", 
     acronym: "JPCS", 
-    logo: "/affiliates/jpcs.png", 
+    logo: "/affiliates/JPCS.png", 
     facebookUrl: "https://www.facebook.com/philippinecomputersociety",
     websiteUrl: "https://www.philippinecomputersociety.org",
     description: "The Philippine Computer Society (PCS) is the longest-running professional association of computing and information technology professionals in the country. It is dedicated to the advancement of Information and Communications Technology (ICT) and the professional development of its practitioners."
