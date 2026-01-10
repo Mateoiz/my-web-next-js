@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
+import Script from "next/script"; // 1. Import Script
 import "./globals.css";
 import { Providers } from "./providers";
 import { LoadingProvider } from "./context/LoadingContext";
 import ClientLayout from "./components/ClientLayout";
-// ✅ Import the theme (ensure export default is used in the component file)
 import HolidayTheme from "./components/HolidayTheme";
 
 export const metadata: Metadata = {
@@ -38,14 +38,29 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className="antialiased bg-white dark:bg-black text-zinc-900 dark:text-white transition-colors duration-300">
         
-        {/* 1. Theme Providers (Wrap everything) */}
+        {/* 2. Google Analytics Scripts added here */}
+        <Script
+          src="https://www.googletagmanager.com/gtag/js?id=G-JK2XK3P10R"
+          strategy="afterInteractive"
+        />
+        <Script id="google-analytics" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+
+            gtag('config', 'G-JK2XK3P10R');
+          `}
+        </Script>
+
+        {/* 3. Theme Providers (Wrap everything) */}
         <Providers>
           
 
-          {/* 2. Loading State Provider */}
+          {/* 4. Loading State Provider */}
           <LoadingProvider>
             
-            {/* 3. The Visual Layout (Navbar, Footer, etc.) */}
+            {/* 5. The Visual Layout (Navbar, Footer, etc.) */}
             <ClientLayout>
               {children}
             </ClientLayout>
