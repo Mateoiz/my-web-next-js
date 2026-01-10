@@ -2,10 +2,12 @@
 
 import { useState, useCallback, memo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { FaCalculator, FaEraser, FaArrowRight, FaExclamationTriangle } from "react-icons/fa";
+import { FaCalculator, FaEraser, FaArrowRight, FaExclamationTriangle, FaChevronDown, FaChevronUp } from "react-icons/fa";
 
 // --- HELPERS ---
 const getGpaFromScore = (score: number) => {
+  // STRICT COMPARISON: No rounding occurs here. 
+  // 96.99 will fail the >= 97 check and correctly return 3.5
   if (score >= 97) return 4.0;
   if (score >= 91) return 3.5;
   if (score >= 85) return 3.0;
@@ -56,7 +58,14 @@ export default function GradeCalculator() {
     if (csPts === -4) return setResult({ ...result, error: "Negative scores invalid." });
 
     const totalScore = midPts + finPts + prodPts + csPts;
-    setResult({ percentage: totalScore, gpa: getGpaFromScore(Math.round(totalScore)), error: null });
+    
+    // FIX: Removed Math.round(totalScore). 
+    // Now passes the exact float (e.g., 96.6) to getGpaFromScore.
+    setResult({ 
+      percentage: totalScore, 
+      gpa: getGpaFromScore(totalScore), 
+      error: null 
+    });
   }, [midterms, finals, finalProduct, classStanding]);
 
   const reset = () => {
