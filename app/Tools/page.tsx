@@ -528,8 +528,73 @@ const SubjectRow = memo(({ sub, index, updateSubject, removeSubject, canRemove }
 SubjectRow.displayName = 'SubjectRow';
 
 // ==========================================
-// 3. SCHEDULE MAKER (MOBILE OPTIMIZED)
+// 3. SCHEDULE MAKER (MOBILE FIX: CUSTOM TIME PICKER)
 // ==========================================
+
+// Helper Component for 12-Hour Time Selection
+const TimeSelector = ({ label, value, onChange }: { label: string, value: string, onChange: (val: string) => void }) => {
+  // Parse current 24h string (e.g., "13:30") into 12h parts
+  const [h24, m] = value.split(':').map(Number);
+  const period = h24 >= 12 ? 'PM' : 'AM';
+  const h12 = h24 % 12 || 12; // Convert 0 or 13->1, 12->12
+
+  const updateTime = (newH12: number, newM: string, newPeriod: string) => {
+    let newH24 = newH12 === 12 ? 0 : newH12;
+    if (newPeriod === 'PM') newH24 += 12;
+    // Format back to "HH:MM" string
+    const hStr = newH24.toString().padStart(2, '0');
+    onChange(`${hStr}:${newM}`);
+  };
+
+  return (
+    <div className="space-y-1">
+      <label className="text-[10px] uppercase font-bold text-zinc-400">{label}</label>
+      <div className="flex items-center gap-1">
+        {/* Hour Dropdown */}
+        <div className="relative flex-1">
+           <select 
+             value={h12}
+             onChange={(e) => updateTime(parseInt(e.target.value), m.toString().padStart(2,'0'), period)}
+             className="w-full appearance-none p-2 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-sm font-bold text-center outline-none focus:border-green-500"
+           >
+             {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(h => (
+               <option key={h} value={h}>{h}</option>
+             ))}
+           </select>
+        </div>
+
+        <span className="text-zinc-400 font-bold">:</span>
+
+        {/* Minute Dropdown */}
+        <div className="relative flex-1">
+           <select 
+             value={m}
+             onChange={(e) => updateTime(h12, e.target.value, period)}
+             className="w-full appearance-none p-2 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-sm font-bold text-center outline-none focus:border-green-500"
+           >
+             {/* 5-minute increments for cleaner UI */}
+             {["00", "05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55"].map(min => (
+               <option key={min} value={min}>{min}</option>
+             ))}
+           </select>
+        </div>
+
+        {/* AM/PM Toggle */}
+        <button
+          onClick={() => updateTime(h12, m.toString().padStart(2,'0'), period === 'AM' ? 'PM' : 'AM')}
+          className={`flex-1 p-2 rounded-xl text-xs font-bold border transition-colors ${
+            period === 'AM' 
+              ? 'bg-yellow-100 text-yellow-700 border-yellow-200 hover:bg-yellow-200' 
+              : 'bg-indigo-100 text-indigo-700 border-indigo-200 hover:bg-indigo-200'
+          }`}
+        >
+          {period}
+        </button>
+      </div>
+    </div>
+  );
+};
+
 interface ClassItem {
   id: string;
   subject: string;
@@ -544,7 +609,7 @@ function ScheduleMaker() {
   const [isExpanded, setIsExpanded] = useState(false);
   const scheduleRef = useRef<HTMLDivElement>(null);
   
-  // NEW: Mobile Tab State ('editor' or 'preview')
+  // Mobile Tab State
   const [mobileTab, setMobileTab] = useState<'editor' | 'preview'>('editor');
 
   // Theme State
@@ -554,7 +619,7 @@ function ScheduleMaker() {
     subject: "",
     room: "",
     days: ["Monday"] as string[], 
-    start: "08:00",
+    start: "08:00", // Stores in 24h format still, but UI converts it
     end: "09:30",
     color: "bg-green-500"
   });
@@ -586,7 +651,6 @@ function ScheduleMaker() {
 
     setClasses(prev => [...prev, ...newClasses]);
     
-    // Optional: Switch to preview on mobile after adding to see result immediately
     if (window.innerWidth < 1024) {
       setMobileTab('preview');
     }
@@ -652,7 +716,7 @@ function ScheduleMaker() {
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
           >
-            {/* NEW: MOBILE TABS */}
+            {/* MOBILE TABS */}
             <div className="flex lg:hidden border-b border-zinc-200 dark:border-zinc-800">
                 <button 
                   onClick={() => setMobileTab('editor')}
@@ -670,7 +734,7 @@ function ScheduleMaker() {
 
             <div className="flex flex-col lg:flex-row h-full">
               
-              {/* LEFT: CONTROLS (Hidden on mobile if tab is preview) */}
+              {/* LEFT: CONTROLS */}
               <div className={`${mobileTab === 'editor' ? 'block' : 'hidden'} lg:block w-full lg:w-1/3 p-6 md:p-8 border-r border-zinc-200 dark:border-zinc-800 space-y-6 bg-zinc-50/50 dark:bg-black/20`}>
                 <div className="space-y-4">
                   <h3 className="text-sm font-bold text-zinc-500 uppercase tracking-widest">Add Class</h3>
@@ -714,31 +778,18 @@ function ScheduleMaker() {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3 pt-2">
-                      <div className="space-y-1">
-                        <label className="text-[10px] uppercase font-bold text-zinc-400">Start</label>
-                        <div className="relative">
-                           <input 
-                             type="time" 
-                             value={form.start}
-                             onChange={(e) => setForm({...form, start: e.target.value})}
-                             className="w-full p-2 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-sm outline-none pl-8"
-                           />
-                           <FaClock className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 text-xs" />
-                        </div>
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] uppercase font-bold text-zinc-400">End</label>
-                        <div className="relative">
-                           <input 
-                             type="time" 
-                             value={form.end}
-                             onChange={(e) => setForm({...form, end: e.target.value})}
-                             className="w-full p-2 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-sm outline-none pl-8"
-                           />
-                           <FaClock className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 text-xs" />
-                        </div>
-                      </div>
+                    {/* NEW: CUSTOM TIME SELECTORS */}
+                    <div className="grid grid-cols-2 gap-4 pt-2">
+                      <TimeSelector 
+                         label="Start Time" 
+                         value={form.start} 
+                         onChange={(val) => setForm({...form, start: val})} 
+                      />
+                      <TimeSelector 
+                         label="End Time" 
+                         value={form.end} 
+                         onChange={(val) => setForm({...form, end: val})} 
+                      />
                     </div>
 
                     {/* Color Picker */}
@@ -789,10 +840,10 @@ function ScheduleMaker() {
                 </div>
               </div>
 
-              {/* VISUAL GRID (Hidden on mobile if tab is editor) */}
+              {/* VISUAL GRID */}
               <div className={`${mobileTab === 'preview' ? 'block' : 'hidden'} lg:flex w-full lg:w-2/3 p-4 md:p-8 overflow-x-auto bg-zinc-100 dark:bg-zinc-950 items-start lg:items-center justify-center`}>
                 <div className="flex flex-col gap-4 w-full">
-                    {/* Mobile Only: Download button inside preview so they don't have to switch tabs */}
+                    {/* Mobile Only: Download button inside preview */}
                     <div className="lg:hidden flex justify-end">
                         <button 
                             onClick={downloadSchedule}
