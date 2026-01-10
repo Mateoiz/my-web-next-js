@@ -528,7 +528,7 @@ const SubjectRow = memo(({ sub, index, updateSubject, removeSubject, canRemove }
 SubjectRow.displayName = 'SubjectRow';
 
 // ==========================================
-// 3. SCHEDULE MAKER (OPTIMIZED + THEMES)
+// 3. SCHEDULE MAKER (MOBILE OPTIMIZED)
 // ==========================================
 interface ClassItem {
   id: string;
@@ -543,6 +543,9 @@ interface ClassItem {
 function ScheduleMaker() {
   const [isExpanded, setIsExpanded] = useState(false);
   const scheduleRef = useRef<HTMLDivElement>(null);
+  
+  // NEW: Mobile Tab State ('editor' or 'preview')
+  const [mobileTab, setMobileTab] = useState<'editor' | 'preview'>('editor');
 
   // Theme State
   const [currentTheme, setCurrentTheme] = useState(BG_THEMES[0]);
@@ -571,7 +574,6 @@ function ScheduleMaker() {
   const addClass = useCallback(() => {
     if (!form.subject || !form.start || !form.end || form.days.length === 0) return;
     
-    // Create an entry for each selected day
     const newClasses = form.days.map((day, index) => ({
       id: `${Date.now()}-${index}`,
       subject: form.subject,
@@ -583,6 +585,12 @@ function ScheduleMaker() {
     }));
 
     setClasses(prev => [...prev, ...newClasses]);
+    
+    // Optional: Switch to preview on mobile after adding to see result immediately
+    if (window.innerWidth < 1024) {
+      setMobileTab('preview');
+    }
+    
     setForm(prev => ({ ...prev, subject: "", room: "" }));
   }, [form]);
 
@@ -596,7 +604,7 @@ function ScheduleMaker() {
         const dataUrl = await toPng(scheduleRef.current, { 
             cacheBust: true, 
             pixelRatio: 2,
-            backgroundColor: currentTheme.hex, // Use theme background
+            backgroundColor: currentTheme.hex, 
         });
         const link = document.createElement("a");
         link.download = `My_JPCS_Schedule_${currentTheme.name}.png`;
@@ -644,10 +652,26 @@ function ScheduleMaker() {
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
           >
+            {/* NEW: MOBILE TABS */}
+            <div className="flex lg:hidden border-b border-zinc-200 dark:border-zinc-800">
+                <button 
+                  onClick={() => setMobileTab('editor')}
+                  className={`flex-1 py-3 text-sm font-bold uppercase tracking-wider transition-colors ${mobileTab === 'editor' ? 'bg-zinc-100 dark:bg-zinc-800 text-green-600 dark:text-green-400 border-b-2 border-green-500' : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300'}`}
+                >
+                  Editor
+                </button>
+                <button 
+                  onClick={() => setMobileTab('preview')}
+                  className={`flex-1 py-3 text-sm font-bold uppercase tracking-wider transition-colors ${mobileTab === 'preview' ? 'bg-zinc-100 dark:bg-zinc-800 text-green-600 dark:text-green-400 border-b-2 border-green-500' : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300'}`}
+                >
+                  Preview
+                </button>
+            </div>
+
             <div className="flex flex-col lg:flex-row h-full">
               
-              {/* LEFT: CONTROLS */}
-              <div className="w-full lg:w-1/3 p-6 md:p-8 border-r border-zinc-200 dark:border-zinc-800 space-y-6 bg-zinc-50/50 dark:bg-black/20">
+              {/* LEFT: CONTROLS (Hidden on mobile if tab is preview) */}
+              <div className={`${mobileTab === 'editor' ? 'block' : 'hidden'} lg:block w-full lg:w-1/3 p-6 md:p-8 border-r border-zinc-200 dark:border-zinc-800 space-y-6 bg-zinc-50/50 dark:bg-black/20`}>
                 <div className="space-y-4">
                   <h3 className="text-sm font-bold text-zinc-500 uppercase tracking-widest">Add Class</h3>
                   
@@ -667,9 +691,9 @@ function ScheduleMaker() {
                       className="w-full p-3 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-sm outline-none focus:border-green-500 transition-colors"
                     />
                     
-                    {/* Day Selector Buttons */}
+                    {/* Day Buttons */}
                     <div className="space-y-2">
-                        <label className="text-[10px] uppercase font-bold text-zinc-400">Select Days (Select Multiple at a time)</label>
+                        <label className="text-[10px] uppercase font-bold text-zinc-400">Select Days</label>
                         <div className="flex flex-wrap gap-2">
                             {DAYS.map((d) => {
                                 const isSelected = form.days.includes(d);
@@ -677,7 +701,7 @@ function ScheduleMaker() {
                                     <button
                                         key={d}
                                         onClick={() => toggleDay(d)}
-                                        className={`flex-1 min-w-[3rem] py-2 text-xs font-bold rounded-lg border transition-all ${
+                                        className={`flex-1 min-w-[3rem] py-3 lg:py-2 text-xs font-bold rounded-lg border transition-all ${
                                             isSelected 
                                             ? "bg-green-500 border-green-500 text-white shadow-md shadow-green-500/20" 
                                             : "bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:border-green-500"
@@ -723,14 +747,14 @@ function ScheduleMaker() {
                           <button
                             key={c.name}
                             onClick={() => setForm({...form, color: c.val})}
-                            className={`w-6 h-6 rounded-full ${c.val} ${form.color === c.val ? 'ring-2 ring-offset-2 ring-zinc-400 dark:ring-offset-zinc-900 scale-110' : 'opacity-50 hover:opacity-100'}`}
+                            className={`w-8 h-8 lg:w-6 lg:h-6 rounded-full ${c.val} ${form.color === c.val ? 'ring-2 ring-offset-2 ring-zinc-400 dark:ring-offset-zinc-900 scale-110' : 'opacity-50 hover:opacity-100'}`}
                           />
                         ))}
                     </div>
 
                     <button 
                       onClick={addClass} 
-                      className="w-full py-3 bg-zinc-900 dark:bg-white text-white dark:text-black font-bold rounded-xl hover:opacity-90 transition-opacity flex items-center justify-center gap-2 mt-2"
+                      className="w-full py-4 lg:py-3 bg-zinc-900 dark:bg-white text-white dark:text-black font-bold rounded-xl hover:opacity-90 transition-opacity flex items-center justify-center gap-2 mt-2"
                     >
                       <FaPlus size={12} /> Add to Schedule
                     </button>
@@ -740,7 +764,6 @@ function ScheduleMaker() {
                 <div className="pt-6 border-t border-zinc-200 dark:border-zinc-800">
                    <h3 className="text-sm font-bold text-zinc-500 uppercase tracking-widest mb-4">Export Settings</h3>
                    
-                   {/* Background Theme Selector */}
                    <div className="grid grid-cols-4 gap-2 mb-4">
                      {BG_THEMES.map((theme) => (
                        <button
@@ -756,10 +779,7 @@ function ScheduleMaker() {
                        />
                      ))}
                    </div>
-                   <p className="text-[10px] text-zinc-400 text-center mb-4">
-                      Current Style: <span className="font-bold text-zinc-500 dark:text-zinc-300">{currentTheme.name}</span>
-                   </p>
-
+                   
                    <button 
                      onClick={downloadSchedule}
                      className="w-full py-3 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl shadow-lg shadow-green-500/20 transition-all active:scale-95 flex items-center justify-center gap-2"
@@ -769,14 +789,30 @@ function ScheduleMaker() {
                 </div>
               </div>
 
-              {/* VISUAL GRID (MEMOIZED) */}
-              <div className="w-full lg:w-2/3 p-6 md:p-8 overflow-x-auto bg-white dark:bg-zinc-950 flex items-center justify-center">
-                <ScheduleGrid 
-                   classes={classes} 
-                   removeClass={removeClass} 
-                   scheduleRef={scheduleRef} 
-                   theme={currentTheme}
-                />
+              {/* VISUAL GRID (Hidden on mobile if tab is editor) */}
+              <div className={`${mobileTab === 'preview' ? 'block' : 'hidden'} lg:flex w-full lg:w-2/3 p-4 md:p-8 overflow-x-auto bg-zinc-100 dark:bg-zinc-950 items-start lg:items-center justify-center`}>
+                <div className="flex flex-col gap-4 w-full">
+                    {/* Mobile Only: Download button inside preview so they don't have to switch tabs */}
+                    <div className="lg:hidden flex justify-end">
+                        <button 
+                            onClick={downloadSchedule}
+                            className="bg-green-600 text-white px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 shadow-lg"
+                        >
+                            <FaDownload /> Save Image
+                        </button>
+                    </div>
+
+                    <ScheduleGrid 
+                       classes={classes} 
+                       removeClass={removeClass} 
+                       scheduleRef={scheduleRef} 
+                       theme={currentTheme}
+                    />
+                    
+                    <p className="lg:hidden text-center text-[10px] text-zinc-400 animate-pulse">
+                        &larr; Scroll horizontally to see full week &rarr;
+                    </p>
+                </div>
               </div>
 
             </div>
@@ -788,7 +824,7 @@ function ScheduleMaker() {
 }
 
 // ==========================================
-// 4. MEMOIZED VISUAL GRID (ISOLATED)
+// 4. MEMOIZED VISUAL GRID (STICKY MOBILE COLS)
 // ==========================================
 const ScheduleGrid = memo(({ 
   classes, 
@@ -834,9 +870,10 @@ const ScheduleGrid = memo(({
       </div>
 
       {/* GRID */}
-      <div className="flex">
-        {/* Time Column */}
-        <div className={`w-16 flex-shrink-0 border-r pr-2 ${theme.border}`}>
+      <div className="flex relative">
+        {/* Time Column (STICKY) */}
+        {/* Added 'sticky left-0 z-30' and theme.bg to cover scrolling content */}
+        <div className={`w-16 flex-shrink-0 border-r pr-2 ${theme.border} sticky left-0 z-30 ${theme.bg}`}>
           <div className="h-10"></div> 
           {HOURS.map(h => (
             <div key={h} className={`h-[60px] text-[10px] font-mono text-right pt-1 relative ${theme.subtext}`}>
