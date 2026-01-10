@@ -50,7 +50,7 @@ export default function ToolsPage() {
             Student <span className="text-green-600 dark:text-green-500">Toolkit</span>
           </motion.h1>
           <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }} className="text-zinc-600 dark:text-zinc-400 max-w-2xl mx-auto text-lg">
-            Essential computational tools for the modern Lasallian.
+            Essential educational tools for the modern Lasallian.
           </motion.p>
         </div>
 
