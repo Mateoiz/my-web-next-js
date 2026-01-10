@@ -28,3 +28,9 @@ body.splash-active [data-hide-on-splash="true"] /* Hides anything else marked */
 {
   display: none !important;
 }
+
+:root {
+  /* Use Hex codes instead */
+  --background: #ffffff;
+  --foreground: #171717;
+}
