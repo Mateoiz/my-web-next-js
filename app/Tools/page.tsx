@@ -16,15 +16,19 @@ import FloatingCubes from "../components/FloatingCubes";
 import CircuitCursor from "../components/CircuitCursor"; 
 
 // --- CONSTANTS & CONFIGURATION ---
+// --- CONSTANTS & CONFIGURATION ---
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const HOURS = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
 
+// ADDED: Pink and Teal for more aesthetic options
 const COLORS = [
   { name: "Green", val: "bg-green-500" },
+  { name: "Teal", val: "bg-teal-400" }, // New
   { name: "Blue", val: "bg-blue-500" },
-  { name: "Purple", val: "bg-purple-500" },
-  { name: "Orange", val: "bg-orange-500" },
-  { name: "Red", val: "bg-red-500" },
+  { name: "Purple", val: "bg-violet-500" },
+  { name: "Pink", val: "bg-pink-400" }, // New
+  { name: "Orange", val: "bg-orange-400" },
+  { name: "Red", val: "bg-rose-500" },
   { name: "Zinc", val: "bg-zinc-600" },
 ];
 
@@ -34,36 +38,50 @@ const BG_THEMES = [
     name: 'Midnight', 
     bg: 'bg-zinc-950', 
     text: 'text-white', 
-    subtext: 'text-zinc-400',
+    subtext: 'text-zinc-500',
     border: 'border-zinc-800', 
-    hex: '#09090b' 
+    hex: '#09090b',       // Actual background color for download
+    displayHex: '#09090b' // Button color (Dark is fine)
   },
   { 
     id: 'light', 
     name: 'Paper', 
     bg: 'bg-white', 
     text: 'text-zinc-900', 
-    subtext: 'text-zinc-500',
-    border: 'border-zinc-200', 
-    hex: '#ffffff' 
+    subtext: 'text-zinc-400',
+    border: 'border-zinc-100', 
+    hex: '#ffffff',
+    displayHex: '#e4e4e7' // Zinc-200: Made darker so it's visible as a button
+  },
+  { 
+    id: 'sakura', 
+    name: 'Sakura', 
+    bg: 'bg-rose-50', 
+    text: 'text-rose-950', 
+    subtext: 'text-rose-400',
+    border: 'border-rose-200', 
+    hex: '#fff1f2',       // Keep the schedule background light/subtle
+    displayHex: '#f472b6' // Pink-400: Make the button pop!
   },
   { 
     id: 'navy', 
     name: 'Blueprint', 
     bg: 'bg-slate-900', 
     text: 'text-slate-100', 
-    subtext: 'text-slate-400',
-    border: 'border-slate-700', 
-    hex: '#0f172a' 
+    subtext: 'text-slate-500',
+    border: 'border-slate-800', 
+    hex: '#0f172a',
+    displayHex: '#0f172a'
   },
   { 
     id: 'cream', 
     name: 'Journal', 
     bg: 'bg-stone-100', 
     text: 'text-stone-800', 
-    subtext: 'text-stone-500',
-    border: 'border-stone-300', 
-    hex: '#f5f5f4' 
+    subtext: 'text-stone-400',
+    border: 'border-stone-200', 
+    hex: '#f5f5f4',
+    displayHex: '#d6d3d1' // Stone-300: Darker for visibility
   },
 ];
 
@@ -528,20 +546,29 @@ const SubjectRow = memo(({ sub, index, updateSubject, removeSubject, canRemove }
 SubjectRow.displayName = 'SubjectRow';
 
 // ==========================================
-// 3. SCHEDULE MAKER (MOBILE FIX: CUSTOM TIME PICKER)
+// 3. SCHEDULE MAKER (FIXED & POLISHED)
 // ==========================================
 
-// Helper Component for 12-Hour Time Selection
+// 1. GLOBAL INTERFACE (Moved outside so ScheduleGrid can use it)
+interface ClassItem {
+  id: string;
+  subject: string;
+  room: string;
+  day: string;
+  start: string;
+  end: string;
+  color: string;
+}
+
+// 2. HELPER COMPONENT (TimeSelector)
 const TimeSelector = ({ label, value, onChange }: { label: string, value: string, onChange: (val: string) => void }) => {
-  // Parse current 24h string (e.g., "13:30") into 12h parts
   const [h24, m] = value.split(':').map(Number);
   const period = h24 >= 12 ? 'PM' : 'AM';
-  const h12 = h24 % 12 || 12; // Convert 0 or 13->1, 12->12
+  const h12 = h24 % 12 || 12; 
 
   const updateTime = (newH12: number, newM: string, newPeriod: string) => {
     let newH24 = newH12 === 12 ? 0 : newH12;
     if (newPeriod === 'PM') newH24 += 12;
-    // Format back to "HH:MM" string
     const hStr = newH24.toString().padStart(2, '0');
     onChange(`${hStr}:${newM}`);
   };
@@ -550,36 +577,29 @@ const TimeSelector = ({ label, value, onChange }: { label: string, value: string
     <div className="space-y-1">
       <label className="text-[10px] uppercase font-bold text-zinc-400">{label}</label>
       <div className="flex items-center gap-1">
-        {/* Hour Dropdown */}
         <div className="relative flex-1">
            <select 
              value={h12}
              onChange={(e) => updateTime(parseInt(e.target.value), m.toString().padStart(2,'0'), period)}
-             className="w-full appearance-none p-2 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-sm font-bold text-center outline-none focus:border-green-500"
+             className="w-full appearance-none p-2 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-sm font-bold text-center outline-none focus:border-green-500 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700"
            >
              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(h => (
                <option key={h} value={h}>{h}</option>
              ))}
            </select>
         </div>
-
         <span className="text-zinc-400 font-bold">:</span>
-
-        {/* Minute Dropdown */}
         <div className="relative flex-1">
            <select 
              value={m}
              onChange={(e) => updateTime(h12, e.target.value, period)}
-             className="w-full appearance-none p-2 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-sm font-bold text-center outline-none focus:border-green-500"
+             className="w-full appearance-none p-2 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-sm font-bold text-center outline-none focus:border-green-500 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700"
            >
-             {/* 5-minute increments for cleaner UI */}
              {["00", "05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55"].map(min => (
                <option key={min} value={min}>{min}</option>
              ))}
            </select>
         </div>
-
-        {/* AM/PM Toggle */}
         <button
           onClick={() => updateTime(h12, m.toString().padStart(2,'0'), period === 'AM' ? 'PM' : 'AM')}
           className={`flex-1 p-2 rounded-xl text-xs font-bold border transition-colors ${
@@ -595,31 +615,23 @@ const TimeSelector = ({ label, value, onChange }: { label: string, value: string
   );
 };
 
-interface ClassItem {
-  id: string;
-  subject: string;
-  room: string;
-  day: string;
-  start: string;
-  end: string;
-  color: string;
-}
-
+// 3. MAIN SCHEDULE MAKER COMPONENT
 function ScheduleMaker() {
   const [isExpanded, setIsExpanded] = useState(false);
   const scheduleRef = useRef<HTMLDivElement>(null);
-  
-  // Mobile Tab State
   const [mobileTab, setMobileTab] = useState<'editor' | 'preview'>('editor');
-
-  // Theme State
   const [currentTheme, setCurrentTheme] = useState(BG_THEMES[0]);
+
+  const [scheduleInfo, setScheduleInfo] = useState({
+    title: "My Schedule",
+    subtitle: "AY 2025-2026"
+  });
 
   const [form, setForm] = useState({
     subject: "",
     room: "",
     days: ["Monday"] as string[], 
-    start: "08:00", // Stores in 24h format still, but UI converts it
+    start: "08:00", 
     end: "09:30",
     color: "bg-green-500"
   });
@@ -671,7 +683,8 @@ function ScheduleMaker() {
             backgroundColor: currentTheme.hex, 
         });
         const link = document.createElement("a");
-        link.download = `My_JPCS_Schedule_${currentTheme.name}.png`;
+        const safeTitle = scheduleInfo.title.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+        link.download = `${safeTitle}_${currentTheme.name}.png`;
         link.href = dataUrl;
         link.click();
       } catch (err) {
@@ -679,7 +692,7 @@ function ScheduleMaker() {
         alert("Error saving image.");
       }
     }
-  }, [currentTheme]);
+  }, [currentTheme, scheduleInfo.title]);
 
   return (
     <motion.div
@@ -736,13 +749,41 @@ function ScheduleMaker() {
               
               {/* LEFT: CONTROLS */}
               <div className={`${mobileTab === 'editor' ? 'block' : 'hidden'} lg:block w-full lg:w-1/3 p-6 md:p-8 border-r border-zinc-200 dark:border-zinc-800 space-y-6 bg-zinc-50/50 dark:bg-black/20`}>
+                
+                {/* SCHEDULE INFO SECTION */}
+                <div className="space-y-4 border-b border-zinc-200 dark:border-zinc-800 pb-6">
+                   <h3 className="text-sm font-bold text-zinc-500 uppercase tracking-widest">Schedule Details</h3>
+                   <div className="space-y-3">
+                     <div className="space-y-1">
+                        <label className="text-[10px] uppercase font-bold text-zinc-400">Title</label>
+                        <input 
+                          type="text" 
+                          placeholder="My Schedule" 
+                          value={scheduleInfo.title}
+                          onChange={(e) => setScheduleInfo({...scheduleInfo, title: e.target.value})}
+                          className="w-full p-2 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-sm font-bold outline-none focus:border-green-500 transition-colors"
+                        />
+                     </div>
+                     <div className="space-y-1">
+                        <label className="text-[10px] uppercase font-bold text-zinc-400">Subtitle / Term</label>
+                        <input 
+                          type="text" 
+                          placeholder="2nd Term, AY 2025-2026" 
+                          value={scheduleInfo.subtitle}
+                          onChange={(e) => setScheduleInfo({...scheduleInfo, subtitle: e.target.value})}
+                          className="w-full p-2 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-sm font-bold outline-none focus:border-green-500 transition-colors"
+                        />
+                     </div>
+                   </div>
+                </div>
+
                 <div className="space-y-4">
                   <h3 className="text-sm font-bold text-zinc-500 uppercase tracking-widest">Add Class</h3>
                   
                   <div className="space-y-3">
                     <input 
                       type="text" 
-                      placeholder="Subject Name (e.g. CS 101)" 
+                      placeholder="Subject (e.g. CS 101)" 
                       value={form.subject}
                       onChange={(e) => setForm({...form, subject: e.target.value})}
                       className="w-full p-3 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-sm outline-none focus:border-green-500 transition-colors"
@@ -778,27 +819,20 @@ function ScheduleMaker() {
                         </div>
                     </div>
 
-                    {/* NEW: CUSTOM TIME SELECTORS */}
+                    {/* TIME SELECTORS */}
                     <div className="grid grid-cols-2 gap-4 pt-2">
-                      <TimeSelector 
-                         label="Start Time" 
-                         value={form.start} 
-                         onChange={(val) => setForm({...form, start: val})} 
-                      />
-                      <TimeSelector 
-                         label="End Time" 
-                         value={form.end} 
-                         onChange={(val) => setForm({...form, end: val})} 
-                      />
+                      <TimeSelector label="Start Time" value={form.start} onChange={(val) => setForm({...form, start: val})} />
+                      <TimeSelector label="End Time" value={form.end} onChange={(val) => setForm({...form, end: val})} />
                     </div>
 
                     {/* Color Picker */}
-                    <div className="flex items-center gap-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl p-2 justify-center mt-2">
+                    <div className="flex items-center gap-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl p-3 justify-center mt-2 flex-wrap">
                         {COLORS.map((c) => (
                           <button
                             key={c.name}
                             onClick={() => setForm({...form, color: c.val})}
-                            className={`w-8 h-8 lg:w-6 lg:h-6 rounded-full ${c.val} ${form.color === c.val ? 'ring-2 ring-offset-2 ring-zinc-400 dark:ring-offset-zinc-900 scale-110' : 'opacity-50 hover:opacity-100'}`}
+                            className={`w-8 h-8 lg:w-6 lg:h-6 rounded-full shadow-sm ${c.val} ${form.color === c.val ? 'ring-2 ring-offset-2 ring-zinc-400 dark:ring-offset-zinc-900 scale-110' : 'opacity-70 hover:opacity-100 hover:scale-105 transition-all'}`}
+                            title={c.name}
                           />
                         ))}
                     </div>
@@ -815,7 +849,7 @@ function ScheduleMaker() {
                 <div className="pt-6 border-t border-zinc-200 dark:border-zinc-800">
                    <h3 className="text-sm font-bold text-zinc-500 uppercase tracking-widest mb-4">Export Settings</h3>
                    
-                   <div className="grid grid-cols-4 gap-2 mb-4">
+                   <div className="grid grid-cols-5 gap-3 mb-4">
                      {BG_THEMES.map((theme) => (
                        <button
                          key={theme.id}
@@ -825,11 +859,14 @@ function ScheduleMaker() {
                              ? 'border-green-500 scale-110 shadow-lg shadow-green-500/20' 
                              : 'border-transparent opacity-70 hover:opacity-100 hover:scale-105'
                          }`}
-                         style={{ backgroundColor: theme.hex }}
+                         style={{ backgroundColor: theme.displayHex }} 
                          title={theme.name}
                        />
                      ))}
                    </div>
+                   <p className="text-[10px] text-zinc-400 text-center mb-4">
+                      Theme: <span className="font-bold text-zinc-600 dark:text-zinc-300">{currentTheme.name}</span>
+                   </p>
                    
                    <button 
                      onClick={downloadSchedule}
@@ -843,7 +880,6 @@ function ScheduleMaker() {
               {/* VISUAL GRID */}
               <div className={`${mobileTab === 'preview' ? 'block' : 'hidden'} lg:flex w-full lg:w-2/3 p-4 md:p-8 overflow-x-auto bg-zinc-100 dark:bg-zinc-950 items-start lg:items-center justify-center`}>
                 <div className="flex flex-col gap-4 w-full">
-                    {/* Mobile Only: Download button inside preview */}
                     <div className="lg:hidden flex justify-end">
                         <button 
                             onClick={downloadSchedule}
@@ -858,6 +894,7 @@ function ScheduleMaker() {
                        removeClass={removeClass} 
                        scheduleRef={scheduleRef} 
                        theme={currentTheme}
+                       scheduleInfo={scheduleInfo}
                     />
                     
                     <p className="lg:hidden text-center text-[10px] text-zinc-400 animate-pulse">
@@ -874,19 +911,19 @@ function ScheduleMaker() {
   );
 }
 
-// ==========================================
-// 4. MEMOIZED VISUAL GRID (STICKY MOBILE COLS)
-// ==========================================
+// 4. MEMOIZED VISUAL GRID
 const ScheduleGrid = memo(({ 
   classes, 
   removeClass, 
   scheduleRef, 
-  theme 
+  theme,
+  scheduleInfo 
 }: { 
   classes: ClassItem[], 
   removeClass: (id: string) => void, 
   scheduleRef: any,
-  theme: typeof BG_THEMES[0]
+  theme: typeof BG_THEMES[0],
+  scheduleInfo: { title: string, subtitle: string }
 }) => {
   
   const getPosition = (timeStr: string) => {
@@ -906,65 +943,65 @@ const ScheduleGrid = memo(({
   return (
     <div 
       ref={scheduleRef} 
-      className={`w-full min-w-[800px] p-6 rounded-xl border transition-colors duration-300 ${theme.bg} ${theme.text} ${theme.border}`}
+      className={`w-full min-w-[800px] p-6 lg:p-10 rounded-2xl border transition-colors duration-300 ${theme.bg} ${theme.text} ${theme.border}`}
     >
       
       {/* Branding Header */}
-      <div className={`flex justify-between items-center mb-6 border-b pb-4 ${theme.border}`}>
+      <div className={`flex justify-between items-end mb-8 border-b-2 pb-6 ${theme.border}`}>
         <div>
-          <h1 className="text-2xl font-black uppercase tracking-tighter">My Schedule</h1>
-          <p className="text-xs text-green-600 font-mono font-bold tracking-wider">JPCS STUDENT TOOLKIT</p>
+          <h1 className="text-4xl font-black uppercase tracking-tighter leading-none mb-1">
+             {scheduleInfo.title || "My Schedule"}
+          </h1>
+          <p className="text-xs font-bold tracking-[0.2em] opacity-60">JPCS STUDENT TOOLKIT</p>
         </div>
         <div className="text-right">
-          <p className={`text-xs font-bold ${theme.subtext}`}>AY 2025-2026</p>
+          <p className={`text-sm font-bold opacity-50 ${theme.text}`}>
+             {scheduleInfo.subtitle || "AY 2025-2026"}
+          </p>
         </div>
       </div>
 
       {/* GRID */}
       <div className="flex relative">
         {/* Time Column (STICKY) */}
-        {/* Added 'sticky left-0 z-30' and theme.bg to cover scrolling content */}
-        <div className={`w-16 flex-shrink-0 border-r pr-2 ${theme.border} sticky left-0 z-30 ${theme.bg}`}>
+        <div className={`w-16 flex-shrink-0 border-r-2 pr-2 ${theme.border} sticky left-0 z-30 ${theme.bg}`}>
           <div className="h-10"></div> 
           {HOURS.map(h => (
-            <div key={h} className={`h-[60px] text-[10px] font-mono text-right pt-1 relative ${theme.subtext}`}>
+            <div key={h} className={`h-[60px] text-[11px] font-bold opacity-40 text-right pt-1 relative`}>
               {h > 12 ? h - 12 : h} {h >= 12 ? 'PM' : 'AM'}
-              <div className={`absolute top-0 right-[-10px] w-2 h-px ${theme.border.replace('border', 'bg')}`}></div>
+              <div className={`absolute top-0 right-[-10px] w-2 h-0.5 ${theme.border.replace('border', 'bg')}`}></div>
             </div>
           ))}
         </div>
 
         {/* Days Columns */}
         <div className="flex-1 grid grid-cols-6 relative">
-          {/* Horizontal Lines */}
           {HOURS.map((h, i) => (
-              <div key={i} className={`absolute w-full h-px z-0 opacity-50 ${theme.border.replace('border', 'bg')}`} style={{ top: `${i * 60 + 40}px` }} />
+              <div key={i} className={`absolute w-full h-px z-0 opacity-30 ${theme.border.replace('border', 'bg')}`} style={{ top: `${i * 60 + 40}px` }} />
           ))}
 
           {DAYS.map((day) => (
             <div key={day} className={`relative border-r last:border-0 ${theme.border}`}>
-              {/* Day Header */}
-              <div className={`h-10 text-center text-[10px] font-bold uppercase tracking-wide flex items-center justify-center ${theme.subtext}`}>
+              <div className={`h-10 text-center text-[10px] font-extrabold uppercase tracking-widest flex items-center justify-center opacity-60 pb-2`}>
                 {day.substring(0, 3)}
               </div>
 
-              {/* Class Blocks */}
-              <div className="relative h-[840px]"> {/* 14 hours * 60px */}
+              <div className="relative h-[840px]">
                 {classes.filter(c => c.day === day).map((c) => (
                   <div
                     key={c.id}
-                    className={`absolute left-1 right-1 rounded-lg p-2 text-white shadow-sm overflow-hidden cursor-pointer hover:brightness-110 transition-all z-10 ${c.color}`}
+                    className={`absolute left-1 right-1 rounded-xl p-3 text-white shadow-md overflow-hidden cursor-pointer hover:scale-[1.02] active:scale-95 transition-all z-10 ${c.color} border border-white/20`}
                     style={{
                       top: `${getPosition(c.start)}px`,
                       height: `${getHeight(c.start, c.end)}px`
                     }}
                     onClick={() => removeClass(c.id)}
                   >
-                    <div className="text-[10px] font-bold leading-tight line-clamp-1">{c.subject}</div>
-                    <div className="text-[9px] opacity-90 line-clamp-1">{c.room}</div>
-                    <div className="text-[8px] font-mono mt-1 opacity-75">{c.start}-{c.end}</div>
+                    <div className="text-xs font-bold leading-tight line-clamp-2">{c.subject}</div>
+                    <div className="text-[10px] opacity-90 line-clamp-1 mt-0.5">{c.room}</div>
+                    <div className="absolute bottom-2 right-2 text-[9px] font-mono opacity-60 bg-black/10 px-1 rounded">{c.start}-{c.end}</div>
                     
-                    <div className="absolute top-1 right-1 opacity-0 hover:opacity-100 bg-black/20 rounded p-0.5">
+                    <div className="absolute top-1 right-1 opacity-0 hover:opacity-100 bg-black/20 rounded-full p-1">
                         <FaTrash size={8} />
                     </div>
                   </div>
