@@ -3,20 +3,19 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-import { FaCalendarAlt, FaMapMarkerAlt, FaChevronRight, FaMicrochip, FaTimes, FaVoteYea } from "react-icons/fa";
+import { FaCalendarAlt, FaMapMarkerAlt, FaChevronRight, FaMicrochip, FaTimes } from "react-icons/fa";
 
-// --- UPDATED EVENT DATA ---
 const NEXT_EVENT = {
   id: 1,
-  title: "Official Shirt Voting",
-  date: "NOW",
-  location: "Voting Terminal",
-  link: "/Cast" // Assumes your voting page is at /voting
+  title: "General Assembly 2026",
+  date: "FEB",
+  location: "TBA",
+  link: "/Events"
 };
 
 export default function HolographicEventTab() {
   const [isOpen, setIsOpen] = useState(false);
-  const [isVisible, setIsVisible] = useState(true); 
+  const [isVisible, setIsVisible] = useState(true); // Control visibility based on scroll
   const containerRef = useRef<HTMLDivElement>(null);
 
   // 1. Handle Click Outside
@@ -33,11 +32,12 @@ export default function HolographicEventTab() {
   // 2. Handle Scroll Visibility
   useEffect(() => {
     const handleScroll = () => {
+      // If user is near the top (< 10px), show the tab. Otherwise, hide it.
       if (window.scrollY < 10) {
         setIsVisible(true);
       } else {
         setIsVisible(false);
-        setIsOpen(false);
+        setIsOpen(false); // Also close the drawer if they scroll away
       }
     };
 
@@ -47,7 +47,7 @@ export default function HolographicEventTab() {
 
   return (
     <>
-      {/* --- MOBILE BACKDROP --- */}
+      {/* --- MOBILE BACKDROP (Dims screen when open) --- */}
       <AnimatePresence>
         {isOpen && isVisible && (
           <motion.div
@@ -61,9 +61,11 @@ export default function HolographicEventTab() {
       </AnimatePresence>
 
       {/* --- MAIN WIDGET CONTAINER --- */}
+      {/* Wrapped in AnimatePresence to handle the scroll exit animation */}
       <AnimatePresence>
         {isVisible && (
           <motion.div 
+            // This motion div controls the Whole Widget appearing/disappearing on scroll
             initial={{ x: -100, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: -100, opacity: 0 }}
@@ -71,15 +73,17 @@ export default function HolographicEventTab() {
             className="fixed top-1/2 -translate-y-1/2 left-0 z-[60] h-auto pointer-events-none"
           >
             
+            {/* Wrapper for Pointer Events & Ref */}
             <motion.div 
               ref={containerRef}
+              // This logic handles the drawer opening/closing
               initial={{ x: "-100%" }} 
               animate={{ x: isOpen ? "0%" : "-100%" }}
               transition={{ type: "spring", stiffness: 200, damping: 25 }}
               className="pointer-events-auto relative flex items-start"
             >
               
-              {/* --- 1. THE DATA PANEL --- */}
+              {/* --- 1. THE DATA PANEL (The Drawer) --- */}
               <div className="relative w-[75vw] max-w-[260px] md:w-80 bg-zinc-900/95 border-r-2 border-green-500/50 backdrop-blur-xl shadow-[0_0_40px_rgba(34,197,94,0.15)] overflow-hidden rounded-r-sm">
                 
                 {/* Cyberpunk Grid Background */}
@@ -94,21 +98,21 @@ export default function HolographicEventTab() {
                   <div className="flex justify-between items-end border-b border-green-500/30 pb-2">
                     <div className="flex flex-col">
                       <span className="text-[9px] md:text-[10px] font-mono text-green-500/80 tracking-widest uppercase mb-0.5 md:mb-1">
-                        <FaMicrochip className="inline mr-1" /> Priority_Task
+                        <FaMicrochip className="inline mr-1" /> System_Alert
                       </span>
-                      <span className="text-white font-bold text-base md:text-lg leading-none">ACTIVE</span>
+                      <span className="text-white font-bold text-base md:text-lg leading-none">UPCOMING</span>
                     </div>
-                    
+                    {/* Mobile Close Button */}
                     <button 
                       onClick={() => setIsOpen(false)}
                       className="md:hidden text-zinc-500 hover:text-white transition-colors p-1"
                     >
                       <FaTimes size={14} />
                     </button>
-                    
+                    {/* Desktop Status */}
                     <div className="hidden md:block text-right">
                       <span className="block text-[10px] font-mono text-zinc-500 uppercase">Status</span>
-                      <span className="text-green-400 font-bold text-xs animate-pulse">● VOTING</span>
+                      <span className="text-green-400 font-bold text-xs animate-pulse">● LIVE</span>
                     </div>
                   </div>
 
@@ -124,7 +128,7 @@ export default function HolographicEventTab() {
                           <FaCalendarAlt className="text-xs md:text-sm" />
                         </div>
                         <div className="flex flex-col">
-                          <span className="text-[9px] md:text-[10px] uppercase tracking-wide text-zinc-500">Timeline</span>
+                          <span className="text-[9px] md:text-[10px] uppercase tracking-wide text-zinc-500">Date Log</span>
                           <span className="text-xs md:text-sm font-mono text-white font-bold">{NEXT_EVENT.date}</span>
                         </div>
                       </div>
@@ -147,7 +151,7 @@ export default function HolographicEventTab() {
                     className="group mt-1 md:mt-2 relative w-full bg-green-600 hover:bg-green-500 text-black font-bold py-2 md:py-3 px-4 text-center uppercase tracking-wider text-[10px] md:text-xs transition-colors overflow-hidden rounded-sm"
                   >
                     <span className="relative z-10 flex items-center justify-center gap-2">
-                      Cast Vote <FaVoteYea size={12} />
+                      Details <FaChevronRight size={10} />
                     </span>
                     {/* Button Glitch Effect */}
                     <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-500" />
@@ -175,10 +179,12 @@ export default function HolographicEventTab() {
 
                 {/* Vertical Text */}
                 <div className="flex flex-col gap-0.5 md:gap-1 font-mono font-bold text-[10px] md:text-xs tracking-widest select-none">
-                  <span>V</span>
-                  <span>O</span>
-                  <span>T</span>
                   <span>E</span>
+                  <span>V</span>
+                  <span>E</span>
+                  <span>N</span>
+                  <span>T</span>
+                  <span>S</span>
                 </div>
 
                 {/* Decorative Dot */}

@@ -1,7 +1,6 @@
 {
   "name": "my-web-next-js",
-  "version": "0.1.1",
-  "type": "module",
+  "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -11,11 +10,6 @@
   },
   "dependencies": {
     "@next/third-parties": "^16.1.1",
-    "@tailwindcss/typography": "^0.5.19",
-    "@tiptap/extension-underline": "^3.15.3",
-    "@tiptap/react": "^3.15.3",
-    "@tiptap/starter-kit": "^3.15.3",
-    "canvas-confetti": "^1.9.4",
     "cobe": "^0.6.5",
     "firebase": "^12.6.0",
     "framer-motion": "^12.23.26",
@@ -29,7 +23,6 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
-    "@types/canvas-confetti": "^1.9.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

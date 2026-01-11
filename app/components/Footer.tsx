@@ -19,6 +19,11 @@ export default function Footer() {
       // but feel free to change back to red if preferred.
       color: "hover:text-green-500 hover:drop-shadow-[0_0_10px_rgba(34,197,94,0.8)]" 
     },
+    { 
+      icon: <FaYoutube />, 
+      href: 'https://youtube.com',
+      color: "hover:text-green-500 hover:drop-shadow-[0_0_10px_rgba(34,197,94,0.8)]" 
+    },
   ];
 
   return (

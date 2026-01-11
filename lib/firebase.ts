@@ -1,9 +1,9 @@
 // lib/firebase.ts
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
-import { getAuth } from "firebase/auth";       // <--- 1. NEW IMPORT
-import { getStorage } from "firebase/storage"; // <--- 2. NEW IMPORT
 
+// Your web app's Firebase configuration
+// (I copied these directly from your screenshot)
 const firebaseConfig = {
   apiKey: "AIzaSyCryw1dmr64bL_YVtxgjuFwRzzNRjxi9C8",
   authDomain: "jpcs-game.firebaseapp.com",
@@ -17,7 +17,5 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Initialize services and export them
+// Initialize Cloud Firestore and export it
 export const db = getFirestore(app);
-export const auth = getAuth(app);       // <--- 3. EXPORT AUTH
-export const storage = getStorage(app); // <--- 4. EXPORT STORAGE
