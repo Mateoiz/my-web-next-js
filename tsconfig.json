@@ -29,6 +29,6 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
     "**/*.mts"
-  ],
+, "app/dashboard/write", "app/context/AuthContext.js"  ],
   "exclude": ["node_modules"]
 }

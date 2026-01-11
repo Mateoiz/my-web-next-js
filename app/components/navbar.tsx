@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence, type Variants } from "framer-motion";
-import { FaBars, FaTimes, FaFacebookF, FaTwitter, FaInstagram, FaLinkedinIn } from "react-icons/fa"; 
+import { FaBars, FaTimes, FaFacebookF, FaInstagram } from "react-icons/fa"; 
 
 // --- ANIMATION VARIANTS (Optimized) ---
 const menuVariants: Variants = {
@@ -47,11 +47,16 @@ export default function Navbar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const pathname = usePathname();
 
-  // --- OPTIMIZATION 1: Efficient Scroll Listener ---
-  useEffect(() => {
-    let ticking = false;
+  // --- INTEGRATION: HIDE NAVBAR ON AUTH PAGES ---
+  // Add the exact paths of your login/signup pages here
+  const isAuthPage = ["/login", "/signup", "/register", "/admin"].includes(pathname);
 
-    const onScroll = () => {
+  // --- OPTIMIZATION 1: Efficient Scroll Listener ---
+useEffect(() => {
+  if (isAuthPage) return; // This logic inside is fine
+
+  let ticking = false;
+  const onScroll = () => {
       if (!ticking) {
         window.requestAnimationFrame(() => {
           // Only update state if the value actually changes to prevent re-renders
@@ -63,9 +68,9 @@ export default function Navbar() {
       }
     };
 
-    window.addEventListener("scroll", onScroll);
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
+window.addEventListener("scroll", onScroll);
+  return () => window.removeEventListener("scroll", onScroll);
+}, [isAuthPage]);
 
   // Lock Body Scroll
   useEffect(() => {
@@ -92,6 +97,9 @@ export default function Navbar() {
     after:absolute after:bottom-0 after:left-0 after:h-[2px] after:bg-green-500 after:transition-all after:duration-300
   `;
 
+  // --- INTEGRATION: RETURN NULL IF AUTH PAGE ---
+  if (isAuthPage) return null;
+
   return (
     <>
       <nav
@@ -104,7 +112,7 @@ export default function Navbar() {
       >
         <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
           
-{/* --- LOGO SECTION --- */}
+          {/* --- LOGO SECTION --- */}
           <Link 
             href="/" 
             className="flex items-center gap-3 group relative px-3 py-2 z-50"
@@ -191,83 +199,83 @@ export default function Navbar() {
               animate="open"
               exit="closed"
               // OPTIMIZATION 4: Added transform-gpu and will-change to force hardware acceleration
-             className="fixed top-0 right-0 h-full w-[85%] max-w-md bg-white dark:bg-zinc-950 border-l border-zinc-200 dark:border-zinc-800 shadow-2xl z-[102] flex flex-col justify-between transform-gpu"
+              className="fixed top-0 right-0 h-full w-[85%] max-w-md bg-white dark:bg-zinc-950 border-l border-zinc-200 dark:border-zinc-800 shadow-2xl z-[102] flex flex-col justify-between transform-gpu"
               style={{ willChange: "transform" }}
             >
-              {/* Static Decoration (Removed Blur filters here to save FPS, using Opacity instead) */}
-              <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-green-500/5 rounded-full pointer-events-none" />
-              <div className="absolute bottom-0 left-0 w-[200px] h-[200px] bg-emerald-500/5 rounded-full pointer-events-none" />
+               {/* Static Decoration (Removed Blur filters here to save FPS, using Opacity instead) */}
+               <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-green-500/5 rounded-full pointer-events-none" />
+               <div className="absolute bottom-0 left-0 w-[200px] h-[200px] bg-emerald-500/5 rounded-full pointer-events-none" />
 
-              <div className="flex flex-col h-full pt-28 px-8 pb-8 relative z-10">
-                
-                {/* Navigation Links */}
-                <div className="flex flex-col gap-6">
-                  {[
-                    { name: "About Us", path: "/About" },
-                    { name: "Officers", path: "/Officers" },
-                    { name: "Blogs", path: "/Blogs" },
-                    { name: "Events", path: "/Events" },
-                    { name: "Tools", path: "/Tools" },
-                  ].map((link, i) => (
-                    <motion.div key={i} variants={linkVariants}>
-                      <Link 
-                        href={link.path} 
-                        onClick={closeMenu}
-                        className={`text-3xl font-bold tracking-tight transition-all duration-300 flex items-center gap-4 group ${
-                          isActive(link.path) ? "text-green-600 dark:text-green-500" : "text-zinc-800 dark:text-zinc-300"
-                        }`}
-                      >
-                        <span className={`text-xs font-mono font-normal mt-2 ${isActive(link.path) ? "text-green-600" : "text-zinc-400"}`}>
-                          0{i + 1}
-                        </span>
-                        <span className="group-hover:translate-x-2 transition-transform">
-                          {link.name}
-                        </span>
-                      </Link>
-                    </motion.div>
-                  ))}
-                </div>
+               <div className="flex flex-col h-full pt-28 px-8 pb-8 relative z-10">
+                 
+                 {/* Navigation Links */}
+                 <div className="flex flex-col gap-6">
+                   {[
+                     { name: "About Us", path: "/About" },
+                     { name: "Officers", path: "/Officers" },
+                     { name: "Blogs", path: "/Blogs" },
+                     { name: "Events", path: "/Events" },
+                     { name: "Tools", path: "/Tools" },
+                   ].map((link, i) => (
+                     <motion.div key={i} variants={linkVariants}>
+                       <Link 
+                         href={link.path} 
+                         onClick={closeMenu}
+                         className={`text-3xl font-bold tracking-tight transition-all duration-300 flex items-center gap-4 group ${
+                           isActive(link.path) ? "text-green-600 dark:text-green-500" : "text-zinc-800 dark:text-zinc-300"
+                         }`}
+                       >
+                         <span className={`text-xs font-mono font-normal mt-2 ${isActive(link.path) ? "text-green-600" : "text-zinc-400"}`}>
+                           0{i + 1}
+                         </span>
+                         <span className="group-hover:translate-x-2 transition-transform">
+                           {link.name}
+                         </span>
+                       </Link>
+                     </motion.div>
+                   ))}
+                 </div>
 
-                {/* Mobile Footer */}
-                <motion.div 
-                  variants={linkVariants}
-                  className="mt-auto space-y-6"
-                >
-                  <div className="h-px w-full bg-zinc-200 dark:bg-zinc-800" />
-                  
-                  {/* Mobile Contact Button */}
-                  <Link 
-                    href="/Contact" 
-                    onClick={closeMenu} 
-                    className="
-                      flex items-center justify-center w-full py-4 rounded-xl font-bold transition-all duration-300
-                      border-2 border-green-600 dark:border-green-500
-                      text-green-700 dark:text-green-400
-                      bg-transparent
-                      hover:bg-green-600 dark:hover:bg-green-500
-                      hover:text-white dark:hover:text-white
-                    "
-                  >
-                    Contact Us
-                  </Link>
+                 {/* Mobile Footer */}
+                 <motion.div 
+                   variants={linkVariants}
+                   className="mt-auto space-y-6"
+                 >
+                   <div className="h-px w-full bg-zinc-200 dark:bg-zinc-800" />
+                   
+                   {/* Mobile Contact Button */}
+                   <Link 
+                     href="/Contact" 
+                     onClick={closeMenu} 
+                     className="
+                       flex items-center justify-center w-full py-4 rounded-xl font-bold transition-all duration-300
+                       border-2 border-green-600 dark:border-green-500
+                       text-green-700 dark:text-green-400
+                       bg-transparent
+                       hover:bg-green-600 dark:hover:bg-green-500
+                       hover:text-white dark:hover:text-white
+                     "
+                   >
+                     Contact Us
+                   </Link>
 
-                  <div className="flex gap-4 justify-center">
-                    {[FaFacebookF,FaInstagram,].map((Icon, idx) => (
-                      <a 
-                        key={idx}
-                        href="#" 
-                        className="w-10 h-10 rounded-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center text-zinc-500 hover:text-white hover:bg-green-600 hover:border-green-600 transition-all duration-300"
-                      >
-                        <Icon size={14} />
-                      </a>
-                    ))}
-                  </div>
-                  
-                  <p className="text-center text-[10px] text-zinc-400 uppercase tracking-widest">
-                    © 2025 JPCS - DLSAU
-                  </p>
-                </motion.div>
-              </div>
+                   <div className="flex gap-4 justify-center">
+                     {[FaFacebookF,FaInstagram,].map((Icon, idx) => (
+                       <a 
+                         key={idx}
+                         href="#" 
+                         className="w-10 h-10 rounded-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center text-zinc-500 hover:text-white hover:bg-green-600 hover:border-green-600 transition-all duration-300"
+                       >
+                         <Icon size={14} />
+                       </a>
+                     ))}
+                   </div>
+                   
+                   <p className="text-center text-[10px] text-zinc-400 uppercase tracking-widest">
+                     © 2025 JPCS - DLSAU
+                   </p>
+                 </motion.div>
+               </div>
             </motion.div>
           </>
         )}
