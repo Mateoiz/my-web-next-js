@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Script from "next/script"; // 1. Import Script
+import Script from "next/script"; 
 import "./globals.css";
 import { Providers } from "./providers";
 import { LoadingProvider } from "./context/LoadingContext";
@@ -9,6 +9,14 @@ import HolidayTheme from "./components/HolidayTheme";
 export const metadata: Metadata = {
   title: "Junior Philippine Computer Society DLSAU",
   description: "The official student organization for Computer Science at De La Salle Araneta University. We empower the next generation of tech innovators.",
+  
+  // ✅ 1. ADDED: Icon Configuration
+  // Make sure you put a file named 'logo.png' in your 'public' folder!
+  icons: {
+    icon: "/Logo.png",
+    apple: "/Logo.png", // Optional: For iPhone/iPad home screen
+  },
+
   openGraph: {
     title: "JPCS DLSAU",
     description: "The official student organization for Computer Science at De La Salle Araneta University.",
@@ -38,7 +46,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className="antialiased bg-white dark:bg-black text-zinc-900 dark:text-white transition-colors duration-300">
         
-        {/* 2. Google Analytics Scripts added here */}
+        {/* Google Analytics Scripts */}
         <Script
           src="https://www.googletagmanager.com/gtag/js?id=G-JK2XK3P10R"
           strategy="afterInteractive"
@@ -53,18 +61,14 @@ export default function RootLayout({
           `}
         </Script>
 
-        {/* 3. Theme Providers (Wrap everything) */}
+        {/* Theme Providers */}
         <Providers>
-          
-
-          {/* 4. Loading State Provider */}
+          {/* Loading State Provider */}
           <LoadingProvider>
-            
-            {/* 5. The Visual Layout (Navbar, Footer, etc.) */}
+            {/* The Visual Layout */}
             <ClientLayout>
               {children}
             </ClientLayout>
-            
           </LoadingProvider>
         </Providers>
 

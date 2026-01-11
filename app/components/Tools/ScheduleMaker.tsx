@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useRef, useCallback, memo } from "react";
-import { motion } from "framer-motion";
-import { FaCalendarAlt, FaDownload, FaPlus, FaTrash } from "react-icons/fa";
+import { motion, AnimatePresence } from "framer-motion";
+import { FaCalendarAlt, FaDownload, FaPlus, FaTrash, FaExclamationTriangle } from "react-icons/fa";
 import { toPng } from 'html-to-image';
 
 // --- CONSTANTS ---
@@ -38,6 +38,12 @@ interface ClassItem {
   end: string;
   color: string;
 }
+
+// Convert "08:30" to minutes (e.g., 510)
+const getMinutes = (timeStr: string) => {
+  const [h, m] = timeStr.split(":").map(Number);
+  return h * 60 + m;
+};
 
 const TimeSelector = ({ label, value, onChange }: { label: string, value: string, onChange: (val: string) => void }) => {
   const [h24, m] = value.split(':').map(Number);
@@ -78,8 +84,11 @@ export default function ScheduleMaker() {
   const [mobileTab, setMobileTab] = useState<'editor' | 'preview'>('editor');
   const [currentTheme, setCurrentTheme] = useState(BG_THEMES[0]);
   const [scheduleInfo, setScheduleInfo] = useState({ title: "My Schedule", subtitle: "AY 2025-2026" });
+  
+  // State
   const [form, setForm] = useState({ subject: "", room: "", days: ["Monday"] as string[], start: "08:00", end: "09:30", color: "bg-green-500" });
   const [classes, setClasses] = useState<ClassItem[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   const toggleDay = useCallback((day: string) => {
     setForm(prev => {
@@ -89,12 +98,55 @@ export default function ScheduleMaker() {
   }, []);
 
   const addClass = useCallback(() => {
-    if (!form.subject || !form.start || !form.end || form.days.length === 0) return;
-    const newClasses = form.days.map((day, index) => ({ id: `${Date.now()}-${index}`, subject: form.subject, room: form.room, day: day, start: form.start, end: form.end, color: form.color }));
+    setError(null);
+
+    // 1. Validation: Empty Fields
+    if (!form.subject.trim()) return setError("Please enter a subject name.");
+    if (form.days.length === 0) return setError("Please select at least one day.");
+
+    // 2. Validation: Time Logic
+    const startMin = getMinutes(form.start);
+    const endMin = getMinutes(form.end);
+
+    if (startMin >= endMin) {
+      return setError("End time must be after start time.");
+    }
+
+    if (endMin - startMin < 30) {
+       return setError("Class must be at least 30 minutes long.");
+    }
+
+    // 3. Validation: Overlap Detection
+    for (const day of form.days) {
+       const conflictingClass = classes.find(c => {
+         if (c.day !== day) return false;
+         const cStart = getMinutes(c.start);
+         const cEnd = getMinutes(c.end);
+         // Check if intervals overlap
+         return (startMin < cEnd && endMin > cStart);
+       });
+
+       if (conflictingClass) {
+         return setError(`Conflict: Overlaps with ${conflictingClass.subject} on ${day}.`);
+       }
+    }
+    
+    // 4. Success: Add Class
+    const newClasses = form.days.map((day, index) => ({ 
+      id: `${Date.now()}-${index}`, 
+      subject: form.subject, 
+      room: form.room, 
+      day: day, 
+      start: form.start, 
+      end: form.end, 
+      color: form.color 
+    }));
+    
     setClasses(prev => [...prev, ...newClasses]);
+    
     if (window.innerWidth < 1024) setMobileTab('preview');
-    setForm(prev => ({ ...prev, subject: "", room: "" }));
-  }, [form]);
+    setForm(prev => ({ ...prev, subject: "", room: "" })); // Keep time/days for ease of adding next class
+  }, [form, classes]);
 
   const removeClass = useCallback((id: string) => setClasses(prev => prev.filter((c) => c.id !== id)), []);
 
@@ -126,7 +178,7 @@ export default function ScheduleMaker() {
         </div>
       </div>
 
-      {/* Content (Always Visible) */}
+      {/* Content */}
       <div className="flex-1 flex flex-col">
         {/* Mobile Tabs */}
         <div className="flex lg:hidden border-b border-zinc-200 dark:border-zinc-800">
@@ -153,6 +205,17 @@ export default function ScheduleMaker() {
                 <div className="space-y-2"><label className="text-[10px] uppercase font-bold text-zinc-400">Select Days</label><div className="flex flex-wrap gap-2">{DAYS.map((d) => <button key={d} onClick={() => toggleDay(d)} className={`flex-1 min-w-[3rem] py-3 lg:py-2 text-xs font-bold rounded-lg border transition-all ${form.days.includes(d) ? "bg-green-500 border-green-500 text-white shadow-md" : "bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:border-green-500"}`}>{d.substring(0, 3)}</button>)}</div></div>
                 <div className="grid grid-cols-2 gap-4 pt-2"><TimeSelector label="Start Time" value={form.start} onChange={(val) => setForm({...form, start: val})} /><TimeSelector label="End Time" value={form.end} onChange={(val) => setForm({...form, end: val})} /></div>
                 <div className="flex items-center gap-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl p-3 justify-center mt-2 flex-wrap">{COLORS.map((c) => <button key={c.name} onClick={() => setForm({...form, color: c.val})} className={`w-8 h-8 lg:w-6 lg:h-6 rounded-full shadow-sm ${c.val} ${form.color === c.val ? 'ring-2 ring-offset-2 ring-zinc-400 scale-110' : 'opacity-70 hover:opacity-100 hover:scale-105 transition-all'}`} title={c.name} />)}</div>
+                
+                {/* ERROR MESSAGE DISPLAY */}
+                <AnimatePresence>
+                  {error && (
+                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-3 rounded-xl text-xs font-bold flex items-center gap-2 border border-red-200 dark:border-red-800">
+                      <FaExclamationTriangle className="shrink-0" />
+                      <span>{error}</span>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
                 <button onClick={addClass} className="w-full py-4 lg:py-3 bg-zinc-900 dark:bg-white text-white dark:text-black font-bold rounded-xl hover:opacity-90 transition-opacity flex items-center justify-center gap-2 mt-2"><FaPlus size={12} /> Add to Schedule</button>
               </div>
             </div>
