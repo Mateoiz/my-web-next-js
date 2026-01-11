@@ -14,6 +14,8 @@ const config: Config = {
       // your existing theme extensions...
     },
   },
-  plugins: [],
+  plugins: [
+    require('@tailwindcss/typography'),
+  ],
 };
 export default config;

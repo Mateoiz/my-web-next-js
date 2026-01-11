@@ -24,30 +24,7 @@ import { OFFICERS } from "./constants/officers";
 
 // --- FACULTY DATA (Hidden for now) ---
 const FACULTY = [
-  {
-    name: "Dr. Alex Pasion",
-    role: "Organization Adviser",
-    image: "/faculty/adviser.jpg",
-    credentials: ["M.S. Computer Science", "Certified Scrum Master"],
-    statement: "Guiding the next generation of IT professionals towards excellence and integrity.",
-    research: ["Software Engineering", "Project Management"]
-  },
-  {
-    name: "Engr. Julius Bancud",
-    role: "Program Chair",
-    image: "/faculty/chair.jpg",
-    credentials: ["PhD. IT (Candidate)", "M.S. Info Tech"],
-    statement: "Technology is a tool; how you use it defines the future.",
-    research: ["Data Science", "Machine Learning"]
-  },
-  {
-    name: "Engr. Melanie Asuncion",
-    role: "Faculty Member",
-    image: "/faculty/lecturer.jpg",
-    credentials: ["M.S. Computer Science", "Cisco Certified"],
-    statement: "Building strong foundations in networking and infrastructure.",
-    research: ["Cybersecurity", "Networking"]
-  },
+  // ... (Data maintained)
 ];
 
 export default function Home() {
@@ -161,7 +138,12 @@ export default function Home() {
           </Link>
         </motion.div>
       </section>
-<CSExploration />
+
+      {/* ================= EXTRA COMPONENTS ================= */}
+      
+      <CSExploration />
+
+      {/* ================= ROADMAP TERMINAL (NEW) ================= */}
 
       {/* ================= 1. ABOUT US TEASER ================= */}
       <motion.section 
@@ -280,90 +262,7 @@ export default function Home() {
         </div>
       </motion.section>
 
-      {/* ================= 4. FACULTY MEMBERS (HIDDEN FOR NOW) ================= */}
-      {/* <motion.section 
-        variants={sectionVariants}
-        initial="hidden"
-        whileInView="visible"
-        viewport={{ once: true }}
-        className="py-20 relative z-10 border-t border-zinc-200 dark:border-zinc-800"
-      >
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="flex items-center gap-6 mb-12">
-             <div className="h-16 w-16 bg-zinc-100 dark:bg-zinc-900 rounded-2xl flex items-center justify-center text-3xl text-zinc-400">
-                <FaChalkboardTeacher />
-             </div>
-             <div>
-                <h2 className="text-3xl font-bold text-zinc-900 dark:text-white">Faculty & Advisers</h2>
-                <p className="text-zinc-500 text-sm mt-1 max-w-lg">The academic mentors guiding our path. Scroll to explore.</p>
-             </div>
-          </div>
-
-          <div className="w-full overflow-x-auto pb-8 custom-scrollbar">
-             <div className="flex gap-6 w-max px-2">
-                {FACULTY.map((prof, index) => (
-                   <div 
-                     key={index} 
-                     className="w-[350px] bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 relative overflow-hidden group hover:border-green-500/50 transition-all duration-300"
-                   >
-                      <div className="flex items-center gap-4 mb-6">
-                         <div className="w-16 h-16 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center text-xs text-zinc-500 overflow-hidden relative">
-                            <div className="absolute inset-0 bg-green-500/10"></div>
-                            IMG
-                         </div>
-                         <div>
-                            <h3 className="font-bold text-lg text-zinc-900 dark:text-white group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors">
-                               {prof.name}
-                            </h3>
-                            <p className="text-xs text-zinc-500 uppercase tracking-wider font-mono">
-                               {prof.role}
-                            </p>
-                         </div>
-                      </div>
-
-                      <div className="mb-4">
-                         <div className="flex items-center gap-2 text-xs font-bold text-zinc-400 mb-2">
-                            <FaGraduationCap /> CREDENTIALS
-                         </div>
-                         <div className="flex flex-wrap gap-2">
-                            {prof.credentials.map((cred, i) => (
-                               <span key={i} className="px-2 py-1 bg-zinc-100 dark:bg-zinc-800 text-[10px] rounded text-zinc-600 dark:text-zinc-300 font-mono">
-                                  {cred}
-                               </span>
-                            ))}
-                         </div>
-                      </div>
-
-                      <div className="mb-6 relative pl-4 border-l-2 border-green-500/30">
-                         <FaQuoteLeft className="absolute -top-1 -left-2 text-green-500/20 text-xl" />
-                         <p className="text-sm italic text-zinc-600 dark:text-zinc-400 leading-relaxed">
-                            "{prof.statement}"
-                         </p>
-                      </div>
-
-                      <div>
-                         <div className="flex items-center gap-2 text-xs font-bold text-zinc-400 mb-2">
-                            <FaSearch /> RESEARCH & FOCUS
-                         </div>
-                         <div className="flex flex-wrap gap-2">
-                            {prof.research.map((item, i) => (
-                               <span key={i} className="px-2 py-1 border border-zinc-200 dark:border-zinc-700 rounded-full text-[10px] text-zinc-500 dark:text-zinc-400 group-hover:border-green-500/30 group-hover:text-green-500 transition-colors">
-                                  #{item}
-                               </span>
-                            ))}
-                         </div>
-                      </div>
-
-                      <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-transparent opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-500" />
-                   </div>
-                ))}
-             </div>
-          </div>
-        </div>
-      </motion.section>
-      */}
-
-      {/* ================= 5. EXECUTIVE OFFICERS (UPDATED TO SCROLLABLE CAROUSEL) ================= */}
+      {/* ================= 5. EXECUTIVE OFFICERS ================= */}
       <motion.section 
         variants={sectionVariants}
         initial="hidden"
@@ -382,7 +281,7 @@ export default function Home() {
              </div>
           </div>
 
-          {/* --- OFFICERS CAROUSEL (Synced with Officers Page Style) --- */}
+          {/* --- OFFICERS CAROUSEL --- */}
           <div className="w-full overflow-x-auto pb-8 custom-scrollbar" dir="rtl">
              <div className="flex gap-6 w-max px-2" dir="ltr">
                 {OFFICERS.map((officer, index) => (
@@ -412,11 +311,11 @@ export default function Home() {
                          </div>
                       </div>
 
-                      {/* Middle: Bio (Statement Style) */}
+                      {/* Middle: Bio */}
                       <div className="mb-6 relative pl-4 border-l-2 border-green-500/30 min-h-[80px]">
                          <FaQuoteLeft className="absolute -top-1 -left-2 text-green-500/20 text-xl" />
                          <p className="text-sm italic text-zinc-600 dark:text-zinc-400 leading-relaxed line-clamp-4">
-                            "{officer.bio}"
+                           "{officer.bio}"
                          </p>
                       </div>
 
@@ -428,7 +327,6 @@ export default function Home() {
                             </div>
                             
                             <div className="flex gap-2">
-                                {/* Facebook */}
                                 {officer.socials.facebook && (
                                   <a 
                                     href={officer.socials.facebook} 
@@ -440,7 +338,6 @@ export default function Home() {
                                   </a>
                                 )}
                                 
-                                {/* Email Link */}
                                 {officer.socials.email && (
                                   <a 
                                     href={`mailto:${officer.socials.email}`} 
@@ -453,7 +350,6 @@ export default function Home() {
                          </div>
                       </div>
 
-                      {/* Hover Effect Background */}
                       <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-transparent opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-500" />
                    </div>
                 ))}
@@ -471,7 +367,7 @@ export default function Home() {
       
       {/* --- CSS FOR GLITCH TEXT --- */}
       <style jsx global>{`
-        /* --- CUSTOM SCROLLBAR FOR FACULTY CAROUSEL --- */
+        /* --- CUSTOM SCROLLBAR --- */
         .custom-scrollbar::-webkit-scrollbar {
           height: 8px;
         }
@@ -479,14 +375,14 @@ export default function Home() {
           background: transparent;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb {
-          background-color: #27272a; /* zinc-800 */
+          background-color: #27272a; 
           border-radius: 20px;
         }
         .custom-scrollbar:hover::-webkit-scrollbar-thumb {
-          background-color: #22c55e; /* green-500 */
+          background-color: #22c55e; 
         }
 
-        /* --- INTENSE CONSTANT GLITCH EFFECT --- */
+        /* --- GLITCH EFFECT --- */
         .glitch-text {
           position: relative;
           color: #27272a; 

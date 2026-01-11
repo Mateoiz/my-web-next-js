@@ -19,8 +19,9 @@ const BackgroundLayer = memo(() => (
      <div className="absolute inset-0 opacity-80">
         <FloatingCubes />
      </div>
-     <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-green-500/10 rounded-full blur-3xl opacity-30" />
-     <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-emerald-500/10 rounded-full blur-3xl opacity-30" />
+     {/* Reduced blur radius for mobile performance */}
+     <div className="absolute top-[-10%] left-[-10%] w-[300px] md:w-[500px] h-[300px] md:h-[500px] bg-green-500/10 rounded-full blur-2xl md:blur-3xl opacity-30" />
+     <div className="absolute bottom-[-10%] right-[-10%] w-[300px] md:w-[500px] h-[300px] md:h-[500px] bg-emerald-500/10 rounded-full blur-2xl md:blur-3xl opacity-30" />
   </div>
 ));
 
@@ -29,15 +30,15 @@ BackgroundLayer.displayName = "BackgroundLayer";
 // --- 2. MAIN PAGE COMPONENT ---
 export default function ContactPage() {
   return (
-    <section className="min-h-screen py-24 px-4 md:px-8 relative overflow-hidden bg-zinc-50 dark:bg-black font-sans selection:bg-green-500/30">
+    <section className="min-h-screen py-20 md:py-24 px-4 md:px-8 relative overflow-hidden bg-zinc-50 dark:bg-black font-sans selection:bg-green-500/30">
       <BackgroundLayer />
       
       <div className="max-w-6xl mx-auto relative z-10">
-        <div className="text-center mb-16 space-y-4">
+        <div className="text-center mb-10 md:mb-16 space-y-4">
           <motion.div 
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-green-500/30 bg-green-500/5 backdrop-blur-md text-xs font-mono text-green-700 dark:text-green-400 mb-4"
+            className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-green-500/30 bg-green-500/5 backdrop-blur-md text-[10px] md:text-xs font-mono text-green-700 dark:text-green-400 mb-2 md:mb-4"
           >
             <FaTerminal /> System Uplink
           </motion.div>
@@ -53,14 +54,15 @@ export default function ContactPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.2 }}
-            className="text-zinc-600 dark:text-zinc-400 max-w-2xl mx-auto text-lg"
+            className="text-zinc-600 dark:text-zinc-400 max-w-2xl mx-auto text-base md:text-lg px-2"
           >
-            Encountered a bug? Have an idea? Or just want to say hello?
-            <br />Establish a connection with the development team.
+            Encountered a bug? Have an idea? 
+            <br className="hidden md:block" /> Establish a connection with the team.
           </motion.p>
         </div>
 
-        <div className="flex flex-col lg:flex-row gap-8 lg:gap-12">
+        {/* MOBILE OPTIMIZATION: flex-col-reverse puts the FORM on TOP on mobile */}
+        <div className="flex flex-col-reverse lg:flex-row gap-8 lg:gap-12">
           <ContactInfo />
           <ContactForm />
         </div>
@@ -86,23 +88,18 @@ function ContactForm() {
     e.preventDefault();
     setResult(""); 
 
-    // --- MANUAL VALIDATION CHECK ---
-    // This ensures fields are filled even if HTML5 validation is bypassed
     if (!formData.name.trim() || !formData.email.trim() || !formData.message.trim()) {
         setResult("Error: Please fill in all required fields.");
         return;
     }
 
-    // Specific check for the Conditional Subject Field
     if (formData.type === "general" && !formData.subject.trim()) {
         setResult("Error: Subject is required for General inquiries.");
         return;
     }
-    // -------------------------------
 
     setIsSubmitting(true);
 
-    // Subject Line Logic
     let finalSubject = "";
     if (formData.type === "general") {
       finalSubject = `[GENERAL] ${formData.subject}`;
@@ -152,15 +149,15 @@ function ContactForm() {
       transition={{ delay: 0.4 }}
       className="w-full lg:w-2/3 flex flex-col"
     >
-      <div className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl border border-zinc-200 dark:border-green-500/30 rounded-2xl p-6 md:p-10 shadow-2xl relative overflow-hidden flex-grow">
+      <div className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl border border-zinc-200 dark:border-green-500/30 rounded-2xl p-5 md:p-10 shadow-2xl relative overflow-hidden flex-grow">
         
         {/* Top Decorative Bar */}
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-green-500 via-emerald-400 to-green-500" />
 
-        <form onSubmit={handleSubmit} className="space-y-8 h-full flex flex-col">
+        <form onSubmit={handleSubmit} className="space-y-6 md:space-y-8 h-full flex flex-col">
           
-          {/* 1. SIGNAL SELECTOR */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* 1. SIGNAL SELECTOR (Optimized for Mobile: 3 columns instead of stack) */}
+          <div className="grid grid-cols-3 gap-2 md:gap-4">
             <TypeOption 
               icon={<FaCommentDots />} 
               label="General" 
@@ -169,20 +166,20 @@ function ContactForm() {
             />
             <TypeOption 
               icon={<FaBug />} 
-              label="Bug Report" 
+              label="Bug" 
               selected={formData.type === "bug"} 
               onClick={() => setFormData({ ...formData, type: "bug" })} 
             />
             <TypeOption 
               icon={<FaLightbulb />} 
-              label="Suggestion" 
+              label="Idea" 
               selected={formData.type === "feature"} 
               onClick={() => setFormData({ ...formData, type: "feature" })} 
             />
           </div>
 
-          {/* 2. IDENTITY FIELDS */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* 2. IDENTITY FIELDS (Stack on mobile, Side-by-Side on Desktop) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
             <div className="space-y-2">
               <Label icon={<FaUser size={10} />} text="User Identity" required />
               <input 
@@ -191,7 +188,8 @@ function ContactForm() {
                 required
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-zinc-900 dark:text-white outline-none focus:border-green-500 transition-colors"
+                // text-base prevents iOS zoom
+                className="w-full bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-base text-zinc-900 dark:text-white outline-none focus:border-green-500 transition-colors"
               />
             </div>
             <div className="space-y-2">
@@ -202,7 +200,7 @@ function ContactForm() {
                 required
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="w-full bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-zinc-900 dark:text-white outline-none focus:border-green-500 transition-colors"
+                className="w-full bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-base text-zinc-900 dark:text-white outline-none focus:border-green-500 transition-colors"
               />
             </div>
           </div>
@@ -224,31 +222,31 @@ function ContactForm() {
                   required={formData.type === "general"}
                   value={formData.subject}
                   onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-                  className="w-full bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-zinc-900 dark:text-white outline-none focus:border-green-500 transition-colors"
+                  className="w-full bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-base text-zinc-900 dark:text-white outline-none focus:border-green-500 transition-colors"
                 />
               </motion.div>
             )}
           </AnimatePresence>
 
           {/* 4. MESSAGE AREA */}
-          <div className="flex-grow space-y-2 flex flex-col">
+          <div className="flex-grow space-y-2 flex flex-col min-h-[150px]">
             <Label icon={<FaTerminal size={10} />} text="Data Packet" required />
             
             <div className="relative group flex-grow h-full">
               <textarea 
-                rows={formData.type === "general" ? 5 : 8} 
+                rows={5} 
                 placeholder="Enter your message transmission here..."
                 required
                 value={formData.message}
                 onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-                className="w-full h-full bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-4 text-zinc-900 dark:text-white outline-none focus:border-green-500 transition-colors resize-none"
+                className="w-full h-full bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-4 text-base text-zinc-900 dark:text-white outline-none focus:border-green-500 transition-colors resize-none"
               />
               <div className="absolute bottom-3 right-3 w-3 h-3 border-b-2 border-r-2 border-zinc-300 dark:border-zinc-600 group-focus-within:border-green-500 transition-colors" />
             </div>
           </div>
 
           {/* 5. SUBMIT BUTTON */}
-          <div className="space-y-4 pt-4">
+          <div className="space-y-4 pt-2">
             <button 
               type="submit"
               disabled={isSubmitting}
@@ -298,7 +296,7 @@ function ContactForm() {
   );
 }
 
-// --- 4. STATIC INFO COMPONENT (Redesigned for Space & Clarity) ---
+// --- 4. STATIC INFO COMPONENT ---
 const ContactInfo = memo(() => (
   <motion.div 
     initial={{ opacity: 0, x: -20 }}
@@ -306,32 +304,29 @@ const ContactInfo = memo(() => (
     transition={{ delay: 0.3 }}
     className="w-full lg:w-1/3 space-y-6"
   >
-     <div className="space-y-6"> {/* Increased vertical spacing */}
-        
-        {/* VISIT HQ CARD - NEW LAYOUT */}
-        <div className="p-6 bg-white/80 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-2xl backdrop-blur-sm shadow-sm hover:border-green-500/50 transition-all group">
-          
-          {/* Header */}
-          <div className="flex items-center gap-3 mb-4">
-             <div className="p-3 bg-green-100 dark:bg-green-500/10 rounded-xl text-green-600 dark:text-green-400 text-xl group-hover:scale-110 transition-transform">
+     <div className="space-y-4 md:space-y-6">
+       
+       {/* VISIT HQ CARD */}
+       <div className="p-5 md:p-6 bg-white/80 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-2xl backdrop-blur-sm shadow-sm hover:border-green-500/50 transition-all group">
+         
+         <div className="flex items-center gap-3 mb-4">
+             <div className="p-3 bg-green-100 dark:bg-green-500/10 rounded-xl text-green-600 dark:text-green-400 text-lg md:text-xl group-hover:scale-110 transition-transform">
                <FaMapMarkerAlt />
              </div>
              <h3 className="font-bold text-lg text-zinc-900 dark:text-white">Visit HQ</h3>
-          </div>
+         </div>
 
-          <div className="space-y-4">
-             {/* Section 1: Street Address */}
+         <div className="space-y-4">
              <div>
                 <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-1 block">Campus Location</span>
-                <p className="text-zinc-600 dark:text-zinc-300 leading-snug">
+                <p className="text-zinc-600 dark:text-zinc-300 leading-snug text-sm md:text-base">
                   302 Victoneta Avenue, Potrero<br />
                   Malabon City 1475, Philippines
                 </p>
              </div>
 
-             {/* Section 2: Boxed Office Detail (Fixes the cramped feeling) */}
              <div className="bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-700/50 rounded-xl p-4 relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-1 h-full bg-green-500" /> {/* Accent Line */}
+                <div className="absolute top-0 left-0 w-1 h-full bg-green-500" /> 
                 <span className="text-[10px] font-bold uppercase tracking-widest text-green-600 dark:text-green-400 mb-1 block">Specific Office</span>
                 <p className="font-bold text-zinc-800 dark:text-zinc-100 text-sm">
                   Life Science Building, 4th Floor
@@ -341,33 +336,33 @@ const ContactInfo = memo(() => (
                   College of Arts, Sciences, & Tech
                 </p>
              </div>
-          </div>
-        </div>
+         </div>
+       </div>
 
-        {/* EMAIL US CARD */}
-        <div className="flex items-center gap-4 p-6 bg-white/80 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-2xl backdrop-blur-sm shadow-sm hover:border-green-500/50 transition-all group">
-          <div className="p-3 bg-green-100 dark:bg-green-500/10 rounded-xl text-green-600 dark:text-green-400 text-xl group-hover:scale-110 transition-transform shrink-0">
-            <FaEnvelope />
-          </div>
-          <div>
-            <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-0.5 block">Direct Line</span>
-            <h3 className="font-bold text-lg text-zinc-900 dark:text-white">jpcs@dlsau.edu.ph</h3>
-          </div>
-        </div>
+       {/* EMAIL US CARD */}
+       <div className="flex items-center gap-4 p-5 md:p-6 bg-white/80 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-2xl backdrop-blur-sm shadow-sm hover:border-green-500/50 transition-all group">
+         <div className="p-3 bg-green-100 dark:bg-green-500/10 rounded-xl text-green-600 dark:text-green-400 text-lg md:text-xl group-hover:scale-110 transition-transform shrink-0">
+           <FaEnvelope />
+         </div>
+         <div className="overflow-hidden">
+           <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-0.5 block">Direct Line</span>
+           <h3 className="font-bold text-base md:text-lg text-zinc-900 dark:text-white truncate">jpcs@dlsau.edu.ph</h3>
+         </div>
+       </div>
      </div>
 
-     {/* Map - Added slightly more height for balance */}
-     <div className="w-full h-[280px] lg:h-[320px] rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 relative group shadow-lg">
-        <div className="absolute inset-0 border-4 border-transparent group-hover:border-green-500/20 transition-all z-10 pointer-events-none rounded-2xl" />
-        <iframe 
-          src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3859.7310431334804!2d120.99598627574215!3d14.67119897534308!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3397b6a2b78fd96f%3A0xf64909861b56b1b9!2sDe%20La%20Salle%20Araneta%20University!5e0!3m2!1sen!2sph!4v1766485397075!5m2!1sen!2sph"
-          width="100%" 
-          height="100%" 
-          className="border-0 dark:invert-[.85] dark:hue-rotate-180 dark:contrast-[1.1] transition-all duration-500"
-          allowFullScreen 
-          loading="lazy" 
-          referrerPolicy="no-referrer-when-downgrade"
-        />
+     {/* Map */}
+     <div className="w-full h-[250px] lg:h-[320px] rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 relative group shadow-lg">
+       <div className="absolute inset-0 border-4 border-transparent group-hover:border-green-500/20 transition-all z-10 pointer-events-none rounded-2xl" />
+       <iframe 
+         src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3859.576137643673!2d120.99364907589332!3d14.679813575124118!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3397b4277732d96b%3A0x600f220c3260759!2sDe%20La%20Salle%20Araneta%20University!5e0!3m2!1sen!2sph!4v1709221234567!5m2!1sen!2sph"
+         width="100%" 
+         height="100%" 
+         className="border-0 dark:invert-[.85] dark:hue-rotate-180 dark:contrast-[1.1] transition-all duration-500"
+         allowFullScreen 
+         loading="lazy" 
+         referrerPolicy="no-referrer-when-downgrade"
+       />
      </div>
   </motion.div>
 ));
@@ -376,7 +371,6 @@ ContactInfo.displayName = "ContactInfo";
 
 // --- HELPER COMPONENTS ---
 
-// UPDATED LABEL COMPONENT WITH RED ASTERISK FOR REQUIRED FIELDS
 const Label = ({ icon, text, required = false }: { icon: any, text: string, required?: boolean }) => (
   <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider flex items-center gap-2 mb-1">
     {icon} {text} {required && <span className="text-red-500">*</span>}
@@ -393,21 +387,22 @@ interface TypeOptionProps {
 const TypeOption = ({ icon, label, selected, onClick }: TypeOptionProps) => (
   <div 
     onClick={onClick}
-    className={`cursor-pointer relative p-4 rounded-xl border-2 transition-all duration-300 flex flex-col items-center gap-3 text-center group
+    className={`cursor-pointer relative p-2 md:p-4 rounded-xl border-2 transition-all duration-300 flex flex-col items-center justify-center gap-2 md:gap-3 text-center group h-20 md:h-auto
       ${selected 
         ? "bg-green-500/10 border-green-500 text-green-700 dark:text-green-400 shadow-[0_0_20px_rgba(34,197,94,0.2)]" 
         : "bg-zinc-50 dark:bg-zinc-900/50 border-transparent hover:border-zinc-300 dark:hover:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"
       }`}
   >
-    <div className={`text-2xl ${selected ? "scale-110" : "group-hover:scale-110"} transition-transform duration-300`}>
+    <div className={`text-lg md:text-2xl ${selected ? "scale-110" : "group-hover:scale-110"} transition-transform duration-300`}>
       {icon}
     </div>
-    <span className="text-sm font-bold uppercase tracking-wider">{label}</span>
+    {/* Smaller text for mobile */}
+    <span className="text-[10px] md:text-sm font-bold uppercase tracking-wider">{label}</span>
     
     {selected && (
       <motion.div 
         layoutId="selected-marker"
-        className="absolute top-2 right-2 w-2 h-2 bg-green-500 rounded-full animate-pulse"
+        className="absolute top-1 right-1 md:top-2 md:right-2 w-1.5 h-1.5 md:w-2 md:h-2 bg-green-500 rounded-full animate-pulse"
       />
     )}
   </div>
