@@ -18,16 +18,9 @@ const RichTextEditor = ({ content, onChange }: RichTextEditorProps) => {
   const editor = useEditor({
     extensions: [StarterKit, Underline],
     content: content,
-    // ✅ FIX: This tells Tiptap to wait for the client (browser) before rendering
-    immediatelyRender: false, 
-    editorProps: {
-      attributes: {
-        class: "prose prose-sm sm:prose-base dark:prose-invert focus:outline-none max-w-none min-h-[200px] px-4 py-3 text-zinc-700 dark:text-zinc-300",
-      },
-    },
-    onUpdate: ({ editor }) => {
-      onChange(editor.getHTML());
-    },
+    immediatelyRender: false, // <--- THIS LINE IS CRITICAL
+    editorProps: { /* ... */ },
+    onUpdate: ({ editor }) => { onChange(editor.getHTML()); },
   });
 
   // Optional: Update editor content if external 'content' prop changes programmatically
