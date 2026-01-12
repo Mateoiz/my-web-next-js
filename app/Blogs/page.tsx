@@ -101,7 +101,7 @@ export default function BlogPage() {
         {/* --- POST GRID --- */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {!loading && filteredPosts.map((post) => (
-            <Link href={`/blog/${post.slug}`} key={post.id} className="group block h-full">
+            <Link href={`/Blogs/${post.slug}`} key={post.id} className="group block h-full">
               <motion.article 
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
