@@ -1,9 +1,7 @@
 "use client";
 
-import { use, useEffect, useState } from "react"; 
+import { use } from "react"; 
 import { notFound } from "next/navigation";
-import { db } from "@/lib/firebase";
-import { collection, query, where, getDocs } from "firebase/firestore";
 import Image from "next/image";
 import Link from "next/link";
 import { motion, useScroll, useTransform } from "framer-motion";
@@ -13,51 +11,59 @@ import { FaArrowLeft, FaTag, FaShareAlt } from "react-icons/fa";
 import FloatingCubes from "../../components/FloatingCubes"; 
 import CircuitCursor from "../../components/CircuitCursor"; 
 
+// --- MOCK DATA ---
+const blogPosts = [
+  {
+    slug: "JPCS-x-LACES-successful-techquizbee-event",
+    title: "JPCS x LACES Successful Techquizbee Event Concludes with Flying Colors",
+    subtitle: "Event Report",
+    date: "November 25, 2025",
+    author: "Ziankyle Piangco",
+    category: "Student Life",
+    image: "/articles/AR1.JPG", 
+    // CONTENT UPDATED TO MATCH YOUR IMAGE TEXT EXACTLY
+    content: `
+      
+    `
+  },
+  {
+    slug: "ai-tech-talk",
+    title: "JPCS Tech Talk: The Future of AI in Education",
+    subtitle: "Seminar Recap",
+    date: "December 10, 2025",
+    author: "Sarah Connors",
+    category: "Technology",
+    image: "/tech-talk.jpg",
+    content: `
+      <p>Artificial Intelligence is no longer a sci-fi concept—it is here, and it is reshaping how we learn. Last Tuesday, the DLSAU Auditorium was packed for the highly anticipated JPCS Tech Talk.</p>
+      <p>Guest speaker Dr. Alan Turing discussed the ethical implications of using LLMs in classroom settings. The talk explored how tools like ChatGPT can be used as personalized tutors rather than plagiarism machines.</p>
+    `
+  },
+  {
+    slug: "community-outreach",
+    title: "Community Outreach: Bridging the Digital Divide",
+    subtitle: "Volunteer Initiative",
+    date: "January 15, 2026",
+    author: "John Doe",
+    category: "Outreach",
+    image: "/outreach.jpg",
+    content: `
+      <p>Technology is a privilege that not everyone enjoys. Recognizing this disparity, the JPCS team organized a weekend outreach program at the local high school.</p>
+      <p>The mission was simple: introduce students to the basics of web development. Using only basic laptops and open-source text editors, the team taught 50 high schoolers how to build their first HTML/CSS webpage.</p>
+    `
+  }
+];
+
 export default function BlogPostPage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = use(params);
   
-  const [post, setPost] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-
-  // 1. Fetch specific post by slug
-  useEffect(() => {
-    const fetchPost = async () => {
-      try {
-        const q = query(collection(db, "posts"), where("slug", "==", slug));
-        const querySnapshot = await getDocs(q);
-        
-        if (!querySnapshot.empty) {
-          setPost(querySnapshot.docs[0].data());
-        } else {
-          setPost(null);
-        }
-      } catch (error) {
-        console.error("Error fetching post:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchPost();
-  }, [slug]);
+  const { slug } = use(params);
+  const post = blogPosts.find((p) => p.slug === slug);
+  if (!post) return notFound();
 
   // Animations
   const { scrollYProgress } = useScroll();
   const scale = useTransform(scrollYProgress, [0, 0.2], [1, 0.95]);
   const opacity = useTransform(scrollYProgress, [0, 0.2], [1, 0.8]);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-black text-zinc-500">
-        <div className="animate-pulse flex flex-col items-center gap-2">
-          <div className="w-8 h-8 border-2 border-green-500 border-t-transparent rounded-full animate-spin"/>
-          <span>Loading Article...</span>
-        </div>
-      </div>
-    );
-  }
-
-  if (!post) return notFound();
 
   return (
     <main className="min-h-screen bg-zinc-50 dark:bg-black selection:bg-green-500/30 relative py-24 px-4 overflow-hidden">
@@ -102,35 +108,37 @@ export default function BlogPostPage({ params }: { params: Promise<{ slug: strin
         </div>
 
         {/* IMAGE SECTION */}
-        {post.image && (
-          <motion.div 
-            style={{ scale, opacity }}
-            className="relative w-full aspect-video md:aspect-[21/9] overflow-hidden bg-zinc-100 dark:bg-zinc-800 border-y border-zinc-200 dark:border-zinc-800"
-          >
-            <Image 
-              src={post.image} 
-              alt={post.title} 
-              fill 
-              priority
-              className="object-cover transition-transform duration-700 hover:scale-105"
-            />
-          </motion.div>
-        )}
+        <motion.div 
+          style={{ scale, opacity }}
+          className="relative w-full aspect-video md:aspect-[21/9] overflow-hidden bg-zinc-100 dark:bg-zinc-800 border-y border-zinc-200 dark:border-zinc-800"
+        >
+          <Image 
+            src={post.image} 
+            alt={post.title} 
+            fill 
+            priority
+            className="object-cover transition-transform duration-700 hover:scale-105"
+          />
+        </motion.div>
 
-        {/* BODY CONTENT */}
+        {/* BODY CONTENT (Styled to match the reference image) */}
         <div className="p-8 md:p-12">
           <div 
             className="
               prose prose-lg dark:prose-invert max-w-none mx-auto
+              
+              /* Paragraph Typography matching the reference */
               prose-p:text-zinc-700 dark:prose-p:text-zinc-300 
-              prose-p:leading-relaxed 
-              prose-p:mb-8            
-              prose-p:text-justify    
-              md:prose-p:text-lg      
+              prose-p:leading-relaxed /* Good line height */
+              prose-p:mb-8            /* Spacing between paragraphs */
+              prose-p:text-justify    /* Justified text for clean block look */
+              md:prose-p:text-lg      /* Slightly larger font on desktop */
+              
+              /* Links */
               prose-a:text-green-600 dark:prose-a:text-green-400 prose-a:no-underline hover:prose-a:underline
+              
+              /* Strong/Bold text */
               prose-strong:text-zinc-900 dark:prose-strong:text-white prose-strong:font-bold
-              prose-headings:text-zinc-900 dark:prose-headings:text-white
-              prose-ul:list-disc prose-ol:list-decimal
             "
             dangerouslySetInnerHTML={{ __html: post.content }} 
           />

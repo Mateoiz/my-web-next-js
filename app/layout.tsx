@@ -3,7 +3,6 @@ import Script from "next/script";
 import "./globals.css";
 import { Providers } from "./providers";
 import { LoadingProvider } from "./context/LoadingContext";
-import { AuthContextProvider } from "./context/AuthContext"; // ✅ 1. Import Auth Context
 import ClientLayout from "./components/ClientLayout";
 import HolidayTheme from "./components/HolidayTheme";
 
@@ -11,9 +10,11 @@ export const metadata: Metadata = {
   title: "Junior Philippine Computer Society DLSAU",
   description: "The official student organization for Computer Science at De La Salle Araneta University. We empower the next generation of tech innovators.",
   
+  // ✅ 1. ADDED: Icon Configuration
+  // Make sure you put a file named 'logo.png' in your 'public' folder!
   icons: {
     icon: "/Logo.png",
-    apple: "/Logo.png", 
+    apple: "/Logo.png", // Optional: For iPhone/iPad home screen
   },
 
   openGraph: {
@@ -62,16 +63,13 @@ export default function RootLayout({
 
         {/* Theme Providers */}
         <Providers>
-          {/* ✅ 2. Wrap everything in AuthProvider */}
-          <AuthContextProvider>
-            {/* Loading State Provider */}
-            <LoadingProvider>
-              {/* The Visual Layout */}
-              <ClientLayout>
-                {children}
-              </ClientLayout>
-            </LoadingProvider>
-          </AuthContextProvider>
+          {/* Loading State Provider */}
+          <LoadingProvider>
+            {/* The Visual Layout */}
+            <ClientLayout>
+              {children}
+            </ClientLayout>
+          </LoadingProvider>
         </Providers>
 
       </body>
