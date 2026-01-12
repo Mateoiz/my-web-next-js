@@ -10,6 +10,18 @@ import {
   ArrowLeft, Image as ImageIcon, Layout, Send, Loader2, X, Eye, FileText
 } from "lucide-react";
 
+// --- UNIFIED STYLES (MATCHING SLUG & PREVIEW PAGES) ---
+// This ensures what you see in the editor is exactly what renders on the site.
+const proseStyles = `
+  prose prose-lg prose-zinc dark:prose-invert max-w-none
+  prose-headings:font-black prose-headings:uppercase prose-headings:tracking-tight
+  prose-p:text-zinc-800 dark:prose-p:text-zinc-300 prose-p:leading-8 prose-p:mb-6
+  prose-a:text-green-600 hover:prose-a:text-green-500 prose-a:font-bold prose-a:no-underline
+  prose-blockquote:border-l-4 prose-blockquote:border-green-500 prose-blockquote:bg-zinc-50 dark:prose-blockquote:bg-zinc-900/50 prose-blockquote:py-2 prose-blockquote:px-4 prose-blockquote:italic
+  prose-ul:list-disc prose-ul:pl-6
+  prose-img:rounded-xl prose-img:border-2 prose-img:border-black dark:prose-img:border-zinc-700
+`;
+
 // --- DYNAMIC IMPORT ---
 const TiptapEditor = dynamic(
   () => import("../../components/TiptapEditor").then((mod) => mod.TiptapEditor), 
@@ -90,13 +102,11 @@ export default function CreatePost() {
   if (!user) return null;
 
   return (
-    // MAIN CONTAINER with padding adjustment for mobile header
     <div className="min-h-screen bg-white dark:bg-zinc-950 text-black dark:text-zinc-100 font-sans transition-colors duration-300 selection:bg-green-500/30 pt-24 md:pt-32 pb-20">
       
       <div className="max-w-7xl mx-auto px-4 md:px-6">
         
         {/* --- TOOLBAR HEADER --- */}
-        {/* Flex-col on mobile, Flex-row on desktop */}
         <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 md:gap-6 mb-8 md:mb-12 border-b-2 border-black dark:border-zinc-800 pb-6 sticky top-[80px] md:static bg-white dark:bg-zinc-950 z-30 pt-4 md:pt-0">
             
             <button 
@@ -131,13 +141,12 @@ export default function CreatePost() {
         </div>
 
         {/* --- MAIN GRID LAYOUT --- */}
-        {/* Stack columns on mobile (grid-cols-1), side-by-side on desktop */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
             
             {/* LEFT COLUMN: WRITING AREA (8 cols) */}
             <div className="lg:col-span-8 space-y-6 md:space-y-8 order-2 lg:order-1">
             
-                {/* Cover Image Preview (Hero Style) */}
+                {/* Cover Image Preview */}
                 {coverImage && (
                     <div className="relative w-full h-48 md:h-96 rounded-xl overflow-hidden group border-2 border-black dark:border-zinc-800 shadow-sm">
                     <img src={coverImage} alt="Cover" className="w-full h-full object-cover" />
@@ -166,17 +175,15 @@ export default function CreatePost() {
                 </div>
 
                 {/* EDITOR CONTAINER */}
-                {/* Min-height reduced for mobile feel */}
                 <div className="min-h-[400px] md:min-h-[600px] border-2 border-black dark:border-zinc-800 rounded-xl p-4 md:p-10 bg-white dark:bg-zinc-900/50 shadow-sm">
-                    <div className="prose prose-base md:prose-lg prose-zinc max-w-none text-black dark:text-zinc-300 dark:prose-invert prose-headings:font-black prose-p:leading-relaxed prose-a:text-green-600 hover:prose-a:text-green-500">
+                    {/* APPLIED UNIFIED STYLES HERE */}
+                    <div className={proseStyles}>
                         <TiptapEditor content={content} onChange={setContent} />
                     </div>
                 </div>
             </div>
 
-            {/* RIGHT COLUMN: PREVIEW & SETTINGS (4 cols) */}
-            {/* On mobile, this stacks BELOW the editor (order-1 to appear first? Usually settings below content is better for writing flow, or use a toggle. Here I'll keep it below by default on mobile or above if you prefer.) */}
-            {/* Let's keep it order-1 on mobile so they can set cover image first, or order-3. Actually, putting it at the bottom (order-3) is better for focus. */}
+            {/* RIGHT COLUMN: SETTINGS & PREVIEW (4 cols) */}
             <aside className="lg:col-span-4 space-y-8 order-1 lg:order-2">
             
                 {/* --- SETTINGS PANEL --- */}
@@ -189,7 +196,7 @@ export default function CreatePost() {
 
                     <div className="space-y-6">
                     
-                    {/* Cover Image Uploader (If empty) */}
+                    {/* Cover Image Uploader */}
                     {!coverImage && (
                         <div>
                         <label className="text-xs font-bold text-black dark:text-zinc-400 uppercase mb-2 block tracking-wider">Cover Asset</label>
@@ -223,7 +230,6 @@ export default function CreatePost() {
                             <option value="Events">Events</option>
                             <option value="Announcements">Announcements</option>
                             </select>
-                            {/* Custom Arrow */}
                             <div className="absolute right-3 top-3.5 pointer-events-none">
                                 <div className="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-t-[6px] border-t-black dark:border-t-white"></div>
                             </div>
@@ -251,16 +257,14 @@ export default function CreatePost() {
                     </div>
                 </div>
 
-                {/* --- LIVE PREVIEW CARD (Hidden on mobile to save space, or keep at bottom) --- */}
+                {/* --- LIVE CARD PREVIEW (Hidden on mobile) --- */}
                 <div className="hidden lg:block space-y-4">
                     <div className="flex items-center gap-2 text-black dark:text-zinc-400 border-b border-zinc-200 dark:border-zinc-800 pb-2">
                         <Eye className="w-4 h-4" />
-                        <span className="text-xs font-bold uppercase tracking-wider">Live Preview</span>
+                        <span className="text-xs font-bold uppercase tracking-wider">Card Preview</span>
                     </div>
                     
-                    {/* The Card Projection */}
                     <div className="border-2 border-black dark:border-zinc-800 rounded-xl overflow-hidden bg-white dark:bg-zinc-900 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] dark:shadow-none hover:translate-y-[-2px] transition-transform">
-                        {/* Image Area */}
                         <div className="h-40 bg-zinc-100 dark:bg-zinc-800 w-full relative border-b-2 border-black dark:border-zinc-800">
                             {coverImage ? (
                                 <img src={coverImage} alt="Preview" className="w-full h-full object-cover" />
@@ -274,7 +278,6 @@ export default function CreatePost() {
                                 {category}
                             </span>
                         </div>
-                        {/* Content Area */}
                         <div className="p-4">
                             <h4 className="font-black text-lg leading-tight mb-2 line-clamp-2 text-black dark:text-white">
                                 {title || "Headline Preview"}

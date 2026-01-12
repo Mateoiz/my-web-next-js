@@ -7,6 +7,20 @@ import { motion, useScroll, useTransform } from "framer-motion";
 import { FaArrowLeft, FaTag, FaShareAlt, FaTerminal, FaClock } from "react-icons/fa";
 import { getPostBySlug, type BlogPost } from "@/lib/db"; 
 
+// --- UNIFIED STYLES (Fixed & Cleaned) ---
+// Note: Removed the CSS comment that was breaking the class list
+const proseStyles = [
+  "prose prose-lg prose-zinc dark:prose-invert max-w-none break-words",
+  "prose-headings:font-black prose-headings:uppercase prose-headings:tracking-tight",
+  "prose-p:text-zinc-800 dark:prose-p:text-zinc-300 prose-p:leading-8 prose-p:mb-6",
+  "prose-a:text-green-600 hover:prose-a:text-green-500 prose-a:font-bold prose-a:no-underline",
+  "prose-blockquote:border-l-4 prose-blockquote:border-green-500 prose-blockquote:bg-zinc-50 dark:prose-blockquote:bg-zinc-900/50 prose-blockquote:py-2 prose-blockquote:px-4 prose-blockquote:italic",
+  "prose-ul:list-disc prose-ul:pl-6 prose-ul:list-outside", // Added list-outside for better bullets
+  "prose-ol:pl-6 prose-ol:list-outside",
+  "prose-img:rounded-xl prose-img:border-2 prose-img:border-black dark:prose-img:border-zinc-700",
+  "prose-table:block prose-table:overflow-x-auto"
+].join(" ");
+
 export default function BlogPostPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params);
   const router = useRouter();
@@ -99,7 +113,6 @@ export default function BlogPostPage({ params }: { params: Promise<{ slug: strin
         >
           
           {/* HEADER SECTION */}
-          {/* Reduced padding on mobile (p-6) vs desktop (p-12) */}
           <div className="p-6 md:p-12 border-b-2 border-black dark:border-zinc-800 bg-zinc-50/50 dark:bg-black/20">
             
             <div className="flex flex-wrap items-center gap-3 mb-4 md:mb-6">
@@ -116,11 +129,11 @@ export default function BlogPostPage({ params }: { params: Promise<{ slug: strin
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 font-mono text-xs md:text-sm border-t-2 border-zinc-200 dark:border-zinc-800 pt-6">
                <div className="flex items-center gap-3">
                   <div className="w-8 h-8 bg-zinc-200 dark:bg-zinc-800 rounded-full flex items-center justify-center shrink-0">
-                     <FaTerminal className="text-zinc-500" size={12}/>
+                      <FaTerminal className="text-zinc-500" size={12}/>
                   </div>
                   <div>
-                     <span className="block text-[10px] text-zinc-500 uppercase font-bold">Author</span>
-                     <span className="font-bold text-sm">{post.author}</span>
+                      <span className="block text-[10px] text-zinc-500 uppercase font-bold">Author</span>
+                      <span className="font-bold text-sm">{post.author}</span>
                   </div>
                </div>
                
@@ -157,20 +170,11 @@ export default function BlogPostPage({ params }: { params: Promise<{ slug: strin
             </motion.div>
           )}
 
-          {/* BODY CONTENT */}
-          {/* Reduced padding on mobile (p-6) to give text more width */}
+          {/* BODY CONTENT - PROSE STYLES APPLIED HERE */}
           <div className="p-6 md:p-12 md:py-16 max-w-4xl mx-auto">
+            
             <div 
-              className="
-                prose prose-base md:prose-lg prose-zinc dark:prose-invert max-w-none 
-                prose-headings:font-black prose-headings:uppercase prose-headings:tracking-tight
-                prose-p:text-zinc-800 dark:prose-p:text-zinc-300 prose-p:leading-7 md:prose-p:leading-8 prose-p:font-medium
-                prose-a:text-green-600 hover:prose-a:text-green-500 prose-a:font-bold prose-a:no-underline
-                prose-blockquote:border-l-4 prose-blockquote:border-green-500 prose-blockquote:bg-zinc-50 dark:prose-blockquote:bg-zinc-800/50 prose-blockquote:p-4 prose-blockquote:italic
-                prose-img:rounded-lg md:prose-img:rounded-none prose-img:border-2 prose-img:border-black dark:prose-img:border-zinc-700
-                /* Ensure tables scroll on mobile */
-                prose-table:block prose-table:overflow-x-auto
-              "
+              className={proseStyles}
               dangerouslySetInnerHTML={{ __html: post.content }} 
             />
 

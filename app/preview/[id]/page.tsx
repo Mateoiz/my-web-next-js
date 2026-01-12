@@ -5,11 +5,24 @@ import { notFound, useRouter } from "next/navigation";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { doc, getDoc } from "firebase/firestore";
-import { db, type BlogPost } from "@/lib/db"; // Import from your centralized DB file
+import { db, type BlogPost } from "@/lib/db"; 
 import { FaArrowLeft, FaTerminal, FaClock, FaTag, FaEye } from "react-icons/fa";
 
+// --- UNIFIED STYLES (Identical to BlogPostPage) ---
+const proseStyles = [
+  "prose prose-lg prose-zinc dark:prose-invert max-w-none break-words",
+  "prose-headings:font-black prose-headings:uppercase prose-headings:tracking-tight",
+  "prose-p:text-zinc-800 dark:prose-p:text-zinc-300 prose-p:leading-8 prose-p:mb-6",
+  "prose-a:text-green-600 hover:prose-a:text-green-500 prose-a:font-bold prose-a:no-underline",
+  "prose-blockquote:border-l-4 prose-blockquote:border-green-500 prose-blockquote:bg-zinc-50 dark:prose-blockquote:bg-zinc-900/50 prose-blockquote:py-2 prose-blockquote:px-4 prose-blockquote:italic",
+  "prose-ul:list-disc prose-ul:pl-6 prose-ul:list-outside",
+  "prose-ol:pl-6 prose-ol:list-outside",
+  "prose-img:rounded-xl prose-img:border-2 prose-img:border-black dark:prose-img:border-zinc-700",
+  "prose-table:block prose-table:overflow-x-auto"
+].join(" ");
+
 export default function PreviewPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params); // Get the ID from the URL
+  const { id } = use(params); 
   const router = useRouter();
   
   const [post, setPost] = useState<BlogPost | null>(null);
@@ -151,13 +164,7 @@ export default function PreviewPage({ params }: { params: Promise<{ id: string }
           {/* BODY CONTENT */}
           <div className="p-8 md:p-12 md:py-16 max-w-4xl mx-auto">
             <div 
-              className="
-                prose prose-lg prose-zinc dark:prose-invert max-w-none 
-                prose-headings:font-black prose-headings:uppercase 
-                prose-p:text-zinc-800 dark:prose-p:text-zinc-300 prose-p:leading-8
-                prose-a:text-green-600 prose-a:font-bold
-                prose-img:border-2 prose-img:border-black dark:prose-img:border-zinc-700
-              "
+              className={proseStyles} 
               dangerouslySetInnerHTML={{ __html: post.content }} 
             />
           </div>

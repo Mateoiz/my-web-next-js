@@ -14,6 +14,9 @@ const config: Config = {
       // your existing theme extensions...
     },
   },
-  plugins: [],
+  plugins: [
+    // This is the line that fixes your issue:
+    require('@tailwindcss/typography'),
+  ],
 };
 export default config;
