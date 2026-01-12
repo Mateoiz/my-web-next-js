@@ -4,6 +4,7 @@ import "./globals.css";
 import { Providers } from "./providers";
 import { LoadingProvider } from "./context/LoadingContext";
 import ClientLayout from "./components/ClientLayout";
+import { AuthProvider } from "./context/AuthContext";
 import HolidayTheme from "./components/HolidayTheme";
 
 export const metadata: Metadata = {
@@ -45,7 +46,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="antialiased bg-white dark:bg-black text-zinc-900 dark:text-white transition-colors duration-300">
-        
+        <AuthProvider>
         {/* Google Analytics Scripts */}
         <Script
           src="https://www.googletagmanager.com/gtag/js?id=G-JK2XK3P10R"
@@ -68,9 +69,11 @@ export default function RootLayout({
             {/* The Visual Layout */}
             <ClientLayout>
               {children}
+              
             </ClientLayout>
           </LoadingProvider>
         </Providers>
+        </AuthProvider>
 
       </body>
     </html>
