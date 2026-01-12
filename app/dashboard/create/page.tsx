@@ -90,40 +90,40 @@ export default function CreatePost() {
   if (!user) return null;
 
   return (
-    // MAIN CONTAINER with pt-32 (Padding Top) to clear the global navbar
-    <div className="min-h-screen bg-white dark:bg-zinc-950 text-black dark:text-zinc-100 font-sans transition-colors duration-300 selection:bg-green-500/30 pt-32 pb-20">
+    // MAIN CONTAINER with padding adjustment for mobile header
+    <div className="min-h-screen bg-white dark:bg-zinc-950 text-black dark:text-zinc-100 font-sans transition-colors duration-300 selection:bg-green-500/30 pt-24 md:pt-32 pb-20">
       
-      <div className="max-w-7xl mx-auto px-6">
+      <div className="max-w-7xl mx-auto px-4 md:px-6">
         
         {/* --- TOOLBAR HEADER --- */}
-        {/* This replaces the sticky nav. It sits at the top of the content area. */}
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 mb-12 border-b-2 border-black dark:border-zinc-800 pb-6">
+        {/* Flex-col on mobile, Flex-row on desktop */}
+        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 md:gap-6 mb-8 md:mb-12 border-b-2 border-black dark:border-zinc-800 pb-6 sticky top-[80px] md:static bg-white dark:bg-zinc-950 z-30 pt-4 md:pt-0">
             
             <button 
                 onClick={() => router.back()} 
-                className="group flex items-center text-black dark:text-zinc-400 hover:text-green-600 dark:hover:text-white transition-colors text-sm font-bold uppercase tracking-wide"
+                className="group flex items-center text-black dark:text-zinc-400 hover:text-green-600 dark:hover:text-white transition-colors text-xs md:text-sm font-bold uppercase tracking-wide"
             >
-                <div className="p-2 bg-zinc-100 dark:bg-zinc-900 rounded-full mr-3 group-hover:bg-black group-hover:text-white transition-colors border border-zinc-200 dark:border-zinc-800">
-                    <ArrowLeft className="w-4 h-4" />
+                <div className="p-1.5 md:p-2 bg-zinc-100 dark:bg-zinc-900 rounded-full mr-2 md:mr-3 group-hover:bg-black group-hover:text-white transition-colors border border-zinc-200 dark:border-zinc-800">
+                    <ArrowLeft className="w-3 h-3 md:w-4 md:h-4" />
                 </div>
                 Return to Dashboard
             </button>
 
-            <div className="flex items-center gap-4 w-full md:w-auto justify-end">
-                <span className="hidden sm:inline-flex items-center px-4 py-1.5 rounded-full text-xs font-bold bg-zinc-100 text-black dark:bg-zinc-900 dark:text-zinc-400 border border-zinc-300 dark:border-zinc-800 uppercase tracking-wider">
-                    <div className="w-2 h-2 bg-yellow-500 rounded-full mr-2 animate-pulse" />
+            <div className="flex items-center gap-2 md:gap-4 w-full md:w-auto justify-end">
+                <span className="hidden sm:inline-flex items-center px-3 py-1 md:px-4 md:py-1.5 rounded-full text-[10px] md:text-xs font-bold bg-zinc-100 text-black dark:bg-zinc-900 dark:text-zinc-400 border border-zinc-300 dark:border-zinc-800 uppercase tracking-wider">
+                    <div className="w-1.5 h-1.5 md:w-2 md:h-2 bg-yellow-500 rounded-full mr-2 animate-pulse" />
                     Draft Mode
                 </span>
                 <button 
                     onClick={handleSubmit}
                     disabled={isSubmitting || isUploadingImage}
-                    className="flex items-center gap-2 bg-black hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-200 text-white dark:text-black text-sm px-6 py-3 rounded-lg font-bold transition-all disabled:opacity-50 shadow-[4px_4px_0px_0px_rgba(0,0,0,0.2)] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,0.2)] active:translate-y-[4px] active:shadow-none"
+                    className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-black hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-200 text-white dark:text-black text-xs md:text-sm px-4 py-2.5 md:px-6 md:py-3 rounded-lg font-bold transition-all disabled:opacity-50 shadow-[2px_2px_0px_0px_rgba(0,0,0,0.2)] active:translate-y-[2px] active:shadow-none"
                 >
                     {isSubmitting ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
                     ) : (
                         <>
-                            Publish Transmission <Send className="w-3 h-3 ml-2" />
+                            Publish <span className="hidden sm:inline">Transmission</span> <Send className="w-3 h-3 ml-1" />
                         </>
                     )}
                 </button>
@@ -131,14 +131,15 @@ export default function CreatePost() {
         </div>
 
         {/* --- MAIN GRID LAYOUT --- */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+        {/* Stack columns on mobile (grid-cols-1), side-by-side on desktop */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
             
             {/* LEFT COLUMN: WRITING AREA (8 cols) */}
-            <div className="lg:col-span-8 space-y-8">
+            <div className="lg:col-span-8 space-y-6 md:space-y-8 order-2 lg:order-1">
             
                 {/* Cover Image Preview (Hero Style) */}
                 {coverImage && (
-                    <div className="relative w-full h-64 md:h-96 rounded-xl overflow-hidden group border-2 border-black dark:border-zinc-800 shadow-sm">
+                    <div className="relative w-full h-48 md:h-96 rounded-xl overflow-hidden group border-2 border-black dark:border-zinc-800 shadow-sm">
                     <img src={coverImage} alt="Cover" className="w-full h-full object-cover" />
                     <button 
                         onClick={() => setCoverImage(null)}
@@ -154,7 +155,7 @@ export default function CreatePost() {
                     <textarea 
                     placeholder="Enter Headline..."
                     rows={1}
-                    className="w-full bg-transparent text-5xl md:text-7xl font-black text-black dark:text-white placeholder-zinc-300 dark:placeholder-zinc-800 outline-none resize-none overflow-hidden leading-tight tracking-tight"
+                    className="w-full bg-transparent text-4xl sm:text-5xl md:text-7xl font-black text-black dark:text-white placeholder-zinc-300 dark:placeholder-zinc-800 outline-none resize-none overflow-hidden leading-tight tracking-tight"
                     value={title}
                     onChange={(e) => {
                         setTitle(e.target.value);
@@ -165,60 +166,21 @@ export default function CreatePost() {
                 </div>
 
                 {/* EDITOR CONTAINER */}
-                {/* High contrast border for Light Mode (border-black) */}
-                <div className="min-h-[600px] border-2 border-black dark:border-zinc-800 rounded-xl p-6 md:p-10 bg-white dark:bg-zinc-900/50 shadow-sm">
-                    <div className="prose prose-lg prose-zinc max-w-none text-black dark:text-zinc-300 dark:prose-invert prose-headings:font-black prose-p:leading-relaxed prose-a:text-green-600 hover:prose-a:text-green-500">
+                {/* Min-height reduced for mobile feel */}
+                <div className="min-h-[400px] md:min-h-[600px] border-2 border-black dark:border-zinc-800 rounded-xl p-4 md:p-10 bg-white dark:bg-zinc-900/50 shadow-sm">
+                    <div className="prose prose-base md:prose-lg prose-zinc max-w-none text-black dark:text-zinc-300 dark:prose-invert prose-headings:font-black prose-p:leading-relaxed prose-a:text-green-600 hover:prose-a:text-green-500">
                         <TiptapEditor content={content} onChange={setContent} />
                     </div>
                 </div>
             </div>
 
             {/* RIGHT COLUMN: PREVIEW & SETTINGS (4 cols) */}
-            <aside className="lg:col-span-4 space-y-8">
+            {/* On mobile, this stacks BELOW the editor (order-1 to appear first? Usually settings below content is better for writing flow, or use a toggle. Here I'll keep it below by default on mobile or above if you prefer.) */}
+            {/* Let's keep it order-1 on mobile so they can set cover image first, or order-3. Actually, putting it at the bottom (order-3) is better for focus. */}
+            <aside className="lg:col-span-4 space-y-8 order-1 lg:order-2">
             
-                {/* --- LIVE PREVIEW CARD --- */}
-                <div className="space-y-4">
-                    <div className="flex items-center gap-2 text-black dark:text-zinc-400 border-b border-zinc-200 dark:border-zinc-800 pb-2">
-                        <Eye className="w-4 h-4" />
-                        <span className="text-xs font-bold uppercase tracking-wider">Live Preview</span>
-                    </div>
-                    
-                    {/* The Card Projection */}
-                    <div className="border-2 border-black dark:border-zinc-800 rounded-xl overflow-hidden bg-white dark:bg-zinc-900 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] dark:shadow-none hover:translate-y-[-2px] transition-transform">
-                        {/* Image Area */}
-                        <div className="h-48 bg-zinc-100 dark:bg-zinc-800 w-full relative border-b-2 border-black dark:border-zinc-800">
-                            {coverImage ? (
-                                <img src={coverImage} alt="Preview" className="w-full h-full object-cover" />
-                            ) : (
-                                <div className="w-full h-full flex flex-col items-center justify-center text-zinc-400 gap-2">
-                                    <ImageIcon className="w-8 h-8 opacity-20" />
-                                    <span className="text-[10px] uppercase font-bold tracking-widest opacity-50">No Cover Asset</span>
-                                </div>
-                            )}
-                            <span className="absolute top-3 left-3 bg-black text-white text-[10px] font-bold px-2 py-1 uppercase tracking-wider border border-white/20">
-                                {category}
-                            </span>
-                        </div>
-                        {/* Content Area */}
-                        <div className="p-5">
-                            <h4 className="font-black text-xl leading-tight mb-3 line-clamp-2 text-black dark:text-white">
-                                {title || "Your Headline Here"}
-                            </h4>
-                            <p className="text-sm text-zinc-600 dark:text-zinc-400 line-clamp-3 mb-4 leading-relaxed">
-                                {excerpt || "The short summary of your article will appear here. This gives readers a quick glimpse of what to expect..."}
-                            </p>
-                            <div className="flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-500 font-mono border-t border-zinc-100 dark:border-zinc-800 pt-3">
-                                <span className="flex items-center gap-1 font-bold text-black dark:text-zinc-300">
-                                    {user?.displayName || "Writer"}
-                                </span>
-                                <span>{new Date().toLocaleDateString()}</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
                 {/* --- SETTINGS PANEL --- */}
-                <div className="bg-zinc-50 dark:bg-zinc-900/50 border-2 border-black dark:border-zinc-800 rounded-xl p-6 shadow-sm sticky top-32 transition-colors">
+                <div className="bg-zinc-50 dark:bg-zinc-900/50 border-2 border-black dark:border-zinc-800 rounded-xl p-5 md:p-6 shadow-sm">
                     
                     <div className="flex items-center gap-2 mb-6 pb-4 border-b border-black/10 dark:border-white/10">
                         <Layout className="w-4 h-4 text-black dark:text-zinc-400" />
@@ -272,8 +234,8 @@ export default function CreatePost() {
                     <div>
                         <label className="text-xs font-bold text-black dark:text-zinc-400 uppercase mb-2 block tracking-wider">Short Summary</label>
                         <textarea 
-                            rows={5}
-                            placeholder="Write a brief intro for the card preview..."
+                            rows={4}
+                            placeholder="Write a brief intro..."
                             className="w-full bg-white dark:bg-zinc-950 border-2 border-zinc-200 dark:border-zinc-800 rounded-lg px-4 py-3 text-sm text-black dark:text-zinc-200 focus:border-black dark:focus:border-white outline-none transition-all resize-none placeholder:text-zinc-400 dark:placeholder:text-zinc-600 leading-relaxed"
                             value={excerpt}
                             onChange={(e) => setExcerpt(e.target.value)}
@@ -288,6 +250,45 @@ export default function CreatePost() {
 
                     </div>
                 </div>
+
+                {/* --- LIVE PREVIEW CARD (Hidden on mobile to save space, or keep at bottom) --- */}
+                <div className="hidden lg:block space-y-4">
+                    <div className="flex items-center gap-2 text-black dark:text-zinc-400 border-b border-zinc-200 dark:border-zinc-800 pb-2">
+                        <Eye className="w-4 h-4" />
+                        <span className="text-xs font-bold uppercase tracking-wider">Live Preview</span>
+                    </div>
+                    
+                    {/* The Card Projection */}
+                    <div className="border-2 border-black dark:border-zinc-800 rounded-xl overflow-hidden bg-white dark:bg-zinc-900 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] dark:shadow-none hover:translate-y-[-2px] transition-transform">
+                        {/* Image Area */}
+                        <div className="h-40 bg-zinc-100 dark:bg-zinc-800 w-full relative border-b-2 border-black dark:border-zinc-800">
+                            {coverImage ? (
+                                <img src={coverImage} alt="Preview" className="w-full h-full object-cover" />
+                            ) : (
+                                <div className="w-full h-full flex flex-col items-center justify-center text-zinc-400 gap-2">
+                                    <ImageIcon className="w-8 h-8 opacity-20" />
+                                    <span className="text-[10px] uppercase font-bold tracking-widest opacity-50">No Asset</span>
+                                </div>
+                            )}
+                            <span className="absolute top-3 left-3 bg-black text-white text-[10px] font-bold px-2 py-1 uppercase tracking-wider border border-white/20">
+                                {category}
+                            </span>
+                        </div>
+                        {/* Content Area */}
+                        <div className="p-4">
+                            <h4 className="font-black text-lg leading-tight mb-2 line-clamp-2 text-black dark:text-white">
+                                {title || "Headline Preview"}
+                            </h4>
+                            <div className="flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-500 font-mono border-t border-zinc-100 dark:border-zinc-800 pt-2">
+                                <span className="font-bold text-black dark:text-zinc-300">
+                                    {user?.displayName || "Writer"}
+                                </span>
+                                <span>{new Date().toLocaleDateString()}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
             </aside>
         </div>
       </div>
