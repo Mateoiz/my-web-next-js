@@ -10,6 +10,9 @@
   },
   "dependencies": {
     "@next/third-parties": "^16.1.1",
+    "@tiptap/extension-image": "^3.15.3",
+    "@tiptap/react": "^3.15.3",
+    "@tiptap/starter-kit": "^3.15.3",
     "cobe": "^0.6.5",
     "firebase": "^12.6.0",
     "framer-motion": "^12.23.26",
