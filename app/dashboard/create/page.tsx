@@ -54,30 +54,44 @@ export default function CreatePost() {
   }, [user, router]);
 
   // --- LOGIC ---
-  const handleSubmit = async () => {
-    if (!title || !content) return alert("Article requires a Title and Content.");
-    
-    setIsSubmitting(true);
-    try {
-      const slug = title.toLowerCase().trim()
-        .replace(/[^\w\s-]/g, '')
-        .replace(/[\s_-]+/g, '-') + "-" + Date.now();
+const handleSubmit = async () => {
+  if (!title || !content) return alert("Article requires a Title and Content.");
+  
+  setIsSubmitting(true);
+  try {
+    // 1. Generate a CLEAN slug (No timestamp)
+    // If you didn't create the utility file, this logic works right here:
+    let cleanSlug = title
+      .toLowerCase()
+      .trim()
+      .replace(/[^\w\s-]/g, '')
+      .replace(/[\s_-]+/g, '-')
+      .replace(/^-+|-+$/g, '');
 
-      await createPost({
-        title, content, excerpt, category, coverImage, 
-        author: user?.displayName || "Editor",
-        authorId: user?.uid || "unknown",
-        slug: slug,
-      });
-      
-      router.push("/dashboard");
-    } catch (e) {
-      console.error(e);
-      alert("Submission failed.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+    // Optional: If title is empty/weird, fallback to "post"
+    if (!cleanSlug) cleanSlug = "post";
+
+    // 2. Pass the clean slug to your DB function
+    await createPost({
+      title, 
+      content, 
+      excerpt, 
+      category, 
+      coverImage, 
+      author: user?.displayName || "Editor",
+      authorId: user?.uid || "unknown",
+      slug: cleanSlug, // <--- The clean URL (e.g., "tech-news")
+      createdAt: new Date(), // Ensure you pass a date
+    });
+    
+    router.push("/dashboard");
+  } catch (e) {
+    console.error(e);
+    alert("Submission failed.");
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
