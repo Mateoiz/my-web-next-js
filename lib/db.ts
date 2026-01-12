@@ -14,7 +14,7 @@ import {
   serverTimestamp 
 } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
-import { getAuth } from "firebase/auth";
+import { getAuth, setPersistence, indexedDBLocalPersistence } from "firebase/auth";
 
 // --- FIREBASE CONFIGURATION ---
 // I have included your hardcoded keys here as requested to fix the "invalid-api-key" error immediately.
@@ -133,4 +133,5 @@ export async function getPostBySlug(slug: string): Promise<BlogPost | null> {
     console.error("Error fetching post by slug:", error);
     return null;
   }
+  
 }

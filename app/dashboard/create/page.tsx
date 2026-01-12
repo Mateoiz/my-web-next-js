@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { createPost, storage } from "@/lib/db"; 
+import { createSlug } from "@/lib/slugify";
 import { useAuth } from "../../context/AuthContext";
 import { useRouter } from "next/navigation";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
@@ -59,19 +60,21 @@ const handleSubmit = async () => {
   
   setIsSubmitting(true);
   try {
-    // 1. Generate a CLEAN slug (No timestamp)
-    // If you didn't create the utility file, this logic works right here:
-    let cleanSlug = title
+    // 1. Generate a CLEAN, lowercase slug (No timestamps)
+    // We call the utility and then apply final sanitization
+    let cleanSlug = createSlug(title)
       .toLowerCase()
       .trim()
-      .replace(/[^\w\s-]/g, '')
-      .replace(/[\s_-]+/g, '-')
-      .replace(/^-+|-+$/g, '');
+      .replace(/[^\w\s-]/g, '')    // Remove special characters
+      .replace(/[\s_-]+/g, '-')    // Replace spaces/underscores with hyphens
+      .replace(/^-+|-+$/g, '');    // Trim hyphens from start/end
 
-    // Optional: If title is empty/weird, fallback to "post"
-    if (!cleanSlug) cleanSlug = "post";
+    // Fallback if title is empty or contains only special characters
+    if (!cleanSlug || cleanSlug === "") {
+      cleanSlug = "post-" + Math.floor(Math.random() * 1000);
+    }
 
-    // 2. Pass the clean slug to your DB function
+    // 2. Pass data to createPost
     await createPost({
       title, 
       content, 
@@ -80,36 +83,42 @@ const handleSubmit = async () => {
       coverImage, 
       author: user?.displayName || "Editor",
       authorId: user?.uid || "unknown",
-      slug: cleanSlug, // <--- The clean URL (e.g., "tech-news")
-      createdAt: new Date(), // Ensure you pass a date
+      slug: cleanSlug, 
+      createdAt: new Date(), 
     });
     
+    // 3. Redirect to dashboard
     router.push("/dashboard");
   } catch (e) {
-    console.error(e);
-    alert("Submission failed.");
+    console.error("Submission error:", e);
+    alert("Submission failed. Check console for details.");
   } finally {
     setIsSubmitting(false);
   }
 };
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) return alert("File max size is 5MB.");
 
     setIsUploadingImage(true);
     try {
-        const safeName = title ? title.slice(0, 20).replace(/\s+/g, '-') : 'untitled';
-        const storageRef = ref(storage, `posts/${safeName}-${Date.now()}`);
-        const snapshot = await uploadBytes(storageRef, file);
-        const url = await getDownloadURL(snapshot.ref);
-        setCoverImage(url);
+      // Create a clean filename for Firebase Storage
+      const fileExtension = file.name.split('.').pop();
+      const safeTitle = title
+        ? title.toLowerCase().slice(0, 15).replace(/[^a-z0-9]/g, '-')
+        : 'untitled';
+
+      const storageRef = ref(storage, `posts/${safeTitle}-${Date.now()}.${fileExtension}`);
+      const snapshot = await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(snapshot.ref);
+      setCoverImage(url);
     } catch (error) {
-        console.error(error);
-        alert("Image upload failed.");
+      console.error("Upload error:", error);
+      alert("Image upload failed.");
     } finally {
-        setIsUploadingImage(false);
+      setIsUploadingImage(false);
     }
   };
 
