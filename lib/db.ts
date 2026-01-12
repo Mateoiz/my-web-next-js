@@ -1,30 +1,39 @@
-import { db } from "./firebase";
+import { db, app } from "./firebase"; // ⚠️ Make sure 'app' is exported from firebase.ts
+import { getStorage } from "firebase/storage";
 import { 
   collection, addDoc, updateDoc, doc, query, where, getDocs, orderBy, serverTimestamp 
 } from "firebase/firestore";
 
-// --- TYPES ---
+// --- 1. INITIALIZE STORAGE ---
+// This allows components to import { storage } from "@/lib/db"
+export const storage = getStorage(app);
+
+// --- 2. TYPES ---
 export type PostStatus = "draft" | "pending" | "published" | "rejected";
 
 export interface BlogPost {
   id?: string;
   title: string;
-  content: string; // HTML string from Tiptap
+  content: string; 
+  excerpt?: string;        // 👈 Added this (optional)
+  category?: string;       // 👈 Added this (optional)
+  coverImage?: string | null; // 👈 Added this (can be null)
   author: string;
   authorId: string;
   status: PostStatus;
   createdAt: any;
-  slug: string; // URL friendly ID
+  slug: string; 
 }
 
-// --- FUNCTIONS ---
+// --- 3. FUNCTIONS ---
 
-// 1. CREATE: Writers save a new post
+// CREATE: Writers save a new post
+// We Omit 'id', 'createdAt', and 'status' so the function can control them securely
 export const createPost = async (postData: Omit<BlogPost, "id" | "createdAt" | "status">) => {
   try {
     const docRef = await addDoc(collection(db, "posts"), {
       ...postData,
-      status: "pending", // Default to pending approval
+      status: "pending", // Force status to pending for writers
       createdAt: serverTimestamp(),
     });
     return docRef.id;
@@ -34,7 +43,7 @@ export const createPost = async (postData: Omit<BlogPost, "id" | "createdAt" | "
   }
 };
 
-// 2. READ (ADMIN): Fetch all pending posts for review
+// READ (ADMIN): Fetch all pending posts for review
 export const getPendingPosts = async () => {
   const q = query(
     collection(db, "posts"), 
@@ -45,7 +54,7 @@ export const getPendingPosts = async () => {
   return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as BlogPost));
 };
 
-// 3. READ (PUBLIC): Fetch only PUBLISHED posts
+// READ (PUBLIC): Fetch only PUBLISHED posts
 export const getPublishedPosts = async () => {
   const q = query(
     collection(db, "posts"), 
@@ -56,7 +65,7 @@ export const getPublishedPosts = async () => {
   return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as BlogPost));
 };
 
-// 4. UPDATE (ADMIN): Approve or Reject a post
+// UPDATE (ADMIN): Approve or Reject a post
 export const updatePostStatus = async (postId: string, status: PostStatus) => {
   const postRef = doc(db, "posts", postId);
   await updateDoc(postRef, { status });

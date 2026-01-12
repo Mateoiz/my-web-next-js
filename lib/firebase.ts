@@ -21,3 +21,4 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 // Initialize services and export them
 export const db = getFirestore(app);
 export const auth = getAuth(app); // <--- Export Auth so you can use it in Login/Signup
+export { app };
