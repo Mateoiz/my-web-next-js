@@ -1,72 +1,136 @@
-import { db, app } from "./firebase"; // ⚠️ Make sure 'app' is exported from firebase.ts
-import { getStorage } from "firebase/storage";
+// lib/db.ts
+import { initializeApp, getApps, getApp } from "firebase/app";
 import { 
-  collection, addDoc, updateDoc, doc, query, where, getDocs, orderBy, serverTimestamp 
+  getFirestore, 
+  collection, 
+  addDoc, 
+  updateDoc, 
+  doc, 
+  getDocs, 
+  query, 
+  where, 
+  orderBy, 
+  limit, 
+  serverTimestamp 
 } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
+import { getAuth } from "firebase/auth";
 
-// --- 1. INITIALIZE STORAGE ---
-// This allows components to import { storage } from "@/lib/db"
-export const storage = getStorage(app);
+// --- FIREBASE CONFIGURATION ---
+// I have included your hardcoded keys here as requested to fix the "invalid-api-key" error immediately.
+const firebaseConfig = {
+  apiKey: "AIzaSyCryw1dmr64bL_YVtxgjuFwRzzNRjxi9C8",
+  authDomain: "jpcs-game.firebaseapp.com",
+  projectId: "jpcs-game",
+  storageBucket: "jpcs-game.firebasestorage.app",
+  messagingSenderId: "1059037110516",
+  appId: "1:1059037110516:web:d76f18f07a7e4719e73ea1",
+  measurementId: "G-GECB5NRBSK"
+};
 
-// --- 2. TYPES ---
-export type PostStatus = "draft" | "pending" | "published" | "rejected";
+// Initialize Firebase (Singleton Pattern)
+const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const storage = getStorage(app);
+const auth = getAuth(app);
 
+// Export the services so your app can use them
+export { db, storage, auth, app };
+
+// --- TYPES ---
 export interface BlogPost {
   id?: string;
   title: string;
-  content: string; 
-  excerpt?: string;        // 👈 Added this (optional)
-  category?: string;       // 👈 Added this (optional)
-  coverImage?: string | null; // 👈 Added this (can be null)
+  content: string;
+  excerpt?: string;
   author: string;
   authorId: string;
-  status: PostStatus;
-  createdAt: any;
-  slug: string; 
+  category: string;
+  status: "draft" | "pending" | "published" | "rejected";
+  createdAt?: any; 
+  slug?: string;
+  coverImage?: string | null;
 }
 
-// --- 3. FUNCTIONS ---
+// --- DATABASE FUNCTIONS ---
 
-// CREATE: Writers save a new post
-// We Omit 'id', 'createdAt', and 'status' so the function can control them securely
-export const createPost = async (postData: Omit<BlogPost, "id" | "createdAt" | "status">) => {
+// 1. Create a New Post
+export const createPost = async (postData: Partial<BlogPost>) => {
   try {
     const docRef = await addDoc(collection(db, "posts"), {
       ...postData,
-      status: "pending", // Force status to pending for writers
+      status: "pending", 
       createdAt: serverTimestamp(),
     });
     return docRef.id;
-  } catch (error) {
-    console.error("Error creating post:", error);
-    throw error;
+  } catch (e) {
+    console.error("Error adding document: ", e);
+    throw e;
   }
 };
 
-// READ (ADMIN): Fetch all pending posts for review
-export const getPendingPosts = async () => {
-  const q = query(
-    collection(db, "posts"), 
-    where("status", "==", "pending"),
-    orderBy("createdAt", "desc")
-  );
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as BlogPost));
+// 2. Get All Pending Posts (Admin)
+export const getPendingPosts = async (): Promise<BlogPost[]> => {
+  const q = query(collection(db, "posts"), where("status", "==", "pending"));
+  const querySnapshot = await getDocs(q);
+  return querySnapshot.docs.map((doc) => ({
+    id: doc.id,
+    ...doc.data(),
+  })) as BlogPost[];
 };
 
-// READ (PUBLIC): Fetch only PUBLISHED posts
-export const getPublishedPosts = async () => {
-  const q = query(
-    collection(db, "posts"), 
-    where("status", "==", "published"),
-    orderBy("createdAt", "desc")
-  );
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as BlogPost));
-};
-
-// UPDATE (ADMIN): Approve or Reject a post
-export const updatePostStatus = async (postId: string, status: PostStatus) => {
-  const postRef = doc(db, "posts", postId);
+// 3. Update Post Status
+export const updatePostStatus = async (id: string, status: "published" | "rejected") => {
+  const postRef = doc(db, "posts", id);
   await updateDoc(postRef, { status });
 };
+
+// 4. Get User's Own Posts
+export const getMyPosts = async (userId: string): Promise<BlogPost[]> => {
+  const q = query(collection(db, "posts"), where("authorId", "==", userId));
+  const querySnapshot = await getDocs(q);
+  return querySnapshot.docs.map((doc) => ({
+    id: doc.id,
+    ...doc.data(),
+  })) as BlogPost[];
+};
+
+// 5. Get All Published Posts (Public Blog)
+export async function getPublishedPosts(): Promise<BlogPost[]> {
+  try {
+    const q = query(
+      collection(db, "posts"),
+      where("status", "==", "published"),
+      orderBy("createdAt", "desc")
+    );
+    
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as BlogPost[];
+  } catch (error) {
+    console.error("Error fetching published posts:", error);
+    return [];
+  }
+}
+
+// 6. Get Single Post by Slug
+export async function getPostBySlug(slug: string): Promise<BlogPost | null> {
+  try {
+    const q = query(
+      collection(db, "posts"),
+      where("slug", "==", slug),
+      limit(1)
+    );
+    const querySnapshot = await getDocs(q);
+
+    if (querySnapshot.empty) return null;
+
+    const doc = querySnapshot.docs[0];
+    return { id: doc.id, ...doc.data() } as BlogPost;
+  } catch (error) {
+    console.error("Error fetching post by slug:", error);
+    return null;
+  }
+}
