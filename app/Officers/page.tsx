@@ -13,7 +13,7 @@ import {
 import FloatingCubes from "../components/FloatingCubes";
 import CircuitCursor from "../components/CircuitCursor"; 
 
-// --- 1. MAIN OFFICERS DATA (UPDATED WITH EMAILS) ---
+// --- 1. MAIN OFFICERS DATA ---
 const officers = [
   {
     id: 1,
@@ -111,8 +111,8 @@ const yearReps = [
   },
 ];
 
-// --- 4. CREATIVE TEAM DATA ---
-const creativeTeam = [
+// --- 4. SPLIT CREATIVE TEAMS DATA ---
+const graphicDesigners = [
   { 
     name: "Jhenelle Fern Refuerzo", 
     role: "Graphic Designer", 
@@ -131,6 +131,15 @@ const creativeTeam = [
     icon: <FaPaintBrush />,
     image: "/creatives/GA3.jpg"
   },
+    { 
+    name: "Ashley Krishan Naomi Navarro", 
+    role: "Graphic Designer", 
+    icon: <FaPaintBrush />,
+    image: "/creatives/GA4.jpg"
+  },
+];
+
+const mediaTeam = [
   { 
     name: "Joshua Enriquez", 
     role: "Photographer", 
@@ -149,12 +158,22 @@ const creativeTeam = [
     icon: <FaVideo />,
     image: "/creatives/VE.JPG"
   },
+];
+
+const contentTeam = [
   { 
     name: "Manuel Zian Kyle Piangco", 
-    role: "Captions / Content", 
+    role: "Captions / Writer", 
     icon: <FaPen />,
     image: "/creatives/CAP.JPG"
   },
+
+  {
+    name: "Shelley Kellzie Chua",
+    role: "Captions / Content",
+    icon: <FaPen />,
+    image:"/creatives/CAP3.jpg"
+  }
 ];
 
 // --- 5. ANIMATION VARIANTS ---
@@ -168,7 +187,9 @@ const cardVariants: Variants = {
   }
 };
 
-export default function OfficersPage() {
+// --- REUSABLE CAROUSEL COMPONENT ---
+// This handles the drag logic independently for each section
+const CreativeCarousel = ({ title, subtitle, team }: { title: string, subtitle: string, team: any[] }) => {
   const carouselRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
   const x = useMotionValue(0); 
@@ -177,14 +198,13 @@ export default function OfficersPage() {
     const updateWidth = () => {
       if (carouselRef.current) {
         const newWidth = carouselRef.current.scrollWidth - carouselRef.current.offsetWidth;
-        setWidth(newWidth);
+        setWidth(newWidth > 0 ? newWidth : 0);
       }
     };
-
     updateWidth();
     window.addEventListener("resize", updateWidth);
     return () => window.removeEventListener("resize", updateWidth);
-  }, []);
+  }, [team]); // Recalculate if team data changes
 
   const SCROLL_STEP = 304; 
 
@@ -200,6 +220,87 @@ export default function OfficersPage() {
     animate(x, newX, { type: "spring", stiffness: 300, damping: 30 });
   };
 
+  return (
+    <div className="mb-20 last:mb-0">
+        <div className="flex flex-col md:flex-row items-end md:items-center justify-between mb-8 px-4">
+          <div className="text-left">
+            <h3 className="text-2xl font-bold text-zinc-900 dark:text-white flex items-center gap-3">
+              <span className="w-8 h-1 bg-green-500 rounded-full"></span>
+              {title}
+            </h3>
+            <p className="text-sm text-zinc-500 dark:text-gray-400 mt-1 pl-11">
+              {subtitle}
+            </p>
+          </div>
+
+          {/* Navigation Buttons (Only show if scrollable) */}
+          {width > 0 && (
+            <div className="flex gap-3 mt-4 md:mt-0">
+              <button 
+                onClick={scrollLeft}
+                className="p-2 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-gray-400 hover:bg-green-500 hover:text-white dark:hover:bg-green-500 dark:hover:text-black transition-all shadow-sm active:scale-95"
+              >
+                <FaChevronLeft size={14} />
+              </button>
+              <button 
+                onClick={scrollRight}
+                className="p-2 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-gray-400 hover:bg-green-500 hover:text-white dark:hover:bg-green-500 dark:hover:text-black transition-all shadow-sm active:scale-95"
+              >
+                <FaChevronRight size={14} />
+              </button>
+            </div>
+          )}
+        </div>
+
+        <motion.div 
+          ref={carouselRef} 
+          className="cursor-grab overflow-hidden px-4 py-4 -mx-4 md:mx-0" 
+          whileTap={{ cursor: "grabbing" }}
+        >
+          <motion.div 
+            drag="x" 
+            dragConstraints={{ right: 0, left: -width }}
+            style={{ x }}
+            dragElastic={0.1}
+            dragTransition={{ power: 0.3, timeConstant: 200 }} 
+            className="flex gap-6"
+          >
+            {team.map((member, index) => (
+              <motion.div 
+                key={index} 
+                className="min-w-[260px] h-[320px] relative rounded-2xl overflow-hidden bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-green-500/20 group hover:border-green-500/50 shadow-md hover:shadow-xl dark:shadow-none transition-all duration-300"
+              >
+                {/* Image Section */}
+                <div className="relative h-2/3 w-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
+                   <Image
+                     src={member.image} 
+                     alt={member.name}
+                     fill
+                     className="object-cover opacity-90 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500"
+                   />
+                   <div className="absolute top-3 right-3 p-2 bg-white/90 dark:bg-black/60 backdrop-blur-md rounded-full text-green-600 dark:text-green-400 border border-green-500/30 shadow-sm">
+                     {member.icon}
+                   </div>
+                </div>
+
+                {/* Info Text */}
+                <div className="h-1/3 p-5 flex flex-col justify-center bg-white dark:bg-gradient-to-t dark:from-black dark:to-zinc-900">
+                  <h3 className="text-lg font-bold text-zinc-800 dark:text-white group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors line-clamp-1">
+                    {member.name}
+                  </h3>
+                  <p className="text-xs text-zinc-500 dark:text-gray-400 uppercase tracking-wider font-semibold mt-1">
+                    {member.role}
+                  </p>
+                </div>
+              </motion.div>
+            ))}
+          </motion.div>
+        </motion.div>
+    </div>
+  );
+};
+
+export default function OfficersPage() {
   return (
     <section className="min-h-screen py-24 px-4 md:px-8 relative overflow-hidden transition-colors duration-300">
       
@@ -272,18 +373,13 @@ export default function OfficersPage() {
                     </a>
                   )}
                   {officer.socials.email && (
-                    // --- UPDATED EMAIL TOOLTIP LOGIC ---
                     <div className="relative group/email">
-                        {/* Tooltip Content */}
                         <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 hidden group-hover/email:block">
                             <div className="bg-zinc-800 text-white text-xs px-3 py-2 rounded-lg whitespace-nowrap shadow-lg border border-zinc-700 relative z-50">
                                 {officer.socials.email}
-                                {/* Tiny arrow pointing down */}
                                 <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-zinc-800 border-b border-r border-zinc-700 rotate-45"></div>
                             </div>
                         </div>
-
-                        {/* Icon Trigger */}
                         <a href={`mailto:${officer.socials.email}`} className="hover:text-green-600 dark:hover:text-green-500 transition-colors">
                             <FaEnvelope />
                         </a>
@@ -330,11 +426,7 @@ export default function OfficersPage() {
                   fill
                   className="object-cover transition-transform duration-700 group-hover:scale-110"
                 />
-                
-                {/* Subtle Green/Dark Tint Overlay that fades on hover */}
                 <div className="absolute inset-0 bg-zinc-900/20 dark:bg-green-900/30 transition-opacity duration-700 group-hover:opacity-0 pointer-events-none" />
-
-                {/* Gradient for text readability */}
                 <div className="absolute inset-0 bg-gradient-to-t from-white via-transparent to-transparent dark:from-zinc-900 dark:via-transparent dark:to-transparent opacity-100 pointer-events-none" />
               </div>
 
@@ -352,8 +444,6 @@ export default function OfficersPage() {
                   </p>
                 </div>
               </div>
-
-              {/* Hover Decorative Line */}
               <div className="absolute bottom-0 left-0 w-0 h-1 bg-green-500 transition-all duration-500 group-hover:w-full" />
             </motion.div>
           ))}
@@ -404,81 +494,39 @@ export default function OfficersPage() {
         </div>
       </div>
 
-      {/* --- SECTION 4: THE CREATIVES --- */}
-      <div className="max-w-7xl mx-auto relative z-20 mt-32 pb-12">
-        <div className="flex flex-col md:flex-row items-center justify-between mb-12 px-4">
-          <div className="text-center md:text-left mb-6 md:mb-0">
-            <h2 className="text-3xl md:text-5xl font-bold mb-2 text-zinc-900 dark:text-white transition-colors duration-300">
-              The <span className="text-green-600 dark:text-green-500">Creatives</span>
-            </h2>
-            <p className="text-zinc-600 dark:text-gray-400 transition-colors duration-300">
-              Multimedia Arts & Design Team
-            </p>
-          </div>
-
-          {/* Navigation Buttons */}
-          <div className="flex gap-4">
-            <button 
-              onClick={scrollLeft}
-              className="p-3 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-green-400 hover:bg-green-500 hover:text-white dark:hover:bg-green-500 dark:hover:text-black transition-all shadow-md active:scale-95"
-              aria-label="Scroll Left"
-            >
-              <FaChevronLeft />
-            </button>
-            <button 
-              onClick={scrollRight}
-              className="p-3 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-green-400 hover:bg-green-500 hover:text-white dark:hover:bg-green-500 dark:hover:text-black transition-all shadow-md active:scale-95"
-              aria-label="Scroll Right"
-            >
-              <FaChevronRight />
-            </button>
-          </div>
+      {/* --- SECTION 4: THE CREATIVES (REVAMPED) --- */}
+      <div className="max-w-7xl mx-auto relative z-20 mt-32 pb-12 px-4">
+        
+        <div className="text-center mb-16">
+          <h2 className="text-3xl md:text-5xl font-bold mb-2 text-zinc-900 dark:text-white transition-colors duration-300">
+            The <span className="text-green-600 dark:text-green-500">Committees</span>
+          </h2>
+          <p className="text-zinc-600 dark:text-gray-400 transition-colors duration-300">
+            Documentation, Editorial, and Operations Committee
+          </p>
         </div>
 
-        <motion.div 
-          ref={carouselRef} 
-          className="cursor-grab overflow-hidden px-4 py-4" 
-          whileTap={{ cursor: "grabbing" }}
-        >
-          <motion.div 
-            drag="x" 
-            dragConstraints={{ right: 0, left: -width }}
-            style={{ x }}
-            dragElastic={0.1}
-            dragTransition={{ power: 0.3, timeConstant: 200 }} 
-            className="flex gap-6"
-          >
-            {creativeTeam.map((member, index) => (
-              <motion.div 
-                key={index} 
-                className="min-w-[280px] h-[350px] relative rounded-2xl overflow-hidden bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-green-500/20 group hover:border-green-500/50 shadow-lg dark:shadow-none transition-all duration-300"
-              >
-                {/* Image Section */}
-                <div className="relative h-2/3 w-full bg-zinc-100 dark:bg-zinc-800">
-                   <Image
-                      src={member.image} 
-                      alt={member.name}
-                      fill
-                      className="object-cover opacity-90 group-hover:opacity-100 transition-opacity"
-                    />
-                   <div className="absolute top-4 right-4 p-2 bg-white/80 dark:bg-black/50 backdrop-blur-md rounded-full text-green-600 dark:text-green-400 border border-green-500/30 shadow-sm">
-                     {member.icon}
-                   </div>
-                </div>
+        {/* --- 4a. GRAPHIC DESIGNERS --- */}
+        <CreativeCarousel 
+          title="Editorial Committee" 
+          subtitle="Visual Architects" 
+          team={graphicDesigners} 
+        />
 
-                {/* Info Text */}
-                <div className="h-1/3 p-6 flex flex-col justify-center bg-white dark:bg-gradient-to-t dark:from-black dark:to-zinc-900 transition-colors duration-300">
-                  <h3 className="text-xl font-bold text-zinc-800 dark:text-white group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors">
-                    {member.name}
-                  </h3>
-                  <p className="text-sm text-zinc-500 dark:text-gray-400 uppercase tracking-wider font-semibold mt-1">
-                    {member.role}
-                  </p>
-                </div>
-              </motion.div>
-            ))}
-          </motion.div>
-        </motion.div>
+        {/* --- 4b. MEDIA TEAM --- */}
+        <CreativeCarousel 
+          title="Documentation Committee" 
+          subtitle="Photography & Video Editing" 
+          team={mediaTeam} 
+        />
+
+        {/* --- 4c. CONTENT TEAM --- */}
+        <CreativeCarousel 
+          title="Content Strategy" 
+          subtitle="Captions & Copywriting" 
+          team={contentTeam} 
+        />
+
       </div>
 
       {/* --- JOIN TEAM CTA SECTION --- */}
@@ -490,21 +538,21 @@ export default function OfficersPage() {
         className="relative z-20 max-w-3xl mx-auto text-center mt-12 mb-32 px-4"
       >
         <div className="p-8 md:p-12 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-sm border border-zinc-200 dark:border-green-500/30 rounded-2xl shadow-xl dark:shadow-[0_0_30px_rgba(34,197,94,0.1)]">
-           <h3 className="text-2xl md:text-3xl font-bold text-zinc-900 dark:text-white mb-4">
-             Want to be part of the Legacy?
-           </h3>
-           <p className="text-zinc-600 dark:text-gray-300 mb-8 max-w-xl mx-auto">
-             We are constantly looking for talented individuals to join our ranks. If you have the passion for tech and leadership, we want you.
-           </p>
-           
-           <Link 
-             href="https://forms.cloud.microsoft/r/yiHAiG5bHt" 
-             target="_blank"
-             rel="noopener noreferrer"
-             className="inline-flex items-center gap-3 px-8 py-4 bg-green-600 hover:bg-green-500 text-white font-bold text-lg rounded-full shadow-[0_0_20px_rgba(34,197,94,0.3)] hover:shadow-[0_0_35px_rgba(34,197,94,0.6)] transition-all transform hover:scale-105"
-           >
-             Be a part of our team <FaArrowRight />
-           </Link>
+            <h3 className="text-2xl md:text-3xl font-bold text-zinc-900 dark:text-white mb-4">
+              Want to be part of the Legacy?
+            </h3>
+            <p className="text-zinc-600 dark:text-gray-300 mb-8 max-w-xl mx-auto">
+              We are constantly looking for talented individuals to join our ranks. If you have the passion for tech and leadership, we want you.
+            </p>
+            
+            <Link 
+              href="https://forms.cloud.microsoft/r/yiHAiG5bHt" 
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-3 px-8 py-4 bg-green-600 hover:bg-green-500 text-white font-bold text-lg rounded-full shadow-[0_0_20px_rgba(34,197,94,0.3)] hover:shadow-[0_0_35px_rgba(34,197,94,0.6)] transition-all transform hover:scale-105"
+            >
+              Be a part of our team <FaArrowRight />
+            </Link>
         </div>
       </motion.div>
 
