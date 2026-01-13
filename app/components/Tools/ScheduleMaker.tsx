@@ -2,7 +2,10 @@
 
 import { useState, useRef, useCallback, memo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { FaCalendarAlt, FaDownload, FaPlus, FaTrash, FaExclamationTriangle } from "react-icons/fa";
+import { 
+  FaCalendarAlt, FaDownload, FaPlus, FaTrash, FaExclamationTriangle, 
+  FaHeart, FaStar, FaCloud, FaSun, FaLeaf 
+} from "react-icons/fa";
 import { toPng } from 'html-to-image';
 
 // --- CONSTANTS ---
@@ -20,12 +23,149 @@ const COLORS = [
   { name: "Zinc", val: "bg-zinc-600" },
 ];
 
+// --- COMPLETE THEME ENGINE ---
 const BG_THEMES = [
-  { id: 'dark', name: 'Midnight', bg: 'bg-zinc-950', text: 'text-white', subtext: 'text-zinc-500', border: 'border-zinc-800', hex: '#09090b', displayHex: '#09090b' },
-  { id: 'light', name: 'Paper', bg: 'bg-white', text: 'text-zinc-900', subtext: 'text-zinc-400', border: 'border-zinc-100', hex: '#ffffff', displayHex: '#e4e4e7' },
-  { id: 'sakura', name: 'Sakura', bg: 'bg-rose-50', text: 'text-rose-950', subtext: 'text-rose-400', border: 'border-rose-200', hex: '#fff1f2', displayHex: '#f472b6' },
-  { id: 'navy', name: 'Blueprint', bg: 'bg-slate-900', text: 'text-slate-100', subtext: 'text-slate-500', border: 'border-slate-800', hex: '#0f172a', displayHex: '#0f172a' },
-  { id: 'cream', name: 'Journal', bg: 'bg-stone-100', text: 'text-stone-800', subtext: 'text-stone-400', border: 'border-stone-200', hex: '#f5f5f4', displayHex: '#d6d3d1' },
+  // === SPECIAL DYNAMIC THEMES ===
+  { 
+    id: 'coquette', 
+    name: 'Coquette', 
+    css: {
+      background: `
+        conic-gradient(from 90deg at 1px 1px, #0000 90deg, #fce7f3 0) 
+        0 0/20px 20px,
+        conic-gradient(from 90deg at 1px 1px, #0000 90deg, #fce7f3 0) 
+        10px 10px/20px 20px,
+        #fff1f2
+      `,
+    },
+    text: 'text-pink-900', 
+    subtext: 'text-pink-400', 
+    border: 'border-pink-300', 
+    hex: '#fff1f2',
+    displayHex: '#fbcfe8', 
+    decoration: 'bow',
+    font: 'font-serif' 
+  },
+  { 
+    id: 'golden', 
+    name: 'Golden Hour', 
+    css: {
+      background: 'linear-gradient(120deg, #f6d365 0%, #fda085 100%)',
+    },
+    text: 'text-orange-900', 
+    subtext: 'text-orange-100', 
+    border: 'border-white/40', 
+    hex: '#fda085',
+    displayHex: '#fb923c',
+    decoration: 'sun',
+    font: 'font-serif italic' 
+  },
+  { 
+    id: 'dreamscape', 
+    name: 'Dreamscape', 
+    css: {
+      background: 'linear-gradient(to top, #accbee 0%, #e7f0fd 100%)',
+    },
+    text: 'text-blue-900', 
+    subtext: 'text-blue-400', 
+    border: 'border-blue-200', 
+    hex: '#e7f0fd',
+    displayHex: '#bfdbfe',
+    decoration: 'cloud',
+    font: 'font-sans tracking-widest' 
+  },
+  { 
+    id: 'botanical', 
+    name: 'Botanical', 
+    css: {
+      backgroundColor: '#eaf4e7',
+      backgroundImage: 'radial-gradient(#4ade80 0.5px, transparent 0.5px), radial-gradient(#4ade80 0.5px, #eaf4e7 0.5px)',
+      backgroundSize: '20px 20px',
+      backgroundPosition: '0 0, 10px 10px'
+    },
+    text: 'text-emerald-900', 
+    subtext: 'text-emerald-600', 
+    border: 'border-emerald-200', 
+    hex: '#eaf4e7',
+    displayHex: '#86efac',
+    decoration: 'leaf',
+    font: 'font-mono' 
+  },
+  { 
+    id: 'y2k', 
+    name: 'Cyber Angel', 
+    css: {
+      background: 'linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%)',
+    },
+    text: 'text-indigo-900', 
+    subtext: 'text-white', 
+    border: 'border-white/50', 
+    hex: '#e0c3fc',
+    displayHex: '#c084fc',
+    decoration: 'stars',
+    font: 'font-mono tracking-tighter' 
+  },
+
+  // === ORIGINAL PLAIN THEMES ===
+  { 
+    id: 'dark', 
+    name: 'Midnight', 
+    css: { backgroundColor: '#09090b' }, 
+    text: 'text-white', 
+    subtext: 'text-zinc-500', 
+    border: 'border-zinc-800', 
+    hex: '#09090b', 
+    displayHex: '#09090b', 
+    font: 'font-sans' 
+  },
+  { 
+    id: 'light', 
+    name: 'Paper', 
+    css: { backgroundColor: '#ffffff' }, 
+    text: 'text-zinc-900', 
+    subtext: 'text-zinc-400', 
+    border: 'border-zinc-100', 
+    hex: '#ffffff', 
+    displayHex: '#e4e4e7', 
+    font: 'font-sans' 
+  },
+  { 
+    id: 'sakura', 
+    name: 'Sakura', 
+    css: { backgroundColor: '#fff1f2' }, 
+    text: 'text-rose-950', 
+    subtext: 'text-rose-400', 
+    border: 'border-rose-200', 
+    hex: '#fff1f2', 
+    displayHex: '#f472b6', 
+    font: 'font-sans' 
+  },
+  { 
+    id: 'navy', 
+    name: 'Blueprint', 
+    css: { 
+      backgroundColor: '#0f172a', 
+      backgroundImage: 'radial-gradient(#1e293b 1px, transparent 1px)', 
+      backgroundSize: '20px 20px' 
+    }, 
+    text: 'text-slate-100', 
+    subtext: 'text-slate-500', 
+    border: 'border-slate-800', 
+    hex: '#0f172a', 
+    displayHex: '#0f172a', 
+    font: 'font-mono' // Blueprint fits mono well
+  },
+  { 
+    id: 'cream', 
+    name: 'Journal', 
+    css: { backgroundColor: '#f5f5f4' }, 
+    text: 'text-stone-800', 
+    subtext: 'text-stone-400', 
+    border: 'border-stone-200', 
+    hex: '#f5f5f4', 
+    displayHex: '#d6d3d1', 
+    font: 'font-serif' // Journal fits serif well
+  },
 ];
 
 // --- INTERFACES & HELPERS ---
@@ -39,7 +179,6 @@ interface ClassItem {
   color: string;
 }
 
-// Convert "08:30" to minutes (e.g., 510)
 const getMinutes = (timeStr: string) => {
   const [h, m] = timeStr.split(":").map(Number);
   return h * 60 + m;
@@ -99,39 +238,25 @@ export default function ScheduleMaker() {
 
   const addClass = useCallback(() => {
     setError(null);
-
-    // 1. Validation: Empty Fields
     if (!form.subject.trim()) return setError("Please enter a subject name.");
     if (form.days.length === 0) return setError("Please select at least one day.");
 
-    // 2. Validation: Time Logic
     const startMin = getMinutes(form.start);
     const endMin = getMinutes(form.end);
 
-    if (startMin >= endMin) {
-      return setError("End time must be after start time.");
-    }
+    if (startMin >= endMin) return setError("End time must be after start time.");
+    if (endMin - startMin < 30) return setError("Class must be at least 30 minutes long.");
 
-    if (endMin - startMin < 30) {
-       return setError("Class must be at least 30 minutes long.");
-    }
-
-    // 3. Validation: Overlap Detection
     for (const day of form.days) {
        const conflictingClass = classes.find(c => {
          if (c.day !== day) return false;
          const cStart = getMinutes(c.start);
          const cEnd = getMinutes(c.end);
-         // Check if intervals overlap
          return (startMin < cEnd && endMin > cStart);
        });
-
-       if (conflictingClass) {
-         return setError(`Conflict: Overlaps with ${conflictingClass.subject} on ${day}.`);
-       }
+       if (conflictingClass) return setError(`Conflict: Overlaps with ${conflictingClass.subject} on ${day}.`);
     }
     
-    // 4. Success: Add Class
     const newClasses = form.days.map((day, index) => ({ 
       id: `${Date.now()}-${index}`, 
       subject: form.subject, 
@@ -143,9 +268,8 @@ export default function ScheduleMaker() {
     }));
     
     setClasses(prev => [...prev, ...newClasses]);
-    
     if (window.innerWidth < 1024) setMobileTab('preview');
-    setForm(prev => ({ ...prev, subject: "", room: "" })); // Keep time/days for ease of adding next class
+    setForm(prev => ({ ...prev, subject: "", room: "" }));
   }, [form, classes]);
 
   const removeClass = useCallback((id: string) => setClasses(prev => prev.filter((c) => c.id !== id)), []);
@@ -170,7 +294,7 @@ export default function ScheduleMaker() {
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md border border-zinc-200 dark:border-green-500/30 rounded-2xl shadow-xl overflow-hidden flex flex-col min-h-[600px]">
       <div className="absolute top-0 left-0 w-full h-1 bg-green-500 z-20" />
       
-      {/* Header (Static) */}
+      {/* Header */}
       <div className="p-6 md:p-8 bg-white dark:bg-zinc-900 border-b border-zinc-100 dark:border-zinc-800">
         <div className="flex items-center gap-3">
           <div className="p-3 bg-green-500/10 rounded-lg text-green-600 dark:text-green-400"><FaCalendarAlt size={20} /></div>
@@ -178,7 +302,6 @@ export default function ScheduleMaker() {
         </div>
       </div>
 
-      {/* Content */}
       <div className="flex-1 flex flex-col">
         {/* Mobile Tabs */}
         <div className="flex lg:hidden border-b border-zinc-200 dark:border-zinc-800">
@@ -206,7 +329,6 @@ export default function ScheduleMaker() {
                 <div className="grid grid-cols-2 gap-4 pt-2"><TimeSelector label="Start Time" value={form.start} onChange={(val) => setForm({...form, start: val})} /><TimeSelector label="End Time" value={form.end} onChange={(val) => setForm({...form, end: val})} /></div>
                 <div className="flex items-center gap-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl p-3 justify-center mt-2 flex-wrap">{COLORS.map((c) => <button key={c.name} onClick={() => setForm({...form, color: c.val})} className={`w-8 h-8 lg:w-6 lg:h-6 rounded-full shadow-sm ${c.val} ${form.color === c.val ? 'ring-2 ring-offset-2 ring-zinc-400 scale-110' : 'opacity-70 hover:opacity-100 hover:scale-105 transition-all'}`} title={c.name} />)}</div>
                 
-                {/* ERROR MESSAGE DISPLAY */}
                 <AnimatePresence>
                   {error && (
                     <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-3 rounded-xl text-xs font-bold flex items-center gap-2 border border-red-200 dark:border-red-800">
@@ -221,8 +343,24 @@ export default function ScheduleMaker() {
             </div>
 
             <div className="pt-6 border-t border-zinc-200 dark:border-zinc-800">
-                <h3 className="text-sm font-bold text-zinc-500 uppercase tracking-widest mb-4">Export Settings</h3>
-                <div className="grid grid-cols-5 gap-3 mb-4">{BG_THEMES.map((theme) => <button key={theme.id} onClick={() => setCurrentTheme(theme)} className={`aspect-square rounded-full border-2 transition-all ${currentTheme.id === theme.id ? 'border-green-500 scale-110 shadow-lg' : 'border-transparent opacity-70 hover:opacity-100'}`} style={{ backgroundColor: theme.displayHex }} title={theme.name} />)}</div>
+                <h3 className="text-sm font-bold text-zinc-500 uppercase tracking-widest mb-4">Select Aesthetic</h3>
+                <div className="grid grid-cols-5 gap-3 mb-4">
+                  {BG_THEMES.map((theme) => (
+                    <button 
+                      key={theme.id} 
+                      onClick={() => setCurrentTheme(theme)} 
+                      className={`aspect-square rounded-full border-2 transition-all flex items-center justify-center relative overflow-hidden ${currentTheme.id === theme.id ? 'border-green-500 scale-110 shadow-lg' : 'border-transparent opacity-70 hover:opacity-100'}`} 
+                      style={{ backgroundColor: theme.displayHex }} 
+                      title={theme.name}
+                    >
+                      {theme.id === 'coquette' && <span className="text-[10px]">🎀</span>}
+                      {theme.id === 'y2k' && <span className="text-[10px]">✨</span>}
+                      {theme.id === 'golden' && <span className="text-[10px]">☀️</span>}
+                      {theme.id === 'dreamscape' && <span className="text-[10px]">☁️</span>}
+                      {theme.id === 'botanical' && <span className="text-[10px]">🌿</span>}
+                    </button>
+                  ))}
+                </div>
                 <button onClick={downloadSchedule} className="w-full py-3 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl shadow-lg shadow-green-500/20 transition-all active:scale-95 flex items-center justify-center gap-2"><FaDownload size={14} /> Save Image</button>
             </div>
           </div>
@@ -247,21 +385,53 @@ const ScheduleGrid = memo(({ classes, removeClass, scheduleRef, theme, scheduleI
   const getHeight = (start: string, end: string) => { const [h1, m1] = start.split(":").map(Number); const [h2, m2] = end.split(":").map(Number); return (((h2 * 60 + m2) - (h1 * 60 + m1)) / 60) * 60; };
 
   return (
-    <div ref={scheduleRef} className={`w-full min-w-[800px] p-6 lg:p-10 rounded-2xl border transition-colors duration-300 ${theme.bg} ${theme.text} ${theme.border}`}>
+    <div 
+      ref={scheduleRef} 
+      style={theme.css} 
+      className={`w-full min-w-[800px] p-6 lg:p-10 rounded-2xl border transition-all duration-300 relative ${theme.text} ${theme.border} shadow-2xl ${theme.font}`}
+    >
+      {/* --- DYNAMIC DECORATIONS --- */}
+      {theme.decoration === 'bow' && <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-pink-300 drop-shadow-md z-50 text-6xl">🎀</div>}
+      {theme.decoration === 'sun' && <div className="absolute top-4 right-4 text-orange-200/50 text-6xl animate-pulse"><FaSun /></div>}
+      {theme.decoration === 'cloud' && <div className="absolute top-6 left-6 text-white/40 text-6xl animate-bounce" style={{ animationDuration: '3s' }}><FaCloud /></div>}
+      {theme.decoration === 'leaf' && <div className="absolute bottom-6 right-6 text-emerald-600/20 text-6xl rotate-45"><FaLeaf /></div>}
+      {theme.decoration === 'stars' && (
+        <>
+          <div className="absolute top-4 right-4 text-white/40 animate-pulse"><FaStar /></div>
+          <div className="absolute bottom-10 left-10 text-white/40 animate-pulse delay-700"><FaStar size={12} /></div>
+        </>
+      )}
+
       <div className={`flex justify-between items-end mb-8 border-b-2 pb-6 ${theme.border}`}>
-        <div><h1 className="text-4xl font-black uppercase tracking-tighter leading-none mb-1">{scheduleInfo.title || "My Schedule"}</h1><p className="text-xs font-bold tracking-[0.2em] opacity-60">JPCS STUDENT TOOLKIT</p></div>
-        <div className="text-right"><p className={`text-sm font-bold opacity-50 ${theme.text}`}>{scheduleInfo.subtitle || "AY 2025-2026"}</p></div>
+        <div>
+          <h1 className={`text-4xl font-black uppercase tracking-tighter leading-none mb-1 ${theme.id === 'coquette' ? 'font-serif italic' : ''}`}>
+            {scheduleInfo.title || "My Schedule"}
+          </h1>
+          <p className="text-xs font-bold tracking-[0.2em] opacity-60">JPCS STUDENT TOOLKIT</p>
+        </div>
+        <div className="text-right">
+          <p className={`text-sm font-bold opacity-50 ${theme.text}`}>
+            {scheduleInfo.subtitle || "AY 2025-2026"}
+            {theme.id === 'coquette' && <FaHeart className="inline ml-2 text-pink-400" />}
+          </p>
+        </div>
       </div>
+
       <div className="flex relative">
-        <div className={`w-16 flex-shrink-0 border-r-2 pr-2 ${theme.border} sticky left-0 z-30 ${theme.bg}`}>
+        <div className={`w-16 flex-shrink-0 border-r-2 pr-2 ${theme.border} sticky left-0 z-30`}>
           <div className="h-10"></div> 
-          {HOURS.map(h => (<div key={h} className={`h-[60px] text-[11px] font-bold opacity-40 text-right pt-1 relative`}>{h > 12 ? h - 12 : h} {h >= 12 ? 'PM' : 'AM'}<div className={`absolute top-0 right-[-10px] w-2 h-0.5 ${theme.border.replace('border', 'bg')}`}></div></div>))}
+          {HOURS.map(h => (
+            <div key={h} className={`h-[60px] text-[11px] font-bold opacity-50 text-right pt-1 relative`}>
+              {h > 12 ? h - 12 : h} {h >= 12 ? 'PM' : 'AM'}
+              <div className={`absolute top-0 right-[-10px] w-2 h-0.5 ${theme.border.replace('border', 'bg')}`}></div>
+            </div>
+          ))}
         </div>
         <div className="flex-1 grid grid-cols-6 relative">
-          {HOURS.map((h, i) => (<div key={i} className={`absolute w-full h-px z-0 opacity-30 ${theme.border.replace('border', 'bg')}`} style={{ top: `${i * 60 + 40}px` }} />))}
+          {HOURS.map((h, i) => (<div key={i} className={`absolute w-full h-px z-0 opacity-20 ${theme.border.replace('border', 'bg')}`} style={{ top: `${i * 60 + 40}px` }} />))}
           {DAYS.map((day) => (
             <div key={day} className={`relative border-r last:border-0 ${theme.border}`}>
-              <div className={`h-10 text-center text-[10px] font-extrabold uppercase tracking-widest flex items-center justify-center opacity-60 pb-2`}>{day.substring(0, 3)}</div>
+              <div className={`h-10 text-center text-[10px] font-extrabold uppercase tracking-widest flex items-center justify-center opacity-70 pb-2`}>{day.substring(0, 3)}</div>
               <div className="relative h-[840px]">
                 {classes.filter(c => c.day === day).map((c) => (
                   <div key={c.id} className={`absolute left-1 right-1 rounded-xl p-3 text-white shadow-md overflow-hidden cursor-pointer hover:scale-[1.02] active:scale-95 transition-all z-10 ${c.color} border border-white/20`} style={{ top: `${getPosition(c.start)}px`, height: `${getHeight(c.start, c.end)}px` }} onClick={() => removeClass(c.id)}>
