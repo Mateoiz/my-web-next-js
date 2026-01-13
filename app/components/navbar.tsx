@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence, type Variants } from "framer-motion";
-import { FaBars, FaTimes, FaFacebookF, FaTwitter, FaInstagram, FaLinkedinIn } from "react-icons/fa"; 
+import { FaBars, FaTimes, FaFacebookF, FaInstagram } from "react-icons/fa"; 
 
 // --- ANIMATION VARIANTS (Optimized) ---
 const menuVariants: Variants = {
@@ -25,7 +25,7 @@ const menuVariants: Variants = {
       type: "spring",
       stiffness: 300,
       damping: 30,
-      staggerChildren: 0.07, // Slightly faster stagger for better perceived performance
+      staggerChildren: 0.07, 
       delayChildren: 0.1,
       when: "beforeChildren"
     }
@@ -34,7 +34,7 @@ const menuVariants: Variants = {
 
 const linkVariants: Variants = {
   closed: { x: 50, opacity: 0 },
-  open: { x: 0, opacity: 1, transition: { type: "tween", ease: "easeOut", duration: 0.3 } } // Switched to tween for lighter calculation than spring
+  open: { x: 0, opacity: 1, transition: { type: "tween", ease: "easeOut", duration: 0.3 } }
 };
 
 const backdropVariants: Variants = {
@@ -54,7 +54,6 @@ export default function Navbar() {
     const onScroll = () => {
       if (!ticking) {
         window.requestAnimationFrame(() => {
-          // Only update state if the value actually changes to prevent re-renders
           const scrolled = window.scrollY > 20;
           setIsScrolled((prev) => (prev !== scrolled ? scrolled : prev));
           ticking = false;
@@ -71,8 +70,6 @@ export default function Navbar() {
   useEffect(() => {
     if (isMobileMenuOpen) {
       document.body.style.overflow = 'hidden';
-      // Optimization: Prevent layout shifting by adding padding for scrollbar if needed
-      // (Optional, simplified here for performance)
     } else {
       document.body.style.overflow = 'unset';
     }
@@ -82,7 +79,7 @@ export default function Navbar() {
   const closeMenu = useCallback(() => setIsMobileMenuOpen(false), []);
   const isActive = (path: string) => pathname === path;
 
-  // Memoize nav link classes to prevent recalculation on every render
+  // Memoize nav link classes
   const getNavLinkClass = (path: string) => `
     relative pb-1 transition-colors duration-300 font-medium tracking-wide
     ${isActive(path) 
@@ -95,7 +92,6 @@ export default function Navbar() {
   return (
     <>
       <nav
-        // FIX: Z-Index set to z-[100]
         className={`fixed top-0 left-0 w-full z-[100] transition-all duration-300 ease-in-out border-b will-change-auto ${
           isScrolled
             ? "bg-white/85 dark:bg-black/85 backdrop-blur-md border-zinc-200 dark:border-zinc-800 py-3 shadow-sm"
@@ -104,22 +100,17 @@ export default function Navbar() {
       >
         <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
           
-{/* --- LOGO SECTION --- */}
+          {/* --- LOGO SECTION --- */}
           <Link 
             href="/" 
             className="flex items-center gap-3 group relative px-3 py-2 z-50"
             onClick={closeMenu}
           >
-            {/* HOVER HIGHLIGHTER */}
             <div className="absolute inset-0 bg-green-500/10 dark:bg-green-500/20 rounded-xl scale-95 opacity-0 group-hover:opacity-100 group-hover:scale-100 transition-all duration-300 ease-out -z-10" />
-
             <div className="relative w-10 h-10 transition-transform duration-300 group-hover:scale-110 shrink-0">
                <Image src="/Logo.png" alt="Logo" fill sizes="40px" className="object-contain drop-shadow-md" priority />
             </div>
-            
-            {/* Optimized Text Hiding */}
             <div className={`flex flex-col leading-tight transition-all duration-300 ${isMobileMenuOpen ? "opacity-0 -translate-x-2 pointer-events-none md:opacity-100 md:translate-x-0 md:pointer-events-auto" : "opacity-100 translate-x-0"}`}>
-              {/* UPDATED: Added whitespace-nowrap and responsive text sizes */}
               <span className="font-bold text-sm md:text-base lg:text-lg text-zinc-900 dark:text-white tracking-tight group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors whitespace-nowrap">
                 Junior Philippine Computer Society
               </span>
@@ -137,6 +128,25 @@ export default function Navbar() {
             <Link href="/Events" className={getNavLinkClass('/Events')}>Events</Link>
             <Link href="/Tools" className={getNavLinkClass('/Tools')}>Tools</Link>
             
+            {/* 🔥 NEW SPECIAL EVENT LINK: CAST 🔥 */}
+            <Link 
+              href="/Cast" 
+              className={`
+                relative flex items-center gap-2 font-bold transition-all duration-300 hover:-translate-y-0.5
+                ${isActive('/Cast') ? 'opacity-100' : 'opacity-90 hover:opacity-100'}
+              `}
+            >
+              {/* Pulsing Dot */}
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-500"></span>
+              </span>
+              {/* Gradient Text */}
+              <span className="bg-gradient-to-r from-blue-600 to-indigo-500 bg-clip-text text-transparent uppercase tracking-wider text-sm">
+                Vote Now
+              </span>
+            </Link>
+
             <Link 
               href="/Contact" 
               className="
@@ -171,7 +181,6 @@ export default function Navbar() {
       <AnimatePresence mode="wait">
         {isMobileMenuOpen && (
           <>
-            {/* Backdrop: OPTIMIZATION 3 - Use GPU transform */}
             <motion.div 
               key="backdrop"
               variants={backdropVariants}
@@ -183,18 +192,15 @@ export default function Navbar() {
               style={{ willChange: "opacity" }} 
             />
 
-            {/* Side Drawer */}
             <motion.div
               key="drawer"
               variants={menuVariants}
               initial="closed"
               animate="open"
               exit="closed"
-              // OPTIMIZATION 4: Added transform-gpu and will-change to force hardware acceleration
-             className="fixed top-0 right-0 h-full w-[85%] max-w-md bg-white dark:bg-zinc-950 border-l border-zinc-200 dark:border-zinc-800 shadow-2xl z-[102] flex flex-col justify-between transform-gpu"
+              className="fixed top-0 right-0 h-full w-[85%] max-w-md bg-white dark:bg-zinc-950 border-l border-zinc-200 dark:border-zinc-800 shadow-2xl z-[102] flex flex-col justify-between transform-gpu"
               style={{ willChange: "transform" }}
             >
-              {/* Static Decoration (Removed Blur filters here to save FPS, using Opacity instead) */}
               <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-green-500/5 rounded-full pointer-events-none" />
               <div className="absolute bottom-0 left-0 w-[200px] h-[200px] bg-emerald-500/5 rounded-full pointer-events-none" />
 
@@ -208,6 +214,8 @@ export default function Navbar() {
                     { name: "Blogs", path: "/Blogs" },
                     { name: "Events", path: "/Events" },
                     { name: "Tools", path: "/Tools" },
+                    // 🔥 Added Cast to Mobile Menu
+                    { name: "Cast Vote", path: "/Cast", isSpecial: true },
                   ].map((link, i) => (
                     <motion.div key={i} variants={linkVariants}>
                       <Link 
@@ -220,9 +228,18 @@ export default function Navbar() {
                         <span className={`text-xs font-mono font-normal mt-2 ${isActive(link.path) ? "text-green-600" : "text-zinc-400"}`}>
                           0{i + 1}
                         </span>
-                        <span className="group-hover:translate-x-2 transition-transform">
-                          {link.name}
-                        </span>
+                        
+                        {/* Special styling for "Cast Vote" */}
+                        {link.isSpecial ? (
+                          <span className="bg-gradient-to-r from-blue-600 to-indigo-500 bg-clip-text text-transparent group-hover:translate-x-2 transition-transform flex items-center gap-3">
+                            {link.name} 
+                            <span className="text-sm bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full border border-blue-200">LIVE</span>
+                          </span>
+                        ) : (
+                          <span className="group-hover:translate-x-2 transition-transform">
+                            {link.name}
+                          </span>
+                        )}
                       </Link>
                     </motion.div>
                   ))}
@@ -235,7 +252,6 @@ export default function Navbar() {
                 >
                   <div className="h-px w-full bg-zinc-200 dark:bg-zinc-800" />
                   
-                  {/* Mobile Contact Button */}
                   <Link 
                     href="/Contact" 
                     onClick={closeMenu} 

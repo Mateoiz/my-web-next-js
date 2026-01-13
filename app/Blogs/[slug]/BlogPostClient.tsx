@@ -8,7 +8,6 @@ import { motion, useScroll, useTransform } from "framer-motion";
 import { FaArrowLeft, FaTag, FaShareAlt, FaTerminal, FaClock } from "react-icons/fa";
 import { getPostBySlug, type BlogPost } from "@/lib/db"; 
 
-const router = useRouter();
 // --- UNIFIED STYLES ---
 const proseStyles = `
   prose prose-lg prose-zinc dark:prose-invert max-w-none
@@ -20,15 +19,6 @@ const proseStyles = `
   prose-img:rounded-xl prose-img:border-2 prose-img:border-black dark:prose-img:border-zinc-700
   prose-table:block prose-table:overflow-x-auto
 `;
-const handleBack = () => {
-  // Check if there is actual browser history to go back to
-  if (typeof window !== "undefined" && window.history.length > 1) {
-    router.back();
-  } else {
-    // Fallback for external links (FB, Messenger, etc.)
-    router.push("/blog"); 
-  }
-};
 
 export default function BlogPostClient({ slug }: { slug: string }) {
   const router = useRouter();
@@ -99,15 +89,16 @@ export default function BlogPostClient({ slug }: { slug: string }) {
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 relative z-10">
 
- <button 
-    onClick={handleBack}
-    className="group mb-6 md:mb-8 inline-flex items-center gap-2 text-xs md:text-sm font-bold uppercase tracking-wide text-zinc-500 hover:text-black dark:text-zinc-400 dark:hover:text-white transition-colors"
->
-    <div className="p-2 bg-zinc-100 dark:bg-zinc-900 rounded-full border border-zinc-200 dark:border-zinc-800 group-hover:border-black dark:group-hover:border-white transition-colors">
-        <FaArrowLeft className="w-3 h-3 md:w-4 md:h-4" />
-    </div>
-    Back to Archives
-</button>
+        {/* BACK BUTTON */}
+        <button 
+            onClick={() => router.back()}
+            className="group mb-6 md:mb-8 inline-flex items-center gap-2 text-xs md:text-sm font-bold uppercase tracking-wide text-zinc-500 hover:text-black dark:text-zinc-400 dark:hover:text-white transition-colors"
+        >
+            <div className="p-2 bg-zinc-100 dark:bg-zinc-900 rounded-full border border-zinc-200 dark:border-zinc-800 group-hover:border-black dark:group-hover:border-white transition-colors">
+                <FaArrowLeft className="w-3 h-3 md:w-4 md:h-4" />
+            </div>
+            Back to Archives
+        </button>
 
         {/* MAIN ARTICLE CONTAINER */}
         <motion.article 
