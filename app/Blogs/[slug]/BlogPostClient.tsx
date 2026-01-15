@@ -1,12 +1,11 @@
-// app/blogs/[slug]/BlogPostClient.tsx
 "use client";
 
-import { useEffect, useState } from "react"; 
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { FaArrowLeft, FaTag, FaShareAlt, FaTerminal, FaClock } from "react-icons/fa";
-import { getPostBySlug, type BlogPost } from "@/lib/db"; 
+// 1. Import the type definition from your server file
+import { type BlogPost } from "@/lib/server-db"; 
 
 // --- UNIFIED STYLES ---
 const proseStyles = `
@@ -20,46 +19,19 @@ const proseStyles = `
   prose-table:block prose-table:overflow-x-auto
 `;
 
-export default function BlogPostClient({ slug }: { slug: string }) {
+// 2. Updated props to accept the full post object
+export default function BlogPostClient({ post }: { post: BlogPost | null }) {
   const router = useRouter();
-  const [post, setPost] = useState<BlogPost | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  
+  // NOTE: Loading state is no longer needed here because the server handles it before rendering.
 
-  // Animations
+  // Animations (Kept exactly as you had them)
   const { scrollYProgress } = useScroll();
   const scale = useTransform(scrollYProgress, [0, 0.2], [1, 0.98]);
   const opacity = useTransform(scrollYProgress, [0, 0.2], [1, 0.9]);
 
-  useEffect(() => {
-    const fetchPost = async () => {
-        try {
-            const data = await getPostBySlug(slug);
-            if (!data) {
-                setError("Post not found in database.");
-            } else {
-                setPost(data);
-            }
-        } catch (err) {
-            console.error("🔥 Error querying database:", err);
-            setError("Database query failed.");
-        } finally {
-            setLoading(false);
-        }
-    };
-    if (slug) fetchPost();
-  }, [slug]);
-
-  if (loading) {
-    return (
-        <div className="min-h-screen flex flex-col items-center justify-center bg-white dark:bg-zinc-950 gap-4">
-            <div className="animate-spin w-8 h-8 border-4 border-black border-t-transparent rounded-full dark:border-white dark:border-t-transparent" />
-            <p className="font-mono text-xs animate-pulse">QUERYING_MAINFRAME...</p>
-        </div>
-    );
-  }
-
-  if (error || !post) {
+  // 3. Handle Missing Post (404 Logic)
+  if (!post) {
     return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-zinc-50 dark:bg-zinc-950 p-6 text-center">
             <div className="bg-red-50 dark:bg-red-900/20 p-6 rounded-xl border-2 border-red-500 max-w-md w-full">
@@ -68,7 +40,7 @@ export default function BlogPostClient({ slug }: { slug: string }) {
                     The requested data packet could not be retrieved.
                 </p>
                 <button 
-                    onClick={() => router.push("/blogs")}
+                    onClick={() => router.push("/Blogs")}
                     className="w-full md:w-auto px-6 py-3 bg-black text-white dark:bg-white dark:text-black font-bold uppercase tracking-widest text-xs rounded hover:opacity-80 transition-opacity"
                 >
                     Return to Archives
@@ -78,6 +50,7 @@ export default function BlogPostClient({ slug }: { slug: string }) {
     );
   }
 
+  // 4. Main Render (Identical to your original design)
   return (
     <main className="min-h-screen bg-white dark:bg-zinc-950 text-black dark:text-zinc-100 font-sans pt-24 md:pt-32 pb-20 selection:bg-green-500/30">
       
@@ -135,16 +108,12 @@ export default function BlogPostClient({ slug }: { slug: string }) {
                
                <div className="flex flex-wrap items-center gap-4 md:gap-6 text-zinc-600 dark:text-zinc-400">
                    <div>
-                        <span className="block text-[10px] text-zinc-500 uppercase font-bold">Date</span>
-                        <span className="font-bold">
-                            {post.createdAt?.seconds 
-                                ? new Date(post.createdAt.seconds * 1000).toLocaleDateString() 
-                                : "Recent"}
-                        </span>
+                       <span className="block text-[10px] text-zinc-500 uppercase font-bold">Date</span>
+                       <span className="font-bold">{post.date}</span>
                    </div>
                    <div className="flex items-center gap-2 border-l border-zinc-300 dark:border-zinc-700 pl-4">
-                        <FaClock className="text-zinc-400" />
-                        <span className="font-bold">5 min</span>
+                       <FaClock className="text-zinc-400" />
+                       <span className="font-bold">5 min</span>
                    </div>
                </div>
             </div>

@@ -1,12 +1,11 @@
-// app/blogs/[slug]/page.tsx
 import type { Metadata } from "next";
-import { getPostBySlug } from "@/lib/db";
-import BlogPostClient from "./BlogPostClient"; // <--- Imports your file from Step 1
+import { getServerSidePostBySlug } from "@/lib/server-db"; // 1. Import server fetcher
+import BlogPostClient from "./BlogPostClient"; // 2. Import client display
 
-// 1. GENERATE METADATA (For Facebook/Twitter Cards)
+// GENERATE METADATA (For SEO/Facebook/Twitter)
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
-  const post = await getPostBySlug(slug);
+  const post = await getServerSidePostBySlug(slug);
 
   if (!post) {
     return { title: "Article Not Found - JPCS" };
@@ -24,8 +23,14 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   };
 }
 
-// 2. MAIN PAGE COMPONENT
+// MAIN PAGE COMPONENT
 export default async function Page({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  return <BlogPostClient slug={slug} />;
+
+  // 3. FETCH DATA HERE (On the Server)
+  // This runs in the cloud, bypassing the school firewall
+  const post = await getServerSidePostBySlug(slug);
+
+  // 4. Pass the full 'post' data to the client component
+  return <BlogPostClient post={post} />;
 }
