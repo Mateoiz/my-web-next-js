@@ -7,6 +7,8 @@ import Link from "next/link";
 import { FaUser, FaCalendarAlt, FaArrowRight, FaSearch, FaTerminal, FaPenNib } from "react-icons/fa";
 import { getPublishedPosts, type BlogPost } from "@/lib/db"; 
 
+import FloatingCubes from "../components/FloatingCubes";  
+import CircuitCursor from "../components/CircuitCursor";
 export default function BlogPage() {
   const [posts, setPosts] = useState<BlogPost[]>([]);
   const [loading, setLoading] = useState(true);
@@ -127,7 +129,6 @@ export default function BlogPage() {
                      {post.category}
                   </div>
                 </div>
-
                 {/* Content */}
                 <div className="flex flex-col flex-grow p-5 md:p-6">
                   <div className="flex items-center gap-3 text-xs font-bold font-mono text-zinc-500 dark:text-zinc-400 mb-3 uppercase tracking-wide">
@@ -161,9 +162,11 @@ export default function BlogPage() {
                 </div>
               </motion.article>
             </Link>
+            
           ))}
         </div>
-
+                <CircuitCursor /> 
+<FloatingCubes />
       </div>
     </main>
   );
