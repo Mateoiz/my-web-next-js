@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   FaTerminal, FaTrophy, FaKey, FaTimes, FaBackspace, 
-  FaCheckCircle, FaLaptopCode, FaSun, FaMoon, FaLevelDownAlt 
+  FaCheckCircle, FaLaptopCode, FaSun, FaMoon, FaLevelDownAlt, FaUserSecret 
 } from "react-icons/fa";
 
 // --- FIREBASE IMPORTS ---
@@ -41,7 +41,7 @@ export default function DailyDecrypt() {
   // --- STATE ---
   const [isOpen, setIsOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [isDark, setIsDark] = useState(true); // Default to Dark/Hacker mode
+  const [isDark, setIsDark] = useState(true); 
   
   // Time State
   const [timeString, setTimeString] = useState("00:00");
@@ -54,17 +54,17 @@ export default function DailyDecrypt() {
   const [gameStatus, setGameStatus] = useState<"PLAYING" | "WON" | "LOST">("PLAYING");
   const [streak, setStreak] = useState(0);
   
-  // Leaderboard State
+  // Meta
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [username, setUsername] = useState("");
   const [showNameInput, setShowNameInput] = useState(false);
   const [loadingLB, setLoadingLB] = useState(true);
 
-  // --- HELPER: PH TIME ---
-  const getPhilippineDateString = () => {
+  // --- HELPER: PH TIME & DATES ---
+  const getPhilippineDateString = (daysOffset = 0) => {
     const now = new Date();
-    // Offset for Philippines is UTC+8
-    const phTime = new Date(now.getTime() + (28800000)); 
+    // Offset for Philippines is UTC+8 (28800000ms) + days offset
+    const phTime = new Date(now.getTime() + (28800000) + (daysOffset * 86400000)); 
     return phTime.getUTCFullYear() + "-" + 
            String(phTime.getUTCMonth() + 1).padStart(2, '0') + "-" + 
            String(phTime.getUTCDate()).padStart(2, '0');
@@ -80,27 +80,22 @@ export default function DailyDecrypt() {
       
       const updateTimer = () => {
         const now = new Date();
-        
-        // 1. Format Time String (HH:MM)
         const formatter = new Intl.DateTimeFormat('en-US', {
             timeZone: 'Asia/Manila',
             hour: '2-digit', minute: '2-digit', hour12: false
         });
         setTimeString(formatter.format(now));
 
-        // 2. Calculate Day Progress %
         const parts = formatter.formatToParts(now);
         const h = parseInt(parts.find(p => p.type === 'hour')?.value || '0');
         const m = parseInt(parts.find(p => p.type === 'minute')?.value || '0');
         const s = now.getSeconds();
-        
         const totalSeconds = h * 3600 + m * 60 + s;
         setDayProgress((totalSeconds / 86400) * 100);
       };
 
       updateTimer(); 
       const timer = setInterval(updateTimer, 1000); 
-      
       return () => {
         clearInterval(timer);
         document.body.style.overflow = "auto";
@@ -112,24 +107,34 @@ export default function DailyDecrypt() {
     if (!mounted) return;
     const today = getPhilippineDateString();
     
-    // Select Word of the Day
+    // 1. Select Word
     let hash = 0;
     for (let i = 0; i < today.length; i++) hash = today.charCodeAt(i) + ((hash << 5) - hash);
     const index = Math.abs(hash) % TECH_WORDS.length;
     setSolution(TECH_WORDS[index]);
 
-    // Restore Local Data
-    const savedStreak = localStorage.getItem("decrypt_streak");
-    if (savedStreak) setStreak(parseInt(savedStreak));
+    // 2. Restore User Identity (Auto-Login)
     const savedName = localStorage.getItem("decrypt_username");
     if (savedName) setUsername(savedName);
 
-    // Check Win State
+    // 3. Check Streak Validity (Reset if they missed a day)
+    const savedStreak = parseInt(localStorage.getItem("decrypt_streak") || "0");
     const lastSolved = localStorage.getItem("decrypt_last_solved");
+    const yesterday = getPhilippineDateString(-1);
+
     if (lastSolved === today) {
-      setGameStatus("WON");
-      setGuesses([TECH_WORDS[index], "", "", "", "", ""]); 
+        // Already played today: Keep streak
+        setStreak(savedStreak);
+        setGameStatus("WON");
+        setGuesses([TECH_WORDS[index], "", "", "", "", ""]); 
+    } else if (lastSolved === yesterday) {
+        // Played yesterday: Streak is safe, waiting for today's win to increment
+        setStreak(savedStreak);
+    } else {
+        // Missed a day or first time: Streak resets to 0 visually until they win
+        setStreak(0);
     }
+
   }, [mounted]);
 
   // --- KEYBOARD LISTENER ---
@@ -180,13 +185,35 @@ export default function DailyDecrypt() {
 
   const handleWin = async () => {
     const today = getPhilippineDateString();
+    const yesterday = getPhilippineDateString(-1);
+    const lastSolved = localStorage.getItem("decrypt_last_solved");
+    let currentStreak = parseInt(localStorage.getItem("decrypt_streak") || "0");
+
+    // LOGIC: ACTUAL STREAK CALCULATION
+    let newStreak = 1;
+    if (lastSolved === yesterday) {
+        // Consecutive day
+        newStreak = currentStreak + 1;
+    } else if (lastSolved === today) {
+        // Replaying same day (shouldn't happen due to checks, but safe to handle)
+        newStreak = currentStreak;
+    } 
+    // Else (Missed a day or New User) -> newStreak remains 1
+
+    // Save Data
     localStorage.setItem("decrypt_last_solved", today);
-    const newStreak = streak + 1;
-    setStreak(newStreak);
     localStorage.setItem("decrypt_streak", newStreak.toString());
+    setStreak(newStreak);
+
     if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
-    if (!username) setShowNameInput(true);
-    else await updateLeaderboard(username, newStreak);
+
+    // CHECK IF NAME EXISTS
+    if (!username) {
+        setShowNameInput(true);
+    } else {
+        // Auto-submit if name exists
+        await updateLeaderboard(username, newStreak);
+    }
   };
 
   const handleNameSubmit = async () => {
@@ -209,8 +236,6 @@ export default function DailyDecrypt() {
   // --- STYLING HELPERS ---
   const getCharStatus = (word: string, idx: number) => {
     const letter = word[idx];
-    
-    // Theme Colors
     const correct = isDark ? "bg-green-600 border-green-500 text-black shadow-green-500/40" : "bg-green-500 border-green-600 text-white";
     const wrongSpot = isDark ? "bg-yellow-500 border-yellow-400 text-black" : "bg-yellow-400 border-yellow-500 text-white";
     const wrong = isDark ? "bg-zinc-800 border-zinc-700 text-zinc-500" : "bg-zinc-200 border-zinc-300 text-zinc-400";
@@ -264,7 +289,6 @@ export default function DailyDecrypt() {
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className={`fixed inset-0 z-[99999] ${isDark ? 'bg-black/95' : 'bg-zinc-100/95'} backdrop-blur-md md:p-8 font-mono flex items-center justify-center`}
           >
-            {/* --- MAIN CONTAINER --- */}
             <div className={`relative w-full h-[100dvh] md:h-[800px] md:max-w-7xl ${bgClass} md:border-2 ${isDark ? 'border-green-500/20' : 'border-zinc-300'} md:rounded-3xl shadow-2xl flex flex-col md:flex-row overflow-hidden`}>
               
               {/* --- BACKGROUND FX --- */}
@@ -293,13 +317,12 @@ export default function DailyDecrypt() {
                     </div>
                   </div>
                   
-                  {/* CONTROLS (Both Mobile & Desktop) */}
+                  {/* CONTROLS */}
                   <div className="flex items-center gap-2">
                     <div className="hidden md:block text-right mr-4">
                         <div className={`text-[10px] uppercase ${mutedClass}`}>Manila Time</div>
                         <div className={`${isDark ? 'text-zinc-300' : 'text-zinc-700'} font-bold`}>{timeString}</div>
                     </div>
-                    {/* Theme Toggle */}
                     <button onClick={() => setIsDark(!isDark)} className={`p-2 rounded-full border ${borderClass} ${mutedClass} hover:${textClass} transition-colors`}>
                         {isDark ? <FaSun size={16} /> : <FaMoon size={16} />}
                     </button>
@@ -309,11 +332,18 @@ export default function DailyDecrypt() {
                   </div>
                 </div>
 
-                {/* GAME GRID (Flexible Height) */}
+                {/* GAME GRID */}
                 <div className="flex-1 flex flex-col items-center justify-center p-2 min-h-0 overflow-y-auto">
                   <div className="w-full max-w-[340px] md:max-w-[420px] flex flex-col gap-1.5 md:gap-3">
                     
-                    {/* Status Message Area */}
+                    {/* Username Indicator (If logged in) */}
+                    {username && (
+                        <div className={`text-center text-[10px] ${mutedClass} uppercase tracking-widest mb-1`}>
+                            OPERATOR: <span className={accentClass}>{username}</span>
+                        </div>
+                    )}
+
+                    {/* Status Message */}
                     <div className="min-h-[40px] flex justify-center items-end mb-2">
                        {gameStatus === "WON" && (
                          <motion.div initial={{scale:0}} animate={{scale:1}} className={`flex items-center gap-2 px-4 py-2 rounded-full border text-xs font-bold tracking-widest shadow-lg ${isDark ? 'text-green-400 bg-green-900/40 border-green-500/50' : 'text-green-800 bg-green-100 border-green-300'}`}>
@@ -360,14 +390,13 @@ export default function DailyDecrypt() {
                   </div>
                 </div>
 
-                {/* KEYBOARD AREA (Lifted & Optimized) */}
-                {/* pb-20 lifts the keyboard up significantly for mobile users */}
+                {/* KEYBOARD AREA */}
                 <div className={`${isDark ? 'bg-zinc-950' : 'bg-zinc-100'} border-t ${borderClass} p-2 pb-20 md:pb-6 z-20 shadow-[0_-10px_30px_rgba(0,0,0,0.1)]`}>
                   {showNameInput ? (
                     <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="flex flex-col items-center gap-4 py-4">
                         <div className="text-center">
-                            <h3 className={`${accentClass} font-bold text-lg mb-1`}>NEW HIGH SCORE DETECTED</h3>
-                            <p className={`${mutedClass} text-xs`}>Enter your codename to join the database.</p>
+                            <h3 className={`${accentClass} font-bold text-lg mb-1`}>NEW HIGH SCORE</h3>
+                            <p className={`${mutedClass} text-xs`}>Identify yourself for the records.</p>
                         </div>
                         <div className="flex w-full max-w-sm gap-2">
                             <input 
@@ -385,7 +414,7 @@ export default function DailyDecrypt() {
                         </div>
                     </motion.div>
                   ) : (
-                    <div className="w-full max-w-[600px] mx-auto flex flex-col gap-2 select-none">
+                    <div className="w-full max-w-[600px] mx-auto flex flex-col gap-2">
                         {KEYS.map((row, i) => (
                             <div key={i} className="flex justify-center gap-1 w-full">
                                 {row.map((key) => {
@@ -411,14 +440,14 @@ export default function DailyDecrypt() {
                     </div>
                   )}
                   
-                  {/* Credits (Mobile Only - Positioned in the padding area) */}
+                  {/* Credits */}
                   <div className="md:hidden absolute bottom-6 left-0 right-0 text-center pointer-events-none">
                      <p className={`text-[9px] font-bold tracking-widest uppercase ${mutedClass} opacity-50`}>Designed by: Ice Matthew Ramirez</p>
                   </div>
                 </div>
               </div>
 
-              {/* --- LEADERBOARD COLUMN (Desktop Only) --- */}
+              {/* --- LEADERBOARD (Desktop) --- */}
               <div className={`hidden md:flex w-80 ${isDark ? 'bg-zinc-900/50' : 'bg-zinc-50'} border-l ${borderClass} flex-col backdrop-blur-sm z-10`}>
                  <div className={`p-6 border-b ${borderClass} ${isDark ? 'bg-black/20' : 'bg-white/50'}`}>
                     <h3 className={`text-sm font-bold ${textClass} flex items-center gap-2`}>
@@ -457,7 +486,7 @@ export default function DailyDecrypt() {
                         <div className="h-full bg-green-600" style={{width: `${dayProgress}%`}} />
                     </div>
                     <div className={`mt-4 text-center text-[10px] ${mutedClass} font-bold uppercase tracking-widest hover:${accentClass} transition-colors`}>
-                        Good luck, Lasallians!
+                        Designed by: Ice Matthew Ramirez
                     </div>
                  </div>
               </div>
