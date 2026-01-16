@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   FaTerminal, FaTrophy, FaKey, FaTimes, FaBackspace, 
-  FaCheckCircle, FaLaptopCode, FaSun, FaMoon, FaLevelDownAlt, FaUserSecret 
+  FaCheckCircle, FaLaptopCode, FaSun, FaMoon, FaLevelDownAlt 
 } from "react-icons/fa";
 
 // --- FIREBASE IMPORTS ---
@@ -54,17 +54,17 @@ export default function DailyDecrypt() {
   const [gameStatus, setGameStatus] = useState<"PLAYING" | "WON" | "LOST">("PLAYING");
   const [streak, setStreak] = useState(0);
   
-  // Meta
+  // Leaderboard State
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [username, setUsername] = useState("");
   const [showNameInput, setShowNameInput] = useState(false);
   const [loadingLB, setLoadingLB] = useState(true);
 
-  // --- HELPER: PH TIME & DATES ---
-  const getPhilippineDateString = (daysOffset = 0) => {
+  // --- HELPER: PH TIME ---
+  const getPhilippineDateString = () => {
     const now = new Date();
-    // Offset for Philippines is UTC+8 (28800000ms) + days offset
-    const phTime = new Date(now.getTime() + (28800000) + (daysOffset * 86400000)); 
+    // Offset for Philippines is UTC+8
+    const phTime = new Date(now.getTime() + (28800000)); 
     return phTime.getUTCFullYear() + "-" + 
            String(phTime.getUTCMonth() + 1).padStart(2, '0') + "-" + 
            String(phTime.getUTCDate()).padStart(2, '0');
@@ -96,6 +96,7 @@ export default function DailyDecrypt() {
 
       updateTimer(); 
       const timer = setInterval(updateTimer, 1000); 
+      
       return () => {
         clearInterval(timer);
         document.body.style.overflow = "auto";
@@ -107,34 +108,21 @@ export default function DailyDecrypt() {
     if (!mounted) return;
     const today = getPhilippineDateString();
     
-    // 1. Select Word
     let hash = 0;
     for (let i = 0; i < today.length; i++) hash = today.charCodeAt(i) + ((hash << 5) - hash);
     const index = Math.abs(hash) % TECH_WORDS.length;
     setSolution(TECH_WORDS[index]);
 
-    // 2. Restore User Identity (Auto-Login)
+    const savedStreak = localStorage.getItem("decrypt_streak");
+    if (savedStreak) setStreak(parseInt(savedStreak));
     const savedName = localStorage.getItem("decrypt_username");
     if (savedName) setUsername(savedName);
 
-    // 3. Check Streak Validity (Reset if they missed a day)
-    const savedStreak = parseInt(localStorage.getItem("decrypt_streak") || "0");
     const lastSolved = localStorage.getItem("decrypt_last_solved");
-    const yesterday = getPhilippineDateString(-1);
-
     if (lastSolved === today) {
-        // Already played today: Keep streak
-        setStreak(savedStreak);
-        setGameStatus("WON");
-        setGuesses([TECH_WORDS[index], "", "", "", "", ""]); 
-    } else if (lastSolved === yesterday) {
-        // Played yesterday: Streak is safe, waiting for today's win to increment
-        setStreak(savedStreak);
-    } else {
-        // Missed a day or first time: Streak resets to 0 visually until they win
-        setStreak(0);
+      setGameStatus("WON");
+      setGuesses([TECH_WORDS[index], "", "", "", "", ""]); 
     }
-
   }, [mounted]);
 
   // --- KEYBOARD LISTENER ---
@@ -185,35 +173,13 @@ export default function DailyDecrypt() {
 
   const handleWin = async () => {
     const today = getPhilippineDateString();
-    const yesterday = getPhilippineDateString(-1);
-    const lastSolved = localStorage.getItem("decrypt_last_solved");
-    let currentStreak = parseInt(localStorage.getItem("decrypt_streak") || "0");
-
-    // LOGIC: ACTUAL STREAK CALCULATION
-    let newStreak = 1;
-    if (lastSolved === yesterday) {
-        // Consecutive day
-        newStreak = currentStreak + 1;
-    } else if (lastSolved === today) {
-        // Replaying same day (shouldn't happen due to checks, but safe to handle)
-        newStreak = currentStreak;
-    } 
-    // Else (Missed a day or New User) -> newStreak remains 1
-
-    // Save Data
     localStorage.setItem("decrypt_last_solved", today);
-    localStorage.setItem("decrypt_streak", newStreak.toString());
+    const newStreak = streak + 1;
     setStreak(newStreak);
-
+    localStorage.setItem("decrypt_streak", newStreak.toString());
     if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
-
-    // CHECK IF NAME EXISTS
-    if (!username) {
-        setShowNameInput(true);
-    } else {
-        // Auto-submit if name exists
-        await updateLeaderboard(username, newStreak);
-    }
+    if (!username) setShowNameInput(true);
+    else await updateLeaderboard(username, newStreak);
   };
 
   const handleNameSubmit = async () => {
@@ -233,35 +199,97 @@ export default function DailyDecrypt() {
     fetchLeaderboard();
   };
 
-  // --- STYLING HELPERS ---
-  const getCharStatus = (word: string, idx: number) => {
-    const letter = word[idx];
-    const correct = isDark ? "bg-green-600 border-green-500 text-black shadow-green-500/40" : "bg-green-500 border-green-600 text-white";
-    const wrongSpot = isDark ? "bg-yellow-500 border-yellow-400 text-black" : "bg-yellow-400 border-yellow-500 text-white";
-    const wrong = isDark ? "bg-zinc-800 border-zinc-700 text-zinc-500" : "bg-zinc-200 border-zinc-300 text-zinc-400";
-    const empty = isDark ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-300";
+  // --- STYLING HELPERS (CORRECTED LOGIC) ---
+  const getCharStatus = (guess: string, index: number) => {
+    const letter = guess[index];
+    if (!letter) return isDark ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-300";
 
-    if (!letter) return empty;
-    if (solution[idx] === letter) return `${correct} font-bold shadow-lg`;
-    if (solution.includes(letter)) return `${wrongSpot} font-bold`;
-    return wrong;
+    // 1. Calculate frequency of each letter in solution
+    const solutionCounts: Record<string, number> = {};
+    for (const char of solution) {
+        solutionCounts[char] = (solutionCounts[char] || 0) + 1;
+    }
+
+    // 2. Identify GREEN matches first and decrement counts
+    const status = Array(5).fill("GRAY");
+    for (let i = 0; i < 5; i++) {
+        if (guess[i] === solution[i]) {
+            status[i] = "GREEN";
+            solutionCounts[guess[i]]--;
+        }
+    }
+
+    // 3. Identify YELLOW matches only if count > 0
+    for (let i = 0; i < 5; i++) {
+        if (status[i] !== "GREEN" && solutionCounts[guess[i]] > 0) {
+            status[i] = "YELLOW";
+            solutionCounts[guess[i]]--;
+        }
+    }
+
+    // 4. Return Styles based on calculated status
+    const type = status[index];
+    
+    if (type === "GREEN") {
+        return isDark 
+            ? "bg-green-600 border-green-500 text-black font-bold shadow-green-500/40 shadow-lg" 
+            : "bg-green-500 border-green-600 text-white font-bold shadow-md";
+    }
+    if (type === "YELLOW") {
+        return isDark 
+            ? "bg-yellow-500 border-yellow-400 text-black font-bold" 
+            : "bg-yellow-400 border-yellow-500 text-white font-bold";
+    }
+    // Gray/Wrong
+    return isDark 
+        ? "bg-zinc-800 border-zinc-700 text-zinc-500" 
+        : "bg-zinc-200 border-zinc-300 text-zinc-400";
   };
 
+  // Improved Key Status to prioritize Green > Yellow > Gray
   const getKeyStatus = (key: string) => {
-    let status = isDark 
+    let status = "DEFAULT"; 
+
+    for (const guess of guesses) {
+        // We need to re-run the logic for every previous guess to find the "best" status for this key
+        const solutionCounts: Record<string, number> = {};
+        for (const char of solution) solutionCounts[char] = (solutionCounts[char] || 0) + 1;
+
+        const rowStatus = Array(5).fill("GRAY");
+        // Greens first
+        for (let i = 0; i < 5; i++) {
+            if (guess[i] === solution[i]) {
+                rowStatus[i] = "GREEN";
+                solutionCounts[guess[i]]--;
+            }
+        }
+        // Yellows second
+        for (let i = 0; i < 5; i++) {
+            if (rowStatus[i] !== "GREEN" && solutionCounts[guess[i]] > 0) {
+                rowStatus[i] = "YELLOW";
+                solutionCounts[guess[i]]--;
+            }
+        }
+
+        // Check if our key was in this guess
+        for (let i = 0; i < 5; i++) {
+            if (guess[i] === key) {
+                const s = rowStatus[i];
+                if (s === "GREEN") return "GREEN"; // Green overrides everything
+                if (s === "YELLOW" && status !== "GREEN") status = "YELLOW";
+                if (s === "GRAY" && status === "DEFAULT") status = "GRAY";
+            }
+        }
+    }
+
+    if (status === "GREEN") return isDark ? "bg-green-600 text-black border-green-800 border-b-4 font-bold" : "bg-green-500 text-white border-green-700 border-b-4 font-bold";
+    if (status === "YELLOW") return isDark ? "bg-yellow-500 text-black border-yellow-700 border-b-4 font-bold" : "bg-yellow-400 text-white border-yellow-600 border-b-4 font-bold";
+    if (status === "GRAY") return isDark ? "bg-zinc-900 text-zinc-600 border-zinc-950 border-b-4 opacity-50" : "bg-zinc-100 text-zinc-300 border-zinc-200 border-b-4";
+    
+    // Default
+    return isDark 
         ? "bg-zinc-800 text-zinc-300 border-b-4 border-zinc-950 active:border-b-0 active:translate-y-1" 
         : "bg-white text-zinc-600 border border-zinc-300 border-b-4 border-b-zinc-200 active:border-b active:translate-y-1";
-        
-    for (const guess of guesses) {
-      for (let i = 0; i < guess.length; i++) {
-        if (guess[i] === key) {
-          if (solution[i] === key) return isDark ? "bg-green-600 text-black border-green-800 border-b-4 font-bold" : "bg-green-500 text-white border-green-700 border-b-4 font-bold";
-          if (solution.includes(key)) status = isDark ? "bg-yellow-500 text-black border-yellow-700 border-b-4 font-bold" : "bg-yellow-400 text-white border-yellow-600 border-b-4 font-bold";
-          else if (!status.includes("green") && !status.includes("yellow")) status = isDark ? "bg-zinc-900 text-zinc-600 border-zinc-950 border-b-4 opacity-50" : "bg-zinc-100 text-zinc-300 border-zinc-200 border-b-4";
-        }
-      }
-    }
-    return status;
   };
 
   if (!mounted) return null;
@@ -336,13 +364,6 @@ export default function DailyDecrypt() {
                 <div className="flex-1 flex flex-col items-center justify-center p-2 min-h-0 overflow-y-auto">
                   <div className="w-full max-w-[340px] md:max-w-[420px] flex flex-col gap-1.5 md:gap-3">
                     
-                    {/* Username Indicator (If logged in) */}
-                    {username && (
-                        <div className={`text-center text-[10px] ${mutedClass} uppercase tracking-widest mb-1`}>
-                            OPERATOR: <span className={accentClass}>{username}</span>
-                        </div>
-                    )}
-
                     {/* Status Message */}
                     <div className="min-h-[40px] flex justify-center items-end mb-2">
                        {gameStatus === "WON" && (
@@ -390,7 +411,7 @@ export default function DailyDecrypt() {
                   </div>
                 </div>
 
-                {/* KEYBOARD AREA */}
+                {/* KEYBOARD AREA (Lifted & Optimized) */}
                 <div className={`${isDark ? 'bg-zinc-950' : 'bg-zinc-100'} border-t ${borderClass} p-2 pb-20 md:pb-6 z-20 shadow-[0_-10px_30px_rgba(0,0,0,0.1)]`}>
                   {showNameInput ? (
                     <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="flex flex-col items-center gap-4 py-4">
@@ -414,7 +435,7 @@ export default function DailyDecrypt() {
                         </div>
                     </motion.div>
                   ) : (
-                    <div className="w-full max-w-[600px] mx-auto flex flex-col gap-2">
+                    <div className="w-full max-w-[600px] mx-auto flex flex-col gap-2 select-none">
                         {KEYS.map((row, i) => (
                             <div key={i} className="flex justify-center gap-1 w-full">
                                 {row.map((key) => {
@@ -486,7 +507,7 @@ export default function DailyDecrypt() {
                         <div className="h-full bg-green-600" style={{width: `${dayProgress}%`}} />
                     </div>
                     <div className={`mt-4 text-center text-[10px] ${mutedClass} font-bold uppercase tracking-widest hover:${accentClass} transition-colors`}>
-                        Designed by: Ice Matthew Ramirez
+                        Good luck, Lasallians!
                     </div>
                  </div>
               </div>
