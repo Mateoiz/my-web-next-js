@@ -143,7 +143,7 @@ export default function Navbar() {
               </span>
               {/* Gradient Text */}
               <span className="bg-gradient-to-r from-blue-600 to-indigo-500 bg-clip-text text-transparent uppercase tracking-wider text-sm">
-                Vote Now
+                Pre-order
               </span>
             </Link>
 
@@ -215,7 +215,7 @@ export default function Navbar() {
                     { name: "Events", path: "/Events" },
                     { name: "Tools", path: "/Tools" },
                     // 🔥 Added Cast to Mobile Menu
-                    { name: "Cast Vote", path: "/Cast", isSpecial: true },
+                    { name: "Pre-Order", path: "/Cast", isSpecial: true },
                   ].map((link, i) => (
                     <motion.div key={i} variants={linkVariants}>
                       <Link 
