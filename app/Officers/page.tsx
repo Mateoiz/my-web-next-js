@@ -132,7 +132,7 @@ const graphicDesigners = [
     image: "/creatives/GA3.jpg"
   },
     { 
-    name: "Ashley Krishan Naomi Navarro", 
+    name: "Ashley Krishan Navarro", 
     role: "Graphic Designer", 
     icon: <FaPaintBrush />,
     image: "/creatives/GA4.jpg"
@@ -173,6 +173,13 @@ const contentTeam = [
     role: "Captions / Content",
     icon: <FaPen />,
     image:"/creatives/CAP3.jpg"
+  }
+  ,
+  {
+    name: "Antonette Marce",
+    role: "Captions / Writer",
+    icon: <FaPen />,
+    image:"/creatives/CAP4.jpg"
   }
 ];
 
