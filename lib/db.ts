@@ -14,7 +14,7 @@ import {
   serverTimestamp 
 } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
-import { getAuth, setPersistence, indexedDBLocalPersistence } from "firebase/auth";
+import { getAuth, setPersistence, indexedDBLocalPersistence, sendEmailVerification, sendPasswordResetEmail, User } from "firebase/auth";
 
 // --- FIREBASE CONFIGURATION ---
 // I have included your hardcoded keys here as requested to fix the "invalid-api-key" error immediately.
@@ -133,5 +133,27 @@ export async function getPostBySlug(slug: string): Promise<BlogPost | null> {
     console.error("Error fetching post by slug:", error);
     return null;
   }
-  
 }
+export const sendVerificationEmail = async (user: User) => {
+  try {
+    await sendEmailVerification(user);
+    return { success: true, message: "Verification email sent! Please check your inbox." };
+  } catch (error: any) {
+    console.error("Error sending verification email:", error);
+    return { success: false, message: error.message };
+  }
+};
+
+// 2. Send Password Reset Email
+export const sendForgotPasswordEmail = async (email: string) => {
+  try {
+    await sendPasswordResetEmail(auth, email);
+    return { success: true, message: "Password reset link sent! Please check your inbox." };
+  } catch (error: any) {
+    console.error("Error sending password reset email:", error);
+    // Security note: Firebase might throw an error if the email doesn't exist.
+    // Ideally, you shouldn't reveal this to the user to prevent enumeration attacks,
+    // but for internal tools, returning the error is fine for debugging.
+    return { success: false, message: error.message };
+  }
+};

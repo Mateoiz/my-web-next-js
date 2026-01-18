@@ -271,7 +271,7 @@ export default function Navbar() {
                     {[FaFacebookF,FaInstagram,].map((Icon, idx) => (
                       <a 
                         key={idx}
-                        href="#" 
+                        href="https://www.facebook.com/JPCSDLSAU" 
                         className="w-10 h-10 rounded-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center text-zinc-500 hover:text-white hover:bg-green-600 hover:border-green-600 transition-all duration-300"
                       >
                         <Icon size={14} />

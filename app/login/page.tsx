@@ -75,6 +75,12 @@ export default function Login() {
             />
           </div>
         </div>
+        <Link 
+  href="/forgot"  // <--- This points to app/forgot/page.tsx
+  className="text-xs font-bold text-green-600 hover:text-green-500 hover:underline transition-colors"
+>
+  Forgot Password?
+</Link>
 
         <button 
           disabled={loading}
