@@ -1,9 +1,9 @@
 // lib/firebase.ts
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
-import { getAuth } from "firebase/auth"; // <--- Add this import
+import { getAuth } from "firebase/auth"; 
+import { getStorage } from "firebase/storage"; // <--- 1. Import Storage
 
-// Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyCryw1dmr64bL_YVtxgjuFwRzzNRjxi9C8",
   authDomain: "jpcs-game.firebaseapp.com",
@@ -15,10 +15,10 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase (Singleton Pattern)
-// This checks if an app already exists to prevent errors during hot-reloads in Next.js
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 // Initialize services and export them
 export const db = getFirestore(app);
-export const auth = getAuth(app); // <--- Export Auth so you can use it in Login/Signup
+export const auth = getAuth(app); 
+export const storage = getStorage(app); // <--- 2. Export Storage
 export { app };

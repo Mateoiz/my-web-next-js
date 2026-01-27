@@ -231,7 +231,7 @@ export default function AboutPage() {
                           </span>
                       </div>
                       <div className="text-7xl md:text-8xl font-black text-zinc-800 dark:text-white tracking-tighter leading-none">
-                          <Counter value={107} />
+                          <Counter value={87} />
                       </div>
                       <div className="text-zinc-500 dark:text-zinc-400 font-bold text-sm uppercase tracking-wide mt-2">
                         Registered Members
