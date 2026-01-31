@@ -6,7 +6,7 @@ import { collection, query, where, orderBy, onSnapshot, serverTimestamp, setDoc,
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, User } from "firebase/auth";
 import { db, auth, storage } from "@/lib/db";
-import { useTheme } from "next-themes"; // <--- 1. IMPORT USE THEME
+import { useTheme } from "next-themes"; 
 
 // --- CUSTOM IMPORTS ---
 import { AppState, UserProfile, ChatMessage } from "./types";
@@ -18,14 +18,14 @@ import { MatchingView } from "./components/MatchingView";
 import { ChatInterface } from "./components/ChatInterface";
 import { HomeView } from "./components/HomeView"; 
 import CircuitCursor from "../components/CircuitCursor";
-import ThemeToggle from "../components/ThemeToggle"; // <--- 2. IMPORT THEME TOGGLE (Adjust path if needed)
+import ThemeToggle from "../components/ThemeToggle"; 
 
 const BTN_BASE = "w-full md:w-48 py-4 font-black rounded-xl transition-all flex items-center justify-center gap-2 text-sm md:text-base";
 const BTN_PRIMARY = `${BTN_BASE} bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-500/20`;
 const BTN_SECONDARY = `${BTN_BASE} bg-zinc-800/50 hover:bg-zinc-700 border border-zinc-700 text-white backdrop-blur-md`;
 
 export default function CupidPage() {
-  const { setTheme } = useTheme(); // <--- 3. INITIALIZE THEME HOOK
+  const { theme } = useTheme(); // We just need to access theme if specific logic needs it, otherwise CSS handles it
   const [state, setState] = useState<AppState>('LOADING');
   const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
 
@@ -63,7 +63,7 @@ export default function CupidPage() {
 
   const initialLoadComplete = useRef(false);
 
-  // --- LOGIC TO HIDE UI ELEMENTS WHEN MODAL IS OPEN ---
+  // --- LOGIC TO HIDE GLOBAL UI ELEMENTS (Navbar, Music, Toggle) WHEN MODAL IS OPEN ---
   useEffect(() => {
     const globalElements = document.querySelectorAll('.global-ui');
     
@@ -75,8 +75,7 @@ export default function CupidPage() {
   }, [showTermsModal]);
 
   useEffect(() => {
-    // 4. SET DARK MODE CORRECTLY VIA HOOK
-    setTheme('dark'); 
+    // NOTE: Removed forced setTheme('dark') here to allow the toggle to work naturally.
     
     signOut(auth); 
 
@@ -132,6 +131,7 @@ export default function CupidPage() {
       }
   };
 
+  // ... (Keep handleLogin, handleSignup, handleImageSelect, removeImage as is) ...
   const handleLogin = async () => {
     if (!email || !password) { setAuthError("Fill all fields."); return; }
     setIsCheckingAuth(true); setAuthError("");
@@ -230,6 +230,7 @@ export default function CupidPage() {
     } catch (e) { console.error(e); alert("Match error."); setState('HOME'); }
   };
 
+  // ... (Keep handleConnect, initializeChat, sendMessage, handleLogout as is) ...
   const handleConnect = async () => {
     if (!currentUser?.id || !match?.id || match.isBot) return;
     setState('CONNECTING');
@@ -280,11 +281,11 @@ export default function CupidPage() {
         <FaHeart className="text-rose-500 animate-bounce" />
         <span className="text-rose-600 dark:text-rose-200 text-xs font-mono uppercase tracking-widest">SAMPISANAN Special</span>
       </div>
-      <h1 className="text-5xl md:text-8xl font-black text-white mb-6 tracking-tighter drop-shadow-xl">
+      <h1 className="text-5xl md:text-8xl font-black text-zinc-900 dark:text-white mb-6 tracking-tighter drop-shadow-xl transition-colors">
         FIND YOUR <br className="md:hidden" />
         <span className="text-transparent bg-clip-text bg-gradient-to-r from-rose-500 via-pink-500 to-purple-500">PLAYER 2</span>
       </h1>
-      <p className="text-zinc-300 text-sm md:text-lg mb-10 font-medium max-w-lg mx-auto leading-relaxed">Initialize <strong>The Cupid Algorithm</strong>. A data-driven approach to finding your Valentine at DLSAU.</p>
+      <p className="text-zinc-600 dark:text-zinc-300 text-sm md:text-lg mb-10 font-medium max-w-lg mx-auto leading-relaxed transition-colors">Initialize <strong>The Cupid Algorithm</strong>. A data-driven approach to finding your Valentine at DLSAU.</p>
       <div className="flex flex-col md:flex-row gap-4 justify-center items-center w-full max-w-sm md:max-w-none mx-auto">
         <button onClick={() => setState('LOGIN')} className={BTN_PRIMARY}>LOG IN</button>
         <button onClick={() => setState('SIGNUP')} className={BTN_SECONDARY}>SIGN UP</button>
@@ -297,20 +298,23 @@ export default function CupidPage() {
       <motion.div 
         initial={{ y: "100%", opacity: 0 }} 
         animate={{ y: 0, opacity: 1 }} 
-        className="bg-zinc-900 border-0 md:border border-zinc-800 w-full h-full md:h-auto md:max-h-[85vh] md:max-w-lg md:rounded-3xl relative shadow-2xl flex flex-col overflow-hidden"
+        className="bg-zinc-50 dark:bg-zinc-900 border-0 md:border border-zinc-200 dark:border-zinc-800 w-full h-full md:h-auto md:max-h-[85vh] md:max-w-lg md:rounded-3xl relative shadow-2xl flex flex-col overflow-hidden transition-colors"
       >
-        <div className="p-5 border-b border-zinc-800 flex justify-between items-center bg-zinc-900 z-10 shadow-sm">
-            <div><h3 className="text-xl font-black text-white flex items-center gap-2"><FaFileContract className="text-rose-500" /> TERMS & RULES</h3><p className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold mt-0.5">Please read carefully</p></div>
-            <button onClick={() => setShowTermsModal(false)} className="w-10 h-10 rounded-full bg-zinc-800/50 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-700 transition-all active:scale-95"><FaTimes /></button>
+        <div className="p-5 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center bg-zinc-100 dark:bg-zinc-900 z-10 shadow-sm transition-colors">
+            <div>
+                <h3 className="text-xl font-black text-zinc-900 dark:text-white flex items-center gap-2 transition-colors"><FaFileContract className="text-rose-500" /> TERMS & RULES</h3>
+                <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold mt-0.5">Please read carefully</p>
+            </div>
+            <button onClick={() => setShowTermsModal(false)} className="w-10 h-10 rounded-full bg-zinc-200 dark:bg-zinc-800/50 flex items-center justify-center text-zinc-500 dark:text-zinc-400 hover:text-white hover:bg-zinc-700 transition-all active:scale-95"><FaTimes /></button>
         </div>
         <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
-          <section><h4 className="text-white font-bold mb-2 text-sm flex items-center gap-2">1. Eligibility & Identity</h4><ul className="list-disc pl-5 space-y-2 text-xs text-zinc-400 leading-relaxed"><li>You must be a currently enrolled student at <strong>De La Salle Araneta University (DLSAU)</strong>.</li><li>You must use your valid institutional email (@dlsau.edu.ph) for verification.</li><li>Impersonation of other students will result in an immediate ban.</li></ul></section>
-          <section><h4 className="text-white font-bold mb-2 text-sm flex items-center gap-2">2. Code of Conduct</h4><ul className="list-disc pl-5 space-y-2 text-xs text-zinc-400 leading-relaxed"><li><strong>Respect is Mandatory:</strong> Harassment, hate speech, bullying, or inappropriate language will not be tolerated.</li><li><strong>No Catfishing:</strong> Photos must be of you.</li><li><strong>Consent First:</strong> Do not share personal contact details unless both parties are comfortable.</li></ul></section>
-          <section><h4 className="text-white font-bold mb-2 text-sm flex items-center gap-2">3. Privacy & Data</h4><ul className="list-disc pl-5 space-y-2 text-xs text-zinc-400 leading-relaxed"><li>Your profile data is visible <strong>only to users you match with</strong>.</li><li>We do not sell or share your data with third parties.</li></ul></section>
-          <section><h4 className="text-white font-bold mb-2 text-sm flex items-center gap-2">4. Safety Disclaimer</h4><div className="text-xs text-zinc-400 leading-relaxed bg-zinc-800/30 p-4 rounded-xl border border-zinc-700/30"><p>While we facilitate matches, JPCS is not responsible for offline interactions. Please meet in public spaces (like the University Quadrangle) for your first meetup.</p></div></section>
+          <section><h4 className="text-zinc-900 dark:text-white font-bold mb-2 text-sm flex items-center gap-2">1. Eligibility & Identity</h4><ul className="list-disc pl-5 space-y-2 text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed"><li>You must be a currently enrolled student at <strong>De La Salle Araneta University (DLSAU)</strong>.</li><li>You must use your valid institutional email (@dlsau.edu.ph) for verification.</li><li>Impersonation of other students will result in an immediate ban.</li></ul></section>
+          <section><h4 className="text-zinc-900 dark:text-white font-bold mb-2 text-sm flex items-center gap-2">2. Code of Conduct</h4><ul className="list-disc pl-5 space-y-2 text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed"><li><strong>Respect is Mandatory:</strong> Harassment, hate speech, bullying, or inappropriate language will not be tolerated.</li><li><strong>No Catfishing:</strong> Photos must be of you.</li><li><strong>Consent First:</strong> Do not share personal contact details unless both parties are comfortable.</li></ul></section>
+          <section><h4 className="text-zinc-900 dark:text-white font-bold mb-2 text-sm flex items-center gap-2">3. Privacy & Data</h4><ul className="list-disc pl-5 space-y-2 text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed"><li>Your profile data is visible <strong>only to users you match with</strong>.</li><li>We do not sell or share your data with third parties.</li></ul></section>
+          <section><h4 className="text-zinc-900 dark:text-white font-bold mb-2 text-sm flex items-center gap-2">4. Safety Disclaimer</h4><div className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed bg-zinc-200 dark:bg-zinc-800/30 p-4 rounded-xl border border-zinc-300 dark:border-zinc-700/30"><p>While we facilitate matches, JPCS is not responsible for offline interactions. Please meet in public spaces (like the University Quadrangle) for your first meetup.</p></div></section>
           <div className="h-20 md:h-0"></div>
         </div>
-        <div className="p-4 border-t border-zinc-800 bg-zinc-900/95 backdrop-blur-sm z-10 pb-8 md:pb-4">
+        <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50/95 dark:bg-zinc-900/95 backdrop-blur-sm z-10 pb-8 md:pb-4 transition-colors">
             <button onClick={() => { setAgreedToTerms(true); setShowTermsModal(false); }} className={`${PRIMARY_BTN_STYLE} w-full py-4 text-sm font-black shadow-lg shadow-rose-900/20 active:scale-[0.98]`}>I ACCEPT & JOIN</button>
         </div>
       </motion.div>
@@ -318,13 +322,14 @@ export default function CupidPage() {
   );
 
   return (
-    <section className="min-h-screen relative overflow-hidden font-sans bg-black selection:bg-rose-500 selection:text-white dark">
+    // CHANGED: Added dynamic background classes (bg-zinc-50 dark:bg-black) for Light Mode support
+    <section className="min-h-screen relative overflow-hidden font-sans bg-zinc-50 dark:bg-black selection:bg-rose-500 selection:text-white transition-colors duration-300">
       <CircuitCursor />
       <ValentineBackground />
       {/* 5. RENDER THEME TOGGLE */}
       <ThemeToggle /> 
       
-      <div className="absolute top-0 left-0 w-full h-[800px] bg-gradient-to-b from-rose-900/20 via-black/0 to-black/0 pointer-events-none z-0" />
+      <div className="absolute top-0 left-0 w-full h-[800px] bg-gradient-to-b from-rose-200/40 dark:from-rose-900/20 via-white/0 dark:via-black/0 to-transparent pointer-events-none z-0" />
       <div className="container mx-auto px-6 pt-32 pb-12 relative z-50 flex flex-col items-center justify-center min-h-[80vh]">
         <AnimatePresence mode="wait">
           <motion.div key={state} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.3 }} className="w-full">
