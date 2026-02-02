@@ -5,7 +5,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence, type Variants } from "framer-motion";
-import { FaBars, FaTimes, FaFacebookF, FaInstagram } from "react-icons/fa"; 
+// ADDED: FaHeart
+import { FaBars, FaTimes, FaFacebookF, FaInstagram, FaHeart } from "react-icons/fa"; 
 
 // --- ANIMATION VARIANTS (Optimized) ---
 const menuVariants: Variants = {
@@ -92,7 +93,7 @@ export default function Navbar() {
   return (
     <>
       <nav
-        className={`fixed top-0 left-0 w-full z-[100] transition-all duration-300 ease-in-out border-b will-change-auto ${
+        className={`fixed top-0 left-0 w-full z-[100] transition-all duration-300 ease-in-out border-b will-change-auto global-ui ${
           isScrolled
             ? "bg-white/85 dark:bg-black/85 backdrop-blur-md border-zinc-200 dark:border-zinc-800 py-3 shadow-sm"
             : "bg-transparent border-transparent py-5"
@@ -128,24 +129,25 @@ export default function Navbar() {
             <Link href="/Events" className={getNavLinkClass('/Events')}>Events</Link>
             <Link href="/Tools" className={getNavLinkClass('/Tools')}>Tools</Link>
             
-            {/* 🔥 NEW SPECIAL EVENT LINK: CAST 🔥 */}
+            {/* 💖 NEW: CUPID LINK (Pops out with Rose/Pink Theme) 💖 */}
             <Link 
-              href="/Cast" 
+              href="/cupid" 
               className={`
-                relative flex items-center gap-2 font-bold transition-all duration-300 hover:-translate-y-0.5
-                ${isActive('/Cast') ? 'opacity-100' : 'opacity-90 hover:opacity-100'}
+                relative flex items-center gap-2 font-black transition-all duration-300 hover:-translate-y-0.5
+                ${isActive('/cupid') ? 'opacity-100' : 'opacity-90 hover:opacity-100'}
               `}
             >
-              {/* Pulsing Dot */}
-              <span className="relative flex h-2.5 w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-500"></span>
+              {/* Pulsing Heart Animation */}
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                <FaHeart className="relative inline-flex text-rose-500" />
               </span>
               {/* Gradient Text */}
-              <span className="bg-gradient-to-r from-blue-600 to-indigo-500 bg-clip-text text-transparent uppercase tracking-wider text-sm">
-                Pre-order
+              <span className="bg-gradient-to-r from-rose-500 to-pink-600 bg-clip-text text-transparent uppercase tracking-wider text-sm drop-shadow-sm">
+                Cupid
               </span>
             </Link>
+
 
             <Link 
               href="/Contact" 
@@ -214,8 +216,8 @@ export default function Navbar() {
                     { name: "Blogs", path: "/Blogs" },
                     { name: "Events", path: "/Events" },
                     { name: "Tools", path: "/Tools" },
-                    // 🔥 Added Cast to Mobile Menu
-                    { name: "Pre-Order", path: "/Cast", isSpecial: true },
+                    // 💖 CUPID MOBILE ENTRY 💖
+                    { name: "Cupid", path: "/cupid", isCupid: true }, 
                   ].map((link, i) => (
                     <motion.div key={i} variants={linkVariants}>
                       <Link 
@@ -230,16 +232,17 @@ export default function Navbar() {
                         </span>
                         
                         {/* Special styling for "Cast Vote" */}
-                        {link.isSpecial ? (
-                          <span className="bg-gradient-to-r from-blue-600 to-indigo-500 bg-clip-text text-transparent group-hover:translate-x-2 transition-transform flex items-center gap-3">
-                            {link.name} 
-                            <span className="text-sm bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full border border-blue-200">LIVE</span>
+                        ) : link.isCupid ? (
+                          // 💖 Special styling for Cupid Mobile
+                          <span className="bg-gradient-to-r from-rose-500 to-pink-600 bg-clip-text text-transparent group-hover:translate-x-2 transition-transform flex items-center gap-3">
+                            {link.name}
+                            <FaHeart className="text-rose-500 text-sm animate-pulse" />
                           </span>
                         ) : (
                           <span className="group-hover:translate-x-2 transition-transform">
                             {link.name}
                           </span>
-                        )}
+                        )
                       </Link>
                     </motion.div>
                   ))}

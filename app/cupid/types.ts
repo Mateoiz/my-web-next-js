@@ -1,6 +1,14 @@
+// Add this new interface
+export interface MatchRequest {
+  id: string;
+  name: string;
+  img: string;
+  course: string;
+}
+
 export interface UserProfile {
   id?: string;
-  email?: string; // Ensure email is here if you use it
+  email?: string;
   name: string;
   studentId: string;
   course: string;
@@ -9,20 +17,22 @@ export interface UserProfile {
   height: string;
   gender: string;
   preferredGender: string;
-  
-  // --- NEW FIELDS ---
   minAge?: string;
   maxAge?: string;
-  // ------------------
 
   instagram: string;
   facebook: string;
   tags: string[];
   imgs: string[];
+  
+  // --- MATCHING FIELDS ---
   currentMatchId?: string;
   hasRerolled?: boolean;
   isBot?: boolean;
-  lastSeen?: any; 
+  lastSeen?: any;
+  
+  // --- NEW: INCOMING REQUESTS ---
+  incomingRequests?: MatchRequest[]; // Array of people who want to match
 }
 
 export interface ChatMessage {

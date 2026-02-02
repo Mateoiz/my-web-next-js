@@ -4,7 +4,6 @@ import { useLoading } from "../context/LoadingContext";
 import Navbar from "./navbar"; 
 import Footer from "./Footer";
 import ThemeToggle from "./ThemeToggle";
-import MusicPlayer from "./MusicPlayer";
 import LoadingScreen from "./SplashScreen"; // <--- IMPORTANT: Importing your SplashScreen file
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
@@ -27,7 +26,6 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         </main>
         <Footer />
         <ThemeToggle />
-        <MusicPlayer />
       </div>
     </>
   );

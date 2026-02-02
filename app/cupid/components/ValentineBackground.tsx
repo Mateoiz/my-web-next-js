@@ -1,37 +1,59 @@
 "use client";
-import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
-import { FaHeart, FaRegHeart, FaMagic } from "react-icons/fa";
+import { useEffect, useState } from "react";
 
 export const ValentineBackground = () => {
-  const [particles, setParticles] = useState<{ id: number; x: number; y: number; size: number; duration: number; delay: number; type: string; color: string; }[]>([]);
+  const [hearts, setHearts] = useState<{ id: number; left: string; delay: string; duration: string }[]>([]);
 
   useEffect(() => {
-    const newParticles = Array.from({ length: 25 }).map((_, i) => ({
+    // Generate static values only once on mount
+    const newHearts = Array.from({ length: 15 }).map((_, i) => ({
       id: i,
-      x: Math.random() * 100,
-      y: Math.random() * 100,
-      size: Math.random() * 30 + 15,
-      duration: Math.random() * 15 + 10,
-      delay: Math.random() * 5,
-      type: Math.random() > 0.6 ? 'heart_solid' : Math.random() > 0.3 ? 'heart_outline' : 'sparkle',
-      color: Math.random() > 0.5 ? 'text-rose-500' : 'text-pink-400'
+      left: `${Math.random() * 100}%`,
+      delay: `${Math.random() * 5}s`,
+      duration: `${10 + Math.random() * 10}s`, // Slower, smoother animation (10-20s)
     }));
-    setParticles(newParticles);
+    setHearts(newHearts);
   }, []);
 
   return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none">
-      <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-rose-500/20 dark:bg-rose-600/20 rounded-full blur-[120px] animate-pulse" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[600px] h-[600px] bg-pink-500/20 dark:bg-pink-600/10 rounded-full blur-[120px] animate-pulse delay-1000" />
-      {particles.map((p) => (
-        <motion.div key={p.id} className={`absolute ${p.color} opacity-60 dark:opacity-40`} style={{ left: `${p.x}%`, top: `${p.y}%`, fontSize: `${p.size}px` }} animate={{ y: [0, -150, 0], opacity: [0.3, 0.8, 0.3], scale: [1, 1.2, 1], rotate: [0, 20, -20, 0] }} transition={{ duration: p.duration, repeat: Infinity, delay: p.delay, ease: "easeInOut" }}>
-          {p.type === 'heart_solid' && <FaHeart />}
-          {p.type === 'heart_outline' && <FaRegHeart />}
-          {p.type === 'sparkle' && <FaMagic />}
-        </motion.div>
+    <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+      {/* CSS for the floating animation */}
+      <style jsx>{`
+        @keyframes floatUp {
+          0% {
+            transform: translateY(110vh) scale(0.5) rotate(0deg);
+            opacity: 0;
+          }
+          10% {
+            opacity: 0.5;
+          }
+          90% {
+            opacity: 0.5;
+          }
+          100% {
+            transform: translateY(-10vh) scale(1) rotate(360deg);
+            opacity: 0;
+          }
+        }
+      `}</style>
+
+      {hearts.map((heart) => (
+        <div
+          key={heart.id}
+          className="absolute text-rose-500/20 dark:text-rose-500/10 text-4xl"
+          style={{
+            left: heart.left,
+            animation: `floatUp ${heart.duration} linear infinite`,
+            animationDelay: heart.delay,
+            willChange: "transform, opacity", // Hint to browser for GPU acceleration
+          }}
+        >
+          ♥
+        </div>
       ))}
-      <div className="absolute inset-0 opacity-5 dark:opacity-10 bg-[url('https://www.transparenttextures.com/patterns/hearts.png')] mix-blend-overlay"></div>
+      
+      {/* Optional: Static Gradient Overlay for mood without cost */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none" />
     </div>
   );
 };
