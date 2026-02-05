@@ -41,10 +41,10 @@ const officers = [
   },
   {
     id: 4,
-    name: "Ma. Antonette Melon",
+    name: "Ashley Krishan Navarro",
     role: "Vice President - Internal",
     bio: "Ensuring Internal Operations are fluid and are optimized for efficiency.",
-    image: "/officers/VPI.JPG",
+    image: "/officers/GA4.jpg",
     socials: { facebook: "https://www.facebook.com/antonette.melon", email: "antonette.melon@dlsau.edu.ph" }
   },
   {
@@ -57,10 +57,10 @@ const officers = [
   },
   {
     id: 7,
-    name: "Iris Caryl Chua",
+    name: "Shelley Kellzie Chua",
     role: "Treasurer",
     bio: "Managing the organization's finances with transparency and accountability, ensuring funds are allocated effectively.",
-    image: "/officers/TRE.JPG",
+    image: "/officers/CAP3.jpg",
     socials: { facebook: "https://www.facebook.com/xua.iris", email: "iris.chua@dlsau.edu.ph" }
   },
   {
