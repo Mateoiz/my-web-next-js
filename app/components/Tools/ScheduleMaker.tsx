@@ -4,7 +4,7 @@ import { useState, useRef, useCallback, memo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   FaCalendarAlt, FaDownload, FaPlus, FaTrash, FaExclamationTriangle, 
-  FaHeart, FaStar, FaCloud, FaSun, FaLeaf, FaMobileAlt 
+  FaHeart, FaStar, FaCloud, FaSun, FaLeaf, FaMobileAlt, FaShareAlt
 } from "react-icons/fa";
 import { toPng } from 'html-to-image';
 
@@ -121,6 +121,7 @@ export default function ScheduleMaker() {
   const [mobileTab, setMobileTab] = useState<'editor' | 'preview'>('editor');
   const [currentTheme, setCurrentTheme] = useState(BG_THEMES[0]);
   const [scheduleInfo, setScheduleInfo] = useState({ title: "My Schedule", subtitle: "AY 2025-2026" });
+  const [isProcessing, setIsProcessing] = useState(false);
   
   // State
   const [form, setForm] = useState({ subject: "", room: "", days: ["Monday"] as string[], start: "08:00", end: "09:30", color: "bg-green-500" });
@@ -166,18 +167,50 @@ export default function ScheduleMaker() {
 
   const removeClass = useCallback((id: string) => setClasses(prev => prev.filter((c) => c.id !== id)), []);
 
+  // --- UPDATED DOWNLOAD LOGIC ---
   const downloadImage = useCallback(async (ref: any, suffix: string) => {
     if (ref.current) {
+      setIsProcessing(true);
       try {
-        const dataUrl = await toPng(ref.current, { cacheBust: true, pixelRatio: 2, backgroundColor: currentTheme.hex });
-        const link = document.createElement("a");
         const safeTitle = scheduleInfo.title.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-        link.download = `${safeTitle}_${suffix}.png`;
+        const filename = `${safeTitle}_${suffix}.png`;
+
+        // Generate Image Data URL
+        const dataUrl = await toPng(ref.current, { cacheBust: true, pixelRatio: 2, backgroundColor: currentTheme.hex });
+
+        // iOS/Mobile Web Share API Flow
+        if (navigator.share) {
+            try {
+                // Convert Data URL to Blob for Sharing
+                const blob = await (await fetch(dataUrl)).blob();
+                const file = new File([blob], filename, { type: 'image/png' });
+
+                // Check if device supports file sharing
+                if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                    await navigator.share({
+                        files: [file],
+                        title: scheduleInfo.title,
+                        text: 'Here is my new schedule!',
+                    });
+                    setIsProcessing(false);
+                    return; // Stop here if shared successfully
+                }
+            } catch (shareError) {
+                // If user cancels share or it fails, fall through to default behavior or just log it
+                console.log("Share skipped or failed, trying fallback", shareError);
+            }
+        }
+
+        // Desktop / Fallback Flow
+        const link = document.createElement("a");
+        link.download = filename;
         link.href = dataUrl;
         link.click();
       } catch (err) {
         console.error(err);
-        alert("Error saving image.");
+        alert("Error generating image.");
+      } finally {
+        setIsProcessing(false);
       }
     }
   }, [currentTheme, scheduleInfo.title]);
@@ -249,13 +282,14 @@ export default function ScheduleMaker() {
                     ))}
                   </div>
                   <div className="grid grid-cols-2 gap-3">
-                      <button onClick={() => downloadImage(scheduleRef, 'desktop')} className="py-3 bg-zinc-800 dark:bg-zinc-700 hover:bg-zinc-700 text-white font-bold rounded-xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2 text-xs">
-                          <FaDownload size={12} /> Desktop Image
+                      <button onClick={() => downloadImage(scheduleRef, 'desktop')} disabled={isProcessing} className="py-3 bg-zinc-800 dark:bg-zinc-700 hover:bg-zinc-700 text-white font-bold rounded-xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2 text-xs disabled:opacity-50">
+                          {isProcessing ? <FaPlus className="animate-spin" /> : <><FaDownload size={12} /> Desktop Image</>}
                       </button>
-                      <button onClick={() => downloadImage(wallpaperRef, 'wallpaper')} className="py-3 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2 text-xs">
-                          <FaMobileAlt size={12} /> Phone Wallpaper
+                      <button onClick={() => downloadImage(wallpaperRef, 'wallpaper')} disabled={isProcessing} className="py-3 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2 text-xs disabled:opacity-50">
+                          {isProcessing ? <FaPlus className="animate-spin" /> : <><FaShareAlt size={12} /> Save / Share</>}
                       </button>
                   </div>
+                  <p className="text-[10px] text-zinc-400 mt-2 text-center">Tip: On iPhone, use &quot;Save / Share&quot; then tap &quot;Save Image&quot;</p>
               </div>
             </div>
 
@@ -273,10 +307,10 @@ export default function ScheduleMaker() {
       {/* --- HIDDEN MOBILE WALLPAPER RENDERER --- */}
       <div style={{ position: 'fixed', left: '-9999px', top: 0 }}>
          <MobileWallpaperTemplate 
-            wallpaperRef={wallpaperRef} 
-            classes={classes} 
-            theme={currentTheme} 
-            scheduleInfo={scheduleInfo} 
+           wallpaperRef={wallpaperRef} 
+           classes={classes} 
+           theme={currentTheme} 
+           scheduleInfo={scheduleInfo} 
          />
       </div>
     </>
@@ -346,7 +380,6 @@ const ScheduleGrid = memo(({ classes, removeClass, scheduleRef, theme, scheduleI
 ScheduleGrid.displayName = 'ScheduleGrid';
 
 // --- SUB-COMPONENT: MOBILE WALLPAPER TEMPLATE ---
-// FIX: Updated props type to allow null ref
 const MobileWallpaperTemplate = ({ wallpaperRef, classes, theme, scheduleInfo }: { wallpaperRef: React.RefObject<HTMLDivElement | null>, classes: ClassItem[], theme: typeof BG_THEMES[0], scheduleInfo: { title: string, subtitle: string } }) => {
   
   const sortClasses = (dayClasses: ClassItem[]) => {
@@ -359,7 +392,6 @@ const MobileWallpaperTemplate = ({ wallpaperRef, classes, theme, scheduleInfo }:
       style={{
         ...theme.css,
         width: '1080px',
-        // FIX: Changed height to auto and added minHeight to allow growth
         height: 'auto',
         minHeight: '1920px',
         padding: '180px 80px 180px 80px', 
@@ -393,10 +425,8 @@ const MobileWallpaperTemplate = ({ wallpaperRef, classes, theme, scheduleInfo }:
       </div>
 
       {/* Vertical List of Days */}
-      {/* FIX: Removed flex-1 so it doesn't constrain height, added mb-10 for spacing */}
       <div className="flex flex-col gap-10 mb-10">
         {DAYS.map(day => {
-          // FIX: Added explicit type for 'c'
           const dayClassesRaw = classes.filter((c: ClassItem) => c.day === day);
           const dayClasses = sortClasses(dayClassesRaw);
           
@@ -411,7 +441,6 @@ const MobileWallpaperTemplate = ({ wallpaperRef, classes, theme, scheduleInfo }:
 
                {/* Classes List */}
                <div className={`flex-1 flex flex-col gap-4 border-l-4 pl-8 ${theme.border}`}>
-                  {/* FIX: Added explicit type for 'c' */}
                   {dayClasses.map((c: ClassItem) => (
                     <div key={c.id} className={`p-6 rounded-3xl ${c.color} text-white shadow-lg flex justify-between items-center border-4 border-white/20`}>
                         <div>
