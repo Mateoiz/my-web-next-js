@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
+import Image from "next/image"; // Added next/image
 import { 
   FaCalendarAlt, 
   FaMapMarkerAlt, 
@@ -19,43 +20,21 @@ import CircuitCursor from "../components/CircuitCursor";
 const events = [
   {
     id: 1,
-    title: "General Assembly 2026",
-    date: "February",
-    location: "TBA",
-    description: "Join us for the annual General Assembly where we discuss plans, goals, and set the direction for JPCS in the coming year.",
-    link: "https://facebook.com/your-event-link", 
+    title: "Organization Fair",
+    date: "February 11-13",
+    location: "DLSAU Grounds",
+    description: "Explore the vibrant student organizations at DLSAU! Visit the JPCS booth to sign up, meet the officers, and find your community in the tech world.",
+    link: "#",
+    image: "/events/PLAYER2.jpg" // Added Image Path
   },
   {
     id: 2,
-    title: "Video Editing Competition",
-    date: "February",
-    location: "TBA",
-    description: "Show off your video editing skills! Create a video on a tech-related topic and win exciting prizes.",
+    title: "CAST Week",
+    date: "March 2-6",
+    location: "DLSAU Campus",
+    description: "A week-long celebration of the College of Arts, Sciences, and Technology. Join us for seminars, coding competitions, and showcasing student innovation.",
     link: "#",
-  },
-  {
-    id: 3,
-    title: "E-Sports Tournament",
-    date: "CAST Week",
-    location: "TBA",
-    description: "Compete in popular games like Valorant and Mobile Legends. Form your teams and claim the crown!",
-    link: "#",
-  },
-  {
-    id: 4,
-    title: "AFK: Sportsfest",
-    date: "March 2026",
-    location: "TBA",
-    description: "Get active with JPCS! Join us for a day of fun sports activities and friendly competition.",
-    link: "#",
-  },
-  {
-    id: 5,
-    title: "AFK: Outreach Program",
-    date: "April 2026",
-    location: "TBA",
-    description: "Tech Literacy 101: Teaching basic computer skills to the local youth. Volunteers needed.",
-    link: "#",
+    image: null // No image yet, will show placeholder
   },
 ];
 
@@ -90,10 +69,8 @@ export default function EventsPage() {
   const [activeEvent, setActiveEvent] = useState(0);
 
   return (
-    // FIX 1: Removed 'overflow-hidden' from the main section so sticky positioning works
     <section className="min-h-screen relative transition-colors duration-300">
       
-      {/* FIX 2: Added 'overflow-hidden' to the background wrapper instead */}
       <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
          <FloatingCubes />
       </div>
@@ -122,7 +99,6 @@ export default function EventsPage() {
                   key={event.id}
                   initial={{ opacity: 0, x: -20 }}
                   whileInView={{ opacity: 1, x: 0 }}
-                  // Adjusted viewport margin to trigger the active state slightly earlier/better
                   viewport={{ margin: "-20% 0px -40% 0px" }} 
                   onViewportEnter={() => setActiveEvent(index)}
                   onClick={() => setActiveEvent(index)}
@@ -168,9 +144,18 @@ export default function EventsPage() {
                     </Link>
                   </div>
 
-                  {/* Mobile-Only Placeholder */}
+                  {/* Mobile-Only Placeholder/Image */}
                   <div className="lg:hidden mt-6 relative h-48 w-full rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-700">
-                    <ComingSoonPlaceholder title={event.title} />
+                    {event.image ? (
+                        <Image 
+                            src={event.image} 
+                            alt={event.title} 
+                            fill 
+                            className="object-cover" 
+                        />
+                    ) : (
+                        <ComingSoonPlaceholder title={event.title} />
+                    )}
                   </div>
                 </motion.div>
               );
@@ -181,9 +166,7 @@ export default function EventsPage() {
           </div>
 
           {/* --- RIGHT COLUMN: STICKY DISPLAY --- */}
-          {/* FIX 3: Added h-full to ensure the column is tall enough for the sticky element to track */}
           <div className="hidden lg:block lg:col-span-6 relative h-full">
-            {/* FIX 4: Sticky top-32 now works because the parent section isn't overflow-hidden */}
             <div className="sticky top-32 w-full flex items-center justify-center">
               
               <div className="relative w-full h-[600px] max-w-[400px] bg-white dark:bg-black/60 backdrop-blur-md rounded-2xl border-2 border-zinc-200 dark:border-green-500/30 p-2 shadow-2xl dark:shadow-[0_0_50px_rgba(34,197,94,0.1)] transition-colors duration-300">
@@ -197,10 +180,25 @@ export default function EventsPage() {
                     transition={{ duration: 0.4 }}
                     className="relative w-full h-full rounded-xl overflow-hidden bg-zinc-100 dark:bg-zinc-900"
                   >
-                    <ComingSoonPlaceholder title={events[activeEvent].title} />
+                    {events[activeEvent].image ? (
+                        // Render Actual Image if Available
+                        <div className="relative w-full h-full">
+                            <Image 
+                                src={events[activeEvent].image!} 
+                                alt={events[activeEvent].title} 
+                                fill 
+                                className="object-cover"
+                                priority
+                            />
+                        </div>
+                    ) : (
+                        // Render Placeholder if No Image
+                        <ComingSoonPlaceholder title={events[activeEvent].title} />
+                    )}
 
+                    {/* Gradient Overlay for Text Visibility */}
                     <div className="absolute inset-0 bg-[linear-gradient(transparent_50%,rgba(0,0,0,0.5)_50%)] bg-size:100%_4px opacity-0 dark:opacity-20 pointer-events-none transition-opacity duration-300" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-60 dark:opacity-80" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-80 dark:opacity-90" />
 
                     <div className="absolute bottom-8 left-8 right-8">
                         <div className="flex items-center gap-2 text-green-400 dark:text-green-500 mb-2">
