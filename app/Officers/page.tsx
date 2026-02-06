@@ -44,7 +44,7 @@ const officers = [
     name: "Ashley Krishan Navarro",
     role: "Vice President - Internal",
     bio: "Ensuring Internal Operations are fluid and are optimized for efficiency.",
-    image: "/officers/GA4.jpg",
+    image: "/creatives/GA4.jpg",
     socials: { facebook: "https://www.facebook.com/antonette.melon", email: "antonette.melon@dlsau.edu.ph" }
   },
   {
@@ -60,7 +60,7 @@ const officers = [
     name: "Shelley Kellzie Chua",
     role: "Treasurer",
     bio: "Managing the organization's finances with transparency and accountability, ensuring funds are allocated effectively.",
-    image: "/officers/CAP3.jpg",
+    image: "/officers/TREAS.JPG",
     socials: { facebook: "https://www.facebook.com/xua.iris", email: "iris.chua@dlsau.edu.ph" }
   },
   {
