@@ -45,7 +45,7 @@ const officers = [
     role: "Vice President - Internal",
     bio: "Ensuring Internal Operations are fluid and are optimized for efficiency.",
     image: "/creatives/GA4.jpg",
-    socials: { facebook: "https://www.facebook.com/antonette.melon", email: "antonette.melon@dlsau.edu.ph" }
+    socials: { facebook: "https://www.facebook.com/antonette.melon", email: "ashley.navarro@dlsau.edu.ph" }
   },
   {
     id: 5,
@@ -61,7 +61,7 @@ const officers = [
     role: "Treasurer",
     bio: "Managing the organization's finances with transparency and accountability, ensuring funds are allocated effectively.",
     image: "/officers/TREAS.JPG",
-    socials: { facebook: "https://www.facebook.com/xua.iris", email: "iris.chua@dlsau.edu.ph" }
+    socials: { facebook: "https://www.facebook.com/xua.iris", email: "shelley.chua@dlsau.edu.ph" }
   },
   {
     id: 8,
