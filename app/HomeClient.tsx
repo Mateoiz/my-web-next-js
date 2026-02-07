@@ -18,38 +18,9 @@ import DailyDecrypt from "./components/DailyDecrypt";
 import CSExploration from "./components/CSExploration";
 
 // --- DATA IMPORTS ---
-// NOTE: We removed BLOG_POSTS because we are using live data now
 import { EVENTS } from "./constants/events"; 
 import { OFFICERS } from "./constants/officers"; 
-import type { BlogPost } from "@/lib/server-db"; // <--- Import the Type
-
-// --- FACULTY DATA (Hidden for now) ---
-const FACULTY = [
-  {
-    name: "Dr. Alex Pasion",
-    role: "Organization Adviser",
-    image: "/faculty/adviser.jpg",
-    credentials: ["M.S. Computer Science", "Certified Scrum Master"],
-    statement: "Guiding the next generation of IT professionals towards excellence and integrity.",
-    research: ["Software Engineering", "Project Management"]
-  },
-  {
-    name: "Engr. Julius Bancud",
-    role: "Program Chair",
-    image: "/faculty/chair.jpg",
-    credentials: ["PhD. IT (Candidate)", "M.S. Info Tech"],
-    statement: "Technology is a tool; how you use it defines the future.",
-    research: ["Data Science", "Machine Learning"]
-  },
-  {
-    name: "Engr. Melanie Asuncion",
-    role: "Faculty Member",
-    image: "/faculty/lecturer.jpg",
-    credentials: ["M.S. Computer Science", "Cisco Certified"],
-    statement: "Building strong foundations in networking and infrastructure.",
-    research: ["Cybersecurity", "Networking"]
-  },
-];
+import type { BlogPost } from "@/lib/server-db"; 
 
 // 1. UPDATE: Accept 'latestNews' as a prop from the server
 export function HomeClient({ latestNews }: { latestNews: BlogPost[] }){
@@ -58,6 +29,12 @@ export function HomeClient({ latestNews }: { latestNews: BlogPost[] }){
     hidden: { opacity: 0, y: 30 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.6 } }
   };
+
+  // FILTER: Only show Executives (President, VPs, Secretary, Treasurer, Auditor)
+  // Ensure the order in OFFICERS constant starts with President
+  const executiveOfficers = OFFICERS.filter(officer => 
+    ['President', 'Vice President', 'Secretary', 'Treasurer', 'Auditor'].some(role => officer.role.includes(role))
+  );
 
   return (
     <main className="min-h-screen relative selection:bg-green-500/30 bg-white dark:bg-black overflow-hidden font-sans">
@@ -191,11 +168,11 @@ export function HomeClient({ latestNews }: { latestNews: BlogPost[] }){
             </Link>
           </div>
           <div className="relative h-[300px] w-full rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-black/50 flex items-center justify-center group">
-             <div className="absolute inset-0 bg-[url('/scanlines.png')] opacity-10 pointer-events-none" />
-             <FaTerminal className="text-9xl text-zinc-300 dark:text-zinc-800 group-hover:text-green-500/20 transition-colors duration-500" />
-             <div className="absolute bottom-4 right-4 font-mono text-xs text-zinc-400">
-               /bin/mission_statement
-             </div>
+              <div className="absolute inset-0 bg-[url('/scanlines.png')] opacity-10 pointer-events-none" />
+              <FaTerminal className="text-9xl text-zinc-300 dark:text-zinc-800 group-hover:text-green-500/20 transition-colors duration-500" />
+              <div className="absolute bottom-4 right-4 font-mono text-xs text-zinc-400">
+                /bin/mission_statement
+              </div>
           </div>
         </div>
       </motion.section>
@@ -217,7 +194,6 @@ export function HomeClient({ latestNews }: { latestNews: BlogPost[] }){
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* 2. Map over the 'latestNews' prop passed from the server */}
             {latestNews.length > 0 ? (
                 latestNews.map((blog) => (
                 <Link href={`/Blogs/${blog.slug}`} key={blog.id} className="group block">
@@ -295,7 +271,7 @@ export function HomeClient({ latestNews }: { latestNews: BlogPost[] }){
         </div>
       </motion.section>
 
-      {/* ================= 5. EXECUTIVE OFFICERS (KEPT) ================= */}
+      {/* ================= 5. EXECUTIVE OFFICERS (UPDATED) ================= */}
       <motion.section 
         variants={sectionVariants}
         initial="hidden"
@@ -315,9 +291,10 @@ export function HomeClient({ latestNews }: { latestNews: BlogPost[] }){
           </div>
 
           {/* --- OFFICERS CAROUSEL --- */}
-          <div className="w-full overflow-x-auto pb-8 custom-scrollbar" dir="rtl">
-             <div className="flex gap-6 w-max px-2" dir="ltr">
-                {OFFICERS.map((officer, index) => (
+          {/* FIX: Removed dir="rtl" to restore standard Left-to-Right scrolling starting with the first item (President) */}
+          <div className="w-full overflow-x-auto pb-8 custom-scrollbar">
+             <div className="flex gap-6 w-max px-2">
+                {executiveOfficers.map((officer, index) => (
                    <div 
                      key={officer.id} 
                      className="w-[350px] bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 relative overflow-hidden group hover:border-green-500/50 transition-all duration-300 text-left"

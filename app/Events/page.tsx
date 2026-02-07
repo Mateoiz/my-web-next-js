@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-import Image from "next/image"; // Added next/image
+import Image from "next/image"; 
 import { 
   FaCalendarAlt, 
   FaMapMarkerAlt, 
@@ -16,27 +16,8 @@ import {
 import FloatingCubes from "../components/FloatingCubes"; 
 import CircuitCursor from "../components/CircuitCursor";
 
-// --- EVENT DATA ---
-const events = [
-  {
-    id: 1,
-    title: "Organization Fair",
-    date: "February 11-13",
-    location: "DLSAU Grounds",
-    description: "Explore the vibrant student organizations at DLSAU! Visit the JPCS booth to sign up, meet the officers, and find your community in the tech world.",
-    link: "#",
-    image: "/events/PLAYER2.jpg" // Added Image Path
-  },
-  {
-    id: 2,
-    title: "CAST Week",
-    date: "March 2-6",
-    location: "DLSAU Campus",
-    description: "A week-long celebration of the College of Arts, Sciences, and Technology. Join us for seminars, coding competitions, and showcasing student innovation.",
-    link: "#",
-    image: null // No image yet, will show placeholder
-  },
-];
+// 1. IMPORT DATA FROM CONSTANTS
+import { EVENTS } from "../constants/events"; 
 
 // --- COMPONENT: THEMED PLACEHOLDER ---
 const ComingSoonPlaceholder = ({ title }: { title: string }) => (
@@ -92,7 +73,7 @@ export default function EventsPage() {
           
           {/* --- LEFT COLUMN: EVENTS LIST --- */}
           <div className="lg:col-span-6 space-y-6">
-            {events.map((event, index) => {
+            {EVENTS.map((event, index) => {
               const isActive = activeEvent === index;
               return (
                 <motion.div
@@ -180,12 +161,12 @@ export default function EventsPage() {
                     transition={{ duration: 0.4 }}
                     className="relative w-full h-full rounded-xl overflow-hidden bg-zinc-100 dark:bg-zinc-900"
                   >
-                    {events[activeEvent].image ? (
+                    {EVENTS[activeEvent].image ? (
                         // Render Actual Image if Available
                         <div className="relative w-full h-full">
                             <Image 
-                                src={events[activeEvent].image!} 
-                                alt={events[activeEvent].title} 
+                                src={EVENTS[activeEvent].image!} 
+                                alt={EVENTS[activeEvent].title} 
                                 fill 
                                 className="object-cover"
                                 priority
@@ -193,7 +174,7 @@ export default function EventsPage() {
                         </div>
                     ) : (
                         // Render Placeholder if No Image
-                        <ComingSoonPlaceholder title={events[activeEvent].title} />
+                        <ComingSoonPlaceholder title={EVENTS[activeEvent].title} />
                     )}
 
                     {/* Gradient Overlay for Text Visibility */}
@@ -206,7 +187,7 @@ export default function EventsPage() {
                           <span className="font-mono text-xs uppercase tracking-widest drop-shadow-md">Live Feed</span>
                         </div>
                         <h2 className="text-3xl font-black text-white leading-none uppercase drop-shadow-lg">
-                          {events[activeEvent].title}
+                          {EVENTS[activeEvent].title}
                         </h2>
                     </div>
                   </motion.div>

@@ -1,5 +1,12 @@
-// constants/officers.ts
+import { 
+  FaStar, 
+  FaPaintBrush, 
+  FaCamera, 
+  FaVideo, 
+  FaPen 
+} from "react-icons/fa";
 
+// --- 1. EXECUTIVE OFFICERS ---
 export const OFFICERS = [
   {
     id: 1,
@@ -41,7 +48,7 @@ export const OFFICERS = [
     image: "/officers/SEC.JPG",
     socials: { facebook: "https://www.facebook.com/reynalyn.morbo", email: "reynalyn.morbo@dlsau.edu.ph" }
   },
-{
+  {
     id: 7,
     name: "Shelley Kellzie Chua",
     role: "Treasurer",
@@ -57,4 +64,113 @@ export const OFFICERS = [
     image: "/officers/AUD.JPG",
     socials: { facebook: "https://www.facebook.com/rodricyr", email: "cyril.rodriguez@dlsau.edu.ph" }
   },
+];
+
+// --- 2. EXECUTIVE ASSOCIATES ---
+export const EXECUTIVES = [
+  { 
+    name: "Joshua Enriquez", 
+    role: "Assistant Secretary", 
+    icon: <FaStar />,
+    image: "/officers/ASEC.JPG" 
+  },
+];
+
+// --- 3. YEAR REPRESENTATIVES ---
+export const YEAR_REPS = [
+  { 
+    id: 1,
+    year: "1st Year",
+    number: "01",
+    name: "Bernadette Basco", 
+    image: "/officers/YR1.png", 
+    quote: "The voice of the fresh minds."
+  },
+  { 
+    id: 2,
+    year: "2nd Year",
+    number: "02",
+    name: "Carlos Alcantara", 
+    image: "/officers/YR2.png", 
+    quote: "Bridging the gap for sophomores."
+  },
+  { 
+    id: 3,
+    year: "3rd Year",
+    number: "03",
+    name: "Synellign Bautista", 
+    image: "/officers/REP3.JPG", 
+    quote: "Guiding the juniors to excellence."
+  },
+];
+
+// --- 4. COMMITTEES ---
+
+export const GRAPHIC_DESIGNERS = [
+  { 
+    name: "Jhenelle Fern Refuerzo", 
+    role: "Graphic Designer", 
+    icon: <FaPaintBrush />,
+    image: "/creatives/GA1.JPG"
+  },
+  { 
+    name: "Chelsy Mei Tuazon", 
+    role: "Graphic Designer", 
+    icon: <FaPaintBrush />,
+    image: "/creatives/GA2.JPG"
+  },
+  { 
+    name: "Marcelino III Zapanta", 
+    role: "Graphic Designer", 
+    icon: <FaPaintBrush />,
+    image: "/creatives/GA3.jpg"
+  },
+  { 
+    name: "Ashley Krishan Navarro", 
+    role: "Graphic Designer", 
+    icon: <FaPaintBrush />,
+    image: "/creatives/GA4.jpg"
+  },
+];
+
+export const MEDIA_TEAM = [
+  { 
+    name: "Joshua Enriquez", 
+    role: "Photographer", 
+    icon: <FaCamera />,
+    image: "/creatives/PH1.png"
+  },
+  { 
+    name: "Jose Luis Gabo", 
+    role: "Photographer", 
+    icon: <FaCamera />,
+    image: "/creatives/PH3.png"
+  },
+  { 
+    name: "Carlos Alcantara", 
+    role: "Video Editor", 
+    icon: <FaVideo />,
+    image: "/creatives/VE.JPG"
+  },
+];
+
+export const CONTENT_TEAM = [
+  { 
+    name: "Manuel Zian Kyle Piangco", 
+    role: "Captions / Writer", 
+    icon: <FaPen />,
+    image: "/creatives/CAP.JPG"
+  },
+  {
+    name: "Shelley Kellzie Chua",
+    role: "Captions / Content",
+    icon: <FaPen />,
+    image: "/creatives/CAP3.jpg"
+  },
+  {
+    name: "Antonette Marce",
+    role: "Captions / Writer",
+    icon: <FaPen />,
+    image: "/creatives/CAP4.jpg"
+  }
 ];

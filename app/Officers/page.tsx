@@ -5,185 +5,24 @@ import Image from "next/image";
 import Link from "next/link";
 import { motion, Variants, useMotionValue, animate } from "framer-motion";
 import { 
-  FaFacebook, FaEnvelope, FaCamera, FaPen, FaVideo, FaPaintBrush, FaArrowRight,
-  FaChevronLeft, FaChevronRight, FaStar 
+  FaFacebook, FaEnvelope, FaChevronLeft, FaChevronRight, FaArrowRight, FaIdBadge, FaQuoteLeft
 } from "react-icons/fa"; 
 
 // 1. IMPORT ANIMATED COMPONENTS
 import FloatingCubes from "../components/FloatingCubes";
 import CircuitCursor from "../components/CircuitCursor"; 
 
-// --- 1. MAIN OFFICERS DATA ---
-const officers = [
-  {
-    id: 1,
-    name: "Justine Lloyd Garma",
-    role: "President",
-    bio: "Leading the vision for JPCS with a passion for innovation and community building. Focused on creating impactful workshops this year.",
-    image: "/officers/PR.JPG", 
-    socials: { facebook: "https://www.facebook.com/justine.lloyd.garma#", email: "justine.garma@dlsau.edu.ph" }
-  },
-  {
-    id: 2,
-    name: "Ice Matthew Ramirez",
-    role: "Vice President - Operations",
-    bio: "Ensuring smooth operations within the organization and managing member engagement. A backend development enthusiast.",
-    image: "/officers/VPO.JPG",
-    socials: { facebook: "https://www.facebook.com/icyy.teo/", email: "ice.ramirez@dlsau.edu.ph" }
-  },
-  {
-    id: 3,
-    name: "Louievince Kyle Laguidao" ,
-    role: "Vice President - External",
-    bio: "Building bridges with other organizations and industry partners. Expert in networking and corporate relations.",
-    image: "/officers/VPE.JPG",
-    socials: { facebook: "https://www.facebook.com/luwi.111093", email: "louievince.laguidao@dlsau.edu.ph" }
-  },
-  {
-    id: 4,
-    name: "Ashley Krishan Navarro",
-    role: "Vice President - Internal",
-    bio: "Ensuring Internal Operations are fluid and are optimized for efficiency.",
-    image: "/creatives/GA4.jpg",
-    socials: { facebook: "https://www.facebook.com/hnchkrshn#", email: "ashley.navarro@dlsau.edu.ph" }
-  },
-  {
-    id: 5,
-    name: "Reynalyn Ruth Morbo",
-    role: "Secretary",
-    bio: "Keeping the organization organized and on track with meticulous record-keeping and scheduling.",
-    image: "/officers/SEC.JPG",
-    socials: { facebook: "https://www.facebook.com/reynalyn.morbo", email: "reynalyn.morbo@dlsau.edu.ph" }
-  },
-  {
-    id: 7,
-    name: "Shelley Kellzie Chua",
-    role: "Treasurer",
-    bio: "Managing the organization's finances with transparency and accountability, ensuring funds are allocated effectively.",
-    image: "/officers/TREAS.JPG",
-    socials: { facebook: "https://www.facebook.com/shelleyk.chua#", email: "shelley.chua@dlsau.edu.ph" }
-  },
-  {
-    id: 8,
-    name: "Cyril Rodriguez",
-    role: "Auditor",
-    bio: "Keeping the organization organized and on track with meticulous record-keeping and scheduling.",
-    image: "/officers/AUD.JPG",
-    socials: { facebook: "https://www.facebook.com/rodricyr", email: "cyril.rodriguez@dlsau.edu.ph" }
-  },
-];
+// 2. IMPORT DATA FROM CONSTANTS
+import { 
+  OFFICERS, 
+  EXECUTIVES, 
+  YEAR_REPS, 
+  GRAPHIC_DESIGNERS, 
+  MEDIA_TEAM, 
+  CONTENT_TEAM 
+} from "../constants/officers";
 
-// --- 2. EXECUTIVE ASSOCIATES DATA ---
-const executives = [
-  { 
-    name: "Joshua Enriquez", 
-    role: "Assistant Secretary", 
-    icon: <FaStar />,
-    image: "/officers/ASEC.JPG" 
-  },
-];
-
-// --- 3. YEAR REPRESENTATIVES DATA ---
-const yearReps = [
-  { 
-    id: 1,
-    year: "1st Year",
-    number: "01",
-    name: "Bernadette Basco", 
-    image: "/officers/YR1.png", 
-    quote: "The voice of the fresh minds."
-  },
-  { 
-    id: 2,
-    year: "2nd Year",
-    number: "02",
-    name: "Carlos Alcantara", 
-    image: "/officers/YR2.png", 
-    quote: "Bridging the gap for sophomores."
-  },
-  { 
-    id: 3,
-    year: "3rd Year",
-    number: "03",
-    name: "Synellign Bautista", 
-    image: "/officers/REP3.JPG", 
-    quote: "Guiding the juniors to excellence."
-  },
-];
-
-// --- 4. SPLIT CREATIVE TEAMS DATA ---
-const graphicDesigners = [
-  { 
-    name: "Jhenelle Fern Refuerzo", 
-    role: "Graphic Designer", 
-    icon: <FaPaintBrush />,
-    image: "/creatives/GA1.JPG"
-  },
-  { 
-    name: "Chelsy Mei Tuazon", 
-    role: "Graphic Designer", 
-    icon: <FaPaintBrush />,
-    image: "/creatives/GA2.JPG"
-  },
-  { 
-    name: "Marcelino III Zapanta", 
-    role: "Graphic Designer", 
-    icon: <FaPaintBrush />,
-    image: "/creatives/GA3.jpg"
-  },
-    { 
-    name: "Ashley Krishan Navarro", 
-    role: "Graphic Designer", 
-    icon: <FaPaintBrush />,
-    image: "/creatives/GA4.jpg"
-  },
-];
-
-const mediaTeam = [
-  { 
-    name: "Joshua Enriquez", 
-    role: "Photographer", 
-    icon: <FaCamera />,
-    image: "/creatives/PH1.png"
-  },
-  { 
-    name: "Jose Luis Gabo", 
-    role: "Photographer", 
-    icon: <FaCamera />,
-    image: "/creatives/PH3.png"
-  },
-  { 
-    name: "Carlos Alcantara", 
-    role: "Video Editor", 
-    icon: <FaVideo />,
-    image: "/creatives/VE.JPG"
-  },
-];
-
-const contentTeam = [
-  { 
-    name: "Manuel Zian Kyle Piangco", 
-    role: "Captions / Writer", 
-    icon: <FaPen />,
-    image: "/creatives/CAP.JPG"
-  },
-
-  {
-    name: "Shelley Kellzie Chua",
-    role: "Captions / Content",
-    icon: <FaPen />,
-    image:"/creatives/CAP3.jpg"
-  }
-  ,
-  {
-    name: "Antonette Marce",
-    role: "Captions / Writer",
-    icon: <FaPen />,
-    image:"/creatives/CAP4.jpg"
-  }
-];
-
-// --- 5. ANIMATION VARIANTS ---
+// --- ANIMATION VARIANTS ---
 const cardVariants: Variants = {
   hidden: { opacity: 0, y: 100, scale: 0.9 },
   visible: { 
@@ -195,7 +34,6 @@ const cardVariants: Variants = {
 };
 
 // --- REUSABLE CAROUSEL COMPONENT ---
-// This handles the drag logic independently for each section
 const CreativeCarousel = ({ title, subtitle, team }: { title: string, subtitle: string, team: any[] }) => {
   const carouselRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
@@ -211,7 +49,7 @@ const CreativeCarousel = ({ title, subtitle, team }: { title: string, subtitle: 
     updateWidth();
     window.addEventListener("resize", updateWidth);
     return () => window.removeEventListener("resize", updateWidth);
-  }, [team]); // Recalculate if team data changes
+  }, [team]); 
 
   const SCROLL_STEP = 304; 
 
@@ -240,7 +78,6 @@ const CreativeCarousel = ({ title, subtitle, team }: { title: string, subtitle: 
             </p>
           </div>
 
-          {/* Navigation Buttons (Only show if scrollable) */}
           {width > 0 && (
             <div className="flex gap-3 mt-4 md:mt-0">
               <button 
@@ -277,20 +114,18 @@ const CreativeCarousel = ({ title, subtitle, team }: { title: string, subtitle: 
                 key={index} 
                 className="min-w-[260px] h-[320px] relative rounded-2xl overflow-hidden bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-green-500/20 group hover:border-green-500/50 shadow-md hover:shadow-xl dark:shadow-none transition-all duration-300"
               >
-                {/* Image Section */}
                 <div className="relative h-2/3 w-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
-                   <Image
-                     src={member.image} 
-                     alt={member.name}
-                     fill
-                     className="object-cover opacity-90 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500"
-                   />
-                   <div className="absolute top-3 right-3 p-2 bg-white/90 dark:bg-black/60 backdrop-blur-md rounded-full text-green-600 dark:text-green-400 border border-green-500/30 shadow-sm">
-                     {member.icon}
-                   </div>
+                    <Image
+                      src={member.image} 
+                      alt={member.name}
+                      fill
+                      className="object-cover opacity-90 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500"
+                    />
+                    <div className="absolute top-3 right-3 p-2 bg-white/90 dark:bg-black/60 backdrop-blur-md rounded-full text-green-600 dark:text-green-400 border border-green-500/30 shadow-sm">
+                      {member.icon}
+                    </div>
                 </div>
 
-                {/* Info Text */}
                 <div className="h-1/3 p-5 flex flex-col justify-center bg-white dark:bg-gradient-to-t dark:from-black dark:to-zinc-900">
                   <h3 className="text-lg font-bold text-zinc-800 dark:text-white group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors line-clamp-1">
                     {member.name}
@@ -310,9 +145,7 @@ const CreativeCarousel = ({ title, subtitle, team }: { title: string, subtitle: 
 export default function OfficersPage() {
   return (
     <section className="min-h-screen py-24 px-4 md:px-8 relative overflow-hidden transition-colors duration-300">
-      
       <CircuitCursor />
-
       <div className="absolute inset-0 z-0">
          <FloatingCubes />
       </div>
@@ -338,7 +171,7 @@ export default function OfficersPage() {
 
       {/* --- SECTION 1: MAIN OFFICERS LIST --- */}
       <div className="max-w-6xl mx-auto flex flex-col gap-24 relative z-20 mb-32">
-        {officers.map((officer, index) => {
+        {OFFICERS.map((officer, index) => {
           const isEven = index % 2 === 0;
           return (
             <motion.div
@@ -411,7 +244,7 @@ export default function OfficersPage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {yearReps.map((rep, index) => (
+          {YEAR_REPS.map((rep, index) => (
             <motion.div
               key={rep.id}
               initial={{ opacity: 0, y: 30 }}
@@ -420,12 +253,9 @@ export default function OfficersPage() {
               transition={{ delay: index * 0.1 }}
               className="group relative h-[450px] bg-white dark:bg-zinc-900 rounded-2xl overflow-hidden border border-zinc-200 dark:border-green-500/20 shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-2"
             >
-              {/* Background Big Number */}
               <div className="absolute -top-10 -right-6 text-[12rem] font-black text-zinc-100 dark:text-zinc-800/50 select-none transition-colors duration-300 group-hover:text-green-500/10">
                 {rep.number}
               </div>
-
-              {/* Image Container */}
               <div className="relative h-3/5 w-full overflow-hidden">
                 <Image
                   src={rep.image}
@@ -436,8 +266,6 @@ export default function OfficersPage() {
                 <div className="absolute inset-0 bg-zinc-900/20 dark:bg-green-900/30 transition-opacity duration-700 group-hover:opacity-0 pointer-events-none" />
                 <div className="absolute inset-0 bg-gradient-to-t from-white via-transparent to-transparent dark:from-zinc-900 dark:via-transparent dark:to-transparent opacity-100 pointer-events-none" />
               </div>
-
-              {/* Info Content */}
               <div className="absolute bottom-0 left-0 w-full p-8 flex flex-col justify-end h-full pointer-events-none">
                 <div className="relative z-10">
                   <span className="inline-block px-3 py-1 mb-3 text-xs font-bold tracking-widest text-white bg-green-600 rounded-full">
@@ -469,7 +297,7 @@ export default function OfficersPage() {
         </div>
 
         <div className="flex flex-wrap justify-center gap-8 px-4">
-          {executives.map((member, index) => (
+          {EXECUTIVES.map((member, index) => (
             <motion.div 
               key={index}
               initial={{ opacity: 0, y: 50 }}
@@ -501,7 +329,7 @@ export default function OfficersPage() {
         </div>
       </div>
 
-      {/* --- SECTION 4: THE CREATIVES (REVAMPED) --- */}
+      {/* --- SECTION 4: THE CREATIVES --- */}
       <div className="max-w-7xl mx-auto relative z-20 mt-32 pb-12 px-4">
         
         <div className="text-center mb-16">
@@ -513,30 +341,27 @@ export default function OfficersPage() {
           </p>
         </div>
 
-        {/* --- 4a. GRAPHIC DESIGNERS --- */}
         <CreativeCarousel 
           title="Editorial Committee" 
           subtitle="Visual Architects" 
-          team={graphicDesigners} 
+          team={GRAPHIC_DESIGNERS} 
         />
 
-        {/* --- 4b. MEDIA TEAM --- */}
         <CreativeCarousel 
           title="Documentation Committee" 
           subtitle="Photography & Video Editing" 
-          team={mediaTeam} 
+          team={MEDIA_TEAM} 
         />
 
-        {/* --- 4c. CONTENT TEAM --- */}
         <CreativeCarousel 
           title="Content Strategy" 
           subtitle="Captions & Copywriting" 
-          team={contentTeam} 
+          team={CONTENT_TEAM} 
         />
 
       </div>
 
-      {/* --- JOIN TEAM CTA SECTION --- */}
+      {/* --- JOIN TEAM CTA --- */}
       <motion.div 
         initial={{ opacity: 0, y: 30 }}
         whileInView={{ opacity: 1, y: 0 }}
