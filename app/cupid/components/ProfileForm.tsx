@@ -22,26 +22,32 @@ export const ProfileForm = (props: ProfileFormProps) => {
   const isEditing = !!props.onCancel;
 
   const handleValidationAndSubmit = () => {
-    // 1. Validate ID Year (2019 - 2026)
-    const id = props.formData.studentId.trim();
-    const yearPrefix = parseInt(id.substring(0, 4));
+    // 1. Clean the ID (remove dashes, spaces, etc.)
+    const rawId = props.formData.studentId.replace(/[^0-9]/g, ''); // Keep only numbers
+
+    // 2. Validate Year (First 4 digits)
+    const yearPrefix = parseInt(rawId.substring(0, 4));
 
     if (isNaN(yearPrefix) || yearPrefix < 2019 || yearPrefix > 2026) {
-        setIdError("ID must start with a valid year (2019-2026). Example: 2024-01-...");
+        setIdError("ID must start with a valid year (2019-2026).");
         return;
     }
 
-    if (!id.includes("-") || id.length < 8 || id.length > 12) {
-        setIdError("Invalid format. ID must be 8-12 characters long.");
+    // 3. Validate Length (Standard DLSAU IDs are usually around 8-10 digits)
+    // Adjust this range if DLSAU IDs have a specific fixed length
+    if (rawId.length < 8 || rawId.length > 12) {
+        setIdError("Invalid ID length. Please check your ID number.");
         return;
     }
 
-    // 2. Validate Age Range
+    // 4. Validate Age Range
     if (parseInt(props.formData.minAge) > parseInt(props.formData.maxAge)) {
         alert("Minimum age cannot be higher than maximum age!");
         return;
     }
 
+    // If valid, update the formData with the clean or formatted ID if you wish, 
+    // or just keep the user's input. Here we proceed with the current input.
     setIdError(""); 
     props.onSubmit(); 
   };
@@ -98,13 +104,13 @@ export const ProfileForm = (props: ProfileFormProps) => {
                  {[1, 2].map((idx) => (
                     <div key={idx} onClick={() => props.fileInputRefs.current[idx]?.click()} className="relative bg-zinc-800/30 rounded-xl border-2 border-dashed border-zinc-700/50 hover:border-rose-500/50 transition-all cursor-pointer overflow-hidden group">
                        {props.previewUrls[idx] ? ( 
-                            <> 
-                                <img src={props.previewUrls[idx]!} className="w-full h-full object-cover" /> 
-                                <button onClick={(e) => { e.stopPropagation(); props.onRemoveImage(idx); }} className="absolute top-2 right-2 bg-black/60 p-1.5 rounded-full text-white hover:bg-rose-600/80"><FaTrash size={10}/></button> 
-                            </> 
-                        ) : ( 
-                            <div className="absolute inset-0 flex flex-col items-center justify-center text-zinc-500 group-hover:text-rose-400"><FaCamera size={16} /></div> 
-                        )}
+                           <> 
+                               <img src={props.previewUrls[idx]!} className="w-full h-full object-cover" /> 
+                               <button onClick={(e) => { e.stopPropagation(); props.onRemoveImage(idx); }} className="absolute top-2 right-2 bg-black/60 p-1.5 rounded-full text-white hover:bg-rose-600/80"><FaTrash size={10}/></button> 
+                           </> 
+                       ) : ( 
+                           <div className="absolute inset-0 flex flex-col items-center justify-center text-zinc-500 group-hover:text-rose-400"><FaCamera size={16} /></div> 
+                       )}
                        <input type="file" ref={el => { props.fileInputRefs.current[idx] = el }} className="hidden" accept="image/*" onChange={(e) => props.onImageSelect(idx, e)} />
                     </div>
                  ))}
@@ -120,14 +126,14 @@ export const ProfileForm = (props: ProfileFormProps) => {
                     <input type="text" className={INPUT_FIELD_STYLE} placeholder="What should we call you?" value={props.formData.name} onChange={e => props.setFormData({...props.formData, name: e.target.value})} />
                 </div>
                 <div>
-                    <label className={LABEL_STYLE}>ID Number (2019-2026)</label>
+                    <label className={LABEL_STYLE}>ID Number (e.g. 20230000979)</label>
                     <div className="relative">
                         <FaIdCard className="absolute top-4 right-4 text-zinc-600" />
                         <input 
                             type="text" 
                             className={`${INPUT_FIELD_STYLE} ${idError ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' : ''}`} 
-                            placeholder="202X-XX-XXXX" 
-                            maxLength={12} 
+                            placeholder="202X-XX-XXXX or 202XXXXXXX" 
+                            maxLength={15} 
                             value={props.formData.studentId} 
                             onChange={e => {
                                 props.setFormData({...props.formData, studentId: e.target.value});
