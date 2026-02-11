@@ -11,17 +11,36 @@ html {
   scroll-behavior: smooth;
 }
 
-/* Force selection color to match theme */
+/* --- VALENTINE'S THEME OVERRIDES --- */
+
+/* 1. Selection Color: Changed from Green to Rose-600 */
 ::selection {
-  background-color: #22c55e; /* Green-500 */
-  color: black;
+  background-color: #e11d48; /* Rose-600 */
+  color: white;
+}
+
+/* 2. Circuit Cursor Override: Forces the cursor trail to be Pink/Rose */
+.cursor-trail {
+  background-color: #e11d48 !important; /* Rose-600 */
+  box-shadow: 0 0 10px #e11d48, 0 0 20px #e11d48 !important;
+}
+
+/* 3. Typing Test Animations */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+@keyframes scan {
+  0% { top: -10%; }
+  100% { top: 110%; }
 }
 
 /* --- SPLASH SCREEN LOGIC --- */
 /* This hides specific elements when the "splash-active" class 
    is added to the <body> tag by page.tsx 
 */
-body.splash-active nav,                  /* Hides the Navbar */
+body.splash-active nav,                 /* Hides the Navbar */
 body.splash-active .ThemeToggle,        /* Hides the Theme Toggle */
 body.splash-active .MusicPlayer,        /* Hides the Music Player */
 body.splash-active [data-hide-on-splash="true"] /* Hides anything else marked */

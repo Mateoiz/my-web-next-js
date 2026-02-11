@@ -11,10 +11,11 @@ interface Point {
 
 export default function CircuitCursor() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  // Use refs for mutable data that doesn't trigger re-renders (better performance)
   const history = useRef<Point[]>([]);
   const mouse = useRef({ x: 0, y: 0 });
-  const requestId = useRef<number>(0); // Initialize with 0
+  
+  // New: Add a "pulse" state for the heartbeat effect
+  const pulseRef = useRef(0); 
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -23,105 +24,131 @@ export default function CircuitCursor() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Configuration options for the trail
+    // --- VALENTINE CONFIGURATION ---
     const config = {
-      trailLength: 40,      // How long the trail is
-      lineWidth: 1,         // Thickness of the wiring
-      color: '#22c55e',     // Tailwind green-500 - matches your logo
-      glowBlur: 15,         // The neon glow effect
-      fadeSpeed: 0.10,      // How quickly the trail disappears
+      trailLength: 20,       // Slightly shorter for a cleaner heart look
+      lineWidth: 2,          // Thicker lines for boldness
+      color: '#e11d48',      // Rose-600 (The Love Color)
+      glowBlur: 15,          // Soft romantic glow
+      fadeSpeed: 0.10,       
     };
 
-    // --- 1. Handle Resizing ---
     const resizeCanvas = () => {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
     };
     window.addEventListener('resize', resizeCanvas);
-    resizeCanvas(); // Initial size set
+    resizeCanvas();
 
-    // --- 2. Handle Mouse Movement ---
     const handleMouseMove = (e: MouseEvent) => {
       mouse.current = { x: e.clientX, y: e.clientY };
     };
     window.addEventListener('mousemove', handleMouseMove);
 
-    // --- 3. The Main Animation Loop ---
-    const animate = () => {
-      // Add current mouse position to history
-      history.current.unshift({ ...mouse.current, age: 0 });
-
-      // Limit history length so memory doesn't explode
-      if (history.current.length > config.trailLength) {
-        history.current.pop();
-      }
-
-      // Clear the canvas for the next frame
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      // Set styling for circuit lines
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.lineWidth = config.lineWidth;
-      ctx.strokeStyle = config.color;
-      ctx.shadowColor = config.color;
-      ctx.shadowBlur = config.glowBlur;
-
-      // Begin drawing the path
+    // Helper: Draw a Heart Shape
+    const drawHeart = (ctx: CanvasRenderingContext2D, x: number, y: number, size: number) => {
+      ctx.save();
       ctx.beginPath();
-
-      // We need at least two points to draw a line
-      if (history.current.length > 1) {
-        // Start at the oldest point
-        const oldestPoint = history.current[history.current.length - 1];
-        ctx.moveTo(oldestPoint.x, oldestPoint.y);
-
-        // Loop backwards through history (from oldest to newest)
-        for (let i = history.current.length - 2; i >= 0; i--) {
-          const current = history.current[i];
-          const prev = history.current[i + 1];
-
-          // --- THE WIRING LOGIC ---
-          // Instead of ctx.lineTo(current.x, current.y) which draws diagonally,
-          // We draw in orthogonal steps (right angles) to look like bus lines.
-          
-          // Step 1: Move horizontally to the new X, keeping old Y
-          ctx.lineTo(current.x, prev.y);
-          // Step 2: Move vertically to the new Y
-          ctx.lineTo(current.x, current.y);
-
-          // Increase age for fading effect (optional logic placeholder)
-          current.age += config.fadeSpeed;
-        }
-      }
-
-      ctx.stroke();
-
-      // Request the next animation frame
-      requestId.current = requestAnimationFrame(animate);
+      const topCurveHeight = size * 0.3;
+      ctx.moveTo(x, y + topCurveHeight);
+      // Top left curve
+      ctx.bezierCurveTo(
+        x, y, 
+        x - size / 2, y, 
+        x - size / 2, y + topCurveHeight
+      );
+      // Bottom left curve
+      ctx.bezierCurveTo(
+        x - size / 2, y + (size + topCurveHeight) / 2, 
+        x, y + (size + topCurveHeight) / 2, 
+        x, y + size
+      );
+      // Bottom right curve
+      ctx.bezierCurveTo(
+        x, y + (size + topCurveHeight) / 2, 
+        x + size / 2, y + (size + topCurveHeight) / 2, 
+        x + size / 2, y + topCurveHeight
+      );
+      // Top right curve
+      ctx.bezierCurveTo(
+        x + size / 2, y, 
+        x, y, 
+        x, y + topCurveHeight
+      );
+      ctx.closePath();
+      ctx.fillStyle = config.color;
+      ctx.shadowColor = config.color;
+      ctx.shadowBlur = 20;
+      ctx.fill();
+      ctx.restore();
     };
 
-    // Start the animation loop
+    // --- Animation Loop ---
+    let animationFrameId: number;
+
+    const animate = () => {
+      // Add current mouse position
+      history.current.push({ ...mouse.current, age: 0 });
+
+      // Limit history length
+      if (history.current.length > config.trailLength) {
+        history.current.shift();
+      }
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Pulse Logic (Heartbeat)
+      pulseRef.current += 0.1;
+      const pulse = Math.sin(pulseRef.current) * 0.5 + 1.5; // Oscillates between 1 and 2
+
+      // Draw the Trail (The "Digital String of Fate")
+      if (history.current.length > 1) {
+        ctx.beginPath();
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.lineWidth = config.lineWidth;
+        ctx.strokeStyle = config.color;
+        ctx.shadowColor = config.color;
+        ctx.shadowBlur = config.glowBlur;
+
+        // Start from oldest
+        ctx.moveTo(history.current[0].x, history.current[0].y);
+
+        for (let i = 0; i < history.current.length - 1; i++) {
+          const current = history.current[i];
+          const next = history.current[i + 1];
+          
+          // Draw smoother curves instead of sharp circuit angles for "fluid love"
+          // Or keep orthogonal for "Digital Love" (I kept orthogonal but softened corners)
+          ctx.lineTo(next.x, current.y); // Horizontal
+          ctx.lineTo(next.x, next.y);    // Vertical
+        }
+        ctx.stroke();
+      }
+
+      // Draw the Heart Cursor Tip
+      if (history.current.length > 0) {
+        const lastPoint = history.current[history.current.length - 1];
+        // The heart beats with the pulse variable
+        drawHeart(ctx, lastPoint.x, lastPoint.y - 10, 12 * pulse);
+      }
+
+      animationFrameId = requestAnimationFrame(animate);
+    };
+
     animate();
 
-    // --- Cleanup ---
     return () => {
       window.removeEventListener('resize', resizeCanvas);
       window.removeEventListener('mousemove', handleMouseMove);
-      if (requestId.current) {
-        cancelAnimationFrame(requestId.current);
-      }
+      cancelAnimationFrame(animationFrameId);
     };
   }, []);
 
   return (
     <canvas
       ref={canvasRef}
-      // Styles explanation:
-      // fixed inset-0: Fills the entire screen and stays in place when scrolling
-      // pointer-events-none: Crucial! Lets clicks pass through to buttons/links below
-      // z-0: Sits behind your main content
-      className="fixed inset-0 pointer-events-none z-1"
+      className="fixed inset-0 pointer-events-none z-50" // Increased Z-index to ensure it floats on top
     />
   );
 }

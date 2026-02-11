@@ -37,7 +37,7 @@ export const OFFICERS = [
     name: "Ashley Krishan Navarro",
     role: "Vice President - Internal",
     bio: "Ensuring Internal Operations are fluid and are optimized for efficiency.",
-    image: "/creatives/GA4.jpg",
+    image: "/officers/VPI.JPG",
     socials: { facebook: "https://www.facebook.com/hnchkrshn#", email: "ashley.navarro@dlsau.edu.ph" }
   },
   {
@@ -129,7 +129,7 @@ export const GRAPHIC_DESIGNERS = [
     name: "Ashley Krishan Navarro", 
     role: "Graphic Designer", 
     icon: <FaPaintBrush />,
-    image: "/creatives/GA4.jpg"
+    image: "/creatives/GA4.JPG"
   },
 ];
 
