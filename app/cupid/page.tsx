@@ -2,19 +2,19 @@
 import { useState, useRef, useEffect, ChangeEvent } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { FaHeart, FaSpinner, FaTimes, FaFileContract, FaCheckCircle, FaEnvelope } from "react-icons/fa";
-import { collection, query, where, orderBy, onSnapshot, serverTimestamp, setDoc, doc, getDoc, updateDoc, getDocs, addDoc, arrayUnion, arrayRemove } from "firebase/firestore";
+import { collection, query, orderBy, onSnapshot, serverTimestamp, setDoc, doc, getDoc, updateDoc, getDocs, addDoc, limit, deleteDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, User, sendPasswordResetEmail } from "firebase/auth";
 import { db, auth, storage } from "@/lib/db";
 import { useTheme } from "next-themes"; 
 
 // --- CUSTOM IMPORTS ---
-import { AppState, UserProfile, ChatMessage, MatchRequest } from "./types";
+// FIXED: Removed MatchRequest
+import { AppState, UserProfile, ChatMessage } from "./types";
 import { QUESTS, PRIMARY_BTN_STYLE, BTN_SECONDARY_STYLE } from "./constants";
 import { ValentineBackground } from "./components/ValentineBackground";
 import { AuthForm } from "./components/AuthForm";
 import { ProfileForm } from "./components/ProfileForm";
-import { MatchingView } from "./components/MatchingView";
 import { ChatInterface } from "./components/ChatInterface";
 import { HomeView } from "./components/HomeView"; 
 import CircuitCursor from "../components/CircuitCursor";
@@ -59,13 +59,11 @@ export default function CupidPage() {
   // Match State
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [match, setMatch] = useState<UserProfile | null>(null);
-  const [compatibility, setCompatibility] = useState(0);
-  const [isRevealed, setIsRevealed] = useState(false);
-  const [hasRerolled, setHasRerolled] = useState(false);
-  const [quest, setQuest] = useState("");
+  const [quest, setQuest] = useState(""); 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const [isPartnerDisconnected, setIsPartnerDisconnected] = useState(false);
 
   const initialLoadComplete = useRef(false);
 
@@ -91,7 +89,6 @@ export default function CupidPage() {
                 if (docSnap.exists()) {
                     const userData = { id: user.uid, ...docSnap.data() } as UserProfile;
                     setCurrentUser(userData);
-                    setHasRerolled(!!userData.hasRerolled);
 
                     if (!initialLoadComplete.current) {
                         if (!userData.preferredGender || !userData.age) {
@@ -101,6 +98,15 @@ export default function CupidPage() {
                         }
                         initialLoadComplete.current = true;
                     }
+
+                    // OMEGLE LOGIC: Check for active match updates
+                    if (userData.currentMatchId && state !== 'CHAT') {
+                        loadMatchAndConnect(userData.currentMatchId, userData.id!);
+                    }
+                    if (!userData.currentMatchId && state === 'CHAT') {
+                        setIsPartnerDisconnected(true);
+                    }
+
                 } else {
                     setState('SETUP_PROFILE'); 
                 }
@@ -114,9 +120,136 @@ export default function CupidPage() {
         }
     });
     return () => unsubscribeAuth();
-  }, []); 
+  }, [state]); 
 
-  // --- HANDLERS ---
+  // --- MATCHING LOGIC (OMEGLE STYLE) ---
+  const searchForPartner = async () => {
+    if (!currentUser?.id) return;
+    setState('SEARCHING');
+    setIsPartnerDisconnected(false);
+
+    try {
+        const queueRef = collection(db, "waiting_queue");
+        const q = query(queueRef, orderBy("timestamp", "asc"), limit(20));
+        const snapshot = await getDocs(q);
+
+        let partnerDoc = null;
+
+        for (const d of snapshot.docs) {
+            const waiter = d.data();
+            if (waiter.userId === currentUser.id) continue;
+
+            const isGenderMatch = currentUser.preferredGender === "Any" || currentUser.preferredGender === waiter.gender;
+            const isReverseMatch = waiter.preferredGender === "Any" || waiter.preferredGender === currentUser.gender;
+
+            if (isGenderMatch && isReverseMatch) {
+                partnerDoc = d;
+                break; 
+            }
+        }
+
+        if (partnerDoc) {
+            const partnerId = partnerDoc.data().userId;
+            await deleteDoc(partnerDoc.ref);
+
+            const matchId = [currentUser.id, partnerId].sort().join("_");
+
+            await Promise.all([
+                updateDoc(doc(db, "cupid_users", currentUser.id), { currentMatchId: matchId, isSearching: false }),
+                updateDoc(doc(db, "cupid_users", partnerId), { currentMatchId: matchId, isSearching: false })
+            ]);
+
+            await setDoc(doc(db, "matches", matchId), { 
+                users: [currentUser.id, partnerId], 
+                createdAt: serverTimestamp(),
+                active: true 
+            });
+
+            loadMatchAndConnect(matchId, currentUser.id);
+
+        } else {
+            const queueEntry = {
+                userId: currentUser.id,
+                gender: currentUser.gender,
+                preferredGender: currentUser.preferredGender,
+                timestamp: serverTimestamp()
+            };
+            await setDoc(doc(db, "waiting_queue", currentUser.id), queueEntry);
+            await updateDoc(doc(db, "cupid_users", currentUser.id), { isSearching: true });
+        }
+
+    } catch (e) {
+        console.error("Search Error:", e);
+        setState('HOME');
+    }
+  };
+
+  const loadMatchAndConnect = async (matchId: string, myId: string) => {
+      const userIds = matchId.split("_");
+      const partnerId = userIds.find(id => id !== myId);
+      if (!partnerId) return;
+
+      const partnerSnap = await getDoc(doc(db, "cupid_users", partnerId));
+      if (partnerSnap.exists()) {
+          const pData = { id: partnerId, ...partnerSnap.data() } as UserProfile;
+          setMatch(pData);
+          setQuest(QUESTS[Math.floor(Math.random() * QUESTS.length)]);
+          
+          const messagesRef = collection(db, "matches", matchId, "messages");
+          const q = query(messagesRef, orderBy("createdAt", "asc"));
+          
+          onSnapshot(q, (snap) => {
+              setMessages(snap.docs.map(d => ({ id: d.id, ...d.data() } as ChatMessage)));
+              setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+          });
+
+          await deleteDoc(doc(db, "waiting_queue", myId)).catch(() => {}); 
+          setState('CHAT');
+      }
+  };
+
+  const handleNext = async () => {
+      if (!currentUser?.id) return;
+      if (match?.id) {
+          try { await updateDoc(doc(db, "cupid_users", match.id), { currentMatchId: null }); } catch(e) {} 
+      }
+      await updateDoc(doc(db, "cupid_users", currentUser.id), { currentMatchId: null });
+      setMatch(null);
+      setMessages([]);
+      searchForPartner();
+  };
+
+const handleStop = async () => {
+      // 1. Immediate UI Update (Feel instant)
+      setState('HOME');
+      setMatch(null);
+      setMessages([]); // Clear chat
+
+      if (!currentUser?.id) return;
+
+      // 2. Background Database Cleanup
+      try {
+          const promises = [];
+
+          // If we were matched, free the partner (best effort)
+          if (match?.id) {
+              promises.push(updateDoc(doc(db, "cupid_users", match.id), { currentMatchId: null }).catch(() => {}));
+          }
+
+          // Reset my own status
+          promises.push(updateDoc(doc(db, "cupid_users", currentUser.id), { currentMatchId: null, isSearching: false }));
+
+          // Remove myself from the waiting queue
+          promises.push(deleteDoc(doc(db, "waiting_queue", currentUser.id)).catch(() => {}));
+
+          // Run all cleanup in parallel
+          await Promise.all(promises);
+      } catch (e) {
+          console.warn("Cleanup warning (non-fatal):", e);
+      }
+  };
+
+  // --- GENERAL HANDLERS ---
   const handleForgotPassword = async () => {
       if (!forgotEmail) { alert("Please enter your email address."); return; }
       setResetStatus('sending');
@@ -124,100 +257,41 @@ export default function CupidPage() {
           await sendPasswordResetEmail(auth, forgotEmail);
           setResetStatus('sent');
       } catch (error: any) {
-          console.error(error);
           setResetStatus('error');
       }
   };
 
-  const handleAcceptRequest = async (request: MatchRequest) => {
-    if (!currentUser?.id) return;
-    if (currentUser.currentMatchId) {
-        const confirm = window.confirm("You already have an active match. Accepting this will END your current conversation. Proceed?");
-        if (!confirm) return;
-    }
-    setState('CONNECTING');
-    try {
-        await updateDoc(doc(db, "cupid_users", currentUser.id), { incomingRequests: arrayRemove(request) });
-        const myUpdate = updateDoc(doc(db, "cupid_users", currentUser.id), { currentMatchId: request.id });
-        const theirUpdate = updateDoc(doc(db, "cupid_users", request.id), { currentMatchId: currentUser.id });
-        await Promise.all([myUpdate, theirUpdate]);
-        const matchData = { id: request.id, name: request.name, imgs: [request.img] } as UserProfile; 
-        setMatch(matchData);
-        setTimeout(() => { setState('ITS_A_MATCH'); setTimeout(() => initializeChat(request.id, false, currentUser.id, matchData), 2000); }, 1500);
-    } catch (e) { console.error(e); setState('HOME'); }
+  const sendMessage = async () => {
+    if (!newMessage.trim() || !currentUser?.id || !match?.id) return;
+    const text = newMessage; setNewMessage("");
+    const mid = [currentUser.id, match.id].sort().join("_");
+    await addDoc(collection(db, "matches", mid, "messages"), { text, senderId: currentUser.id, createdAt: serverTimestamp() });
   };
 
-  const handleRejectRequest = async (request: MatchRequest) => {
-      if (!currentUser?.id) return;
-      try {
-          await updateDoc(doc(db, "cupid_users", currentUser.id), { incomingRequests: arrayRemove(request) });
-          const newReqs = currentUser.incomingRequests?.filter(r => r.id !== request.id) || [];
-          setCurrentUser({...currentUser, incomingRequests: newReqs});
-      } catch (e) { console.error(e); }
-  };
-
-  const loadExistingMatch = async (matchId: string, myId: string) => {
-      setState('LOADING');
-      try {
-          const matchDoc = await getDoc(doc(db, "cupid_users", matchId));
-          if (matchDoc.exists()) {
-              const matchData = { id: matchId, ...matchDoc.data() } as UserProfile;
-              setMatch(matchData);
-              initializeChat(matchId, true, myId, matchData); 
-          } else {
-              console.warn("Match missing - resetting profile");
-              await updateDoc(doc(db, "cupid_users", myId), { currentMatchId: "" });
-              setMatch(null);
-              setState('HOME');
-          }
-      } catch (e) { console.error("Error loading match:", e); setState('HOME'); }
-  };
-
-  const findMatch = async (user: UserProfile, isReroll = false, excludeId?: string) => {
-    if (!user.id) { console.error("User ID missing"); return; }
-    const OPEN_DATE = new Date("2026-02-12T00:00:00");
-    if (new Date() < OPEN_DATE) { alert("Cupid's arrows are being sharpened! Matching opens on Feb 12."); return; }
-
-    setState('SCANNING'); 
-    try {
-      const q = user.preferredGender === "Any" ? query(collection(db, "cupid_users")) : query(collection(db, "cupid_users"), where("gender", "==", user.preferredGender));
-      const snapshot = await getDocs(q);
-      const minAge = parseInt(user.minAge || "18");
-      const maxAge = parseInt(user.maxAge || "99");
-
-      let potentialMatches = snapshot.docs
-        .map(d => ({id: d.id, ...d.data()} as UserProfile))
-        .filter(u => {
-             const cAge = parseInt(u.age);
-             const requests = u.incomingRequests || [];
-             const alreadyRequested = requests.some(r => r.id === user.id);
-             return u.id !== user.id && (!user.currentMatchId || u.id !== user.currentMatchId) && (!excludeId || u.id !== excludeId) && (!isNaN(cAge) && cAge >= minAge && cAge <= maxAge) && requests.length < 3 && !alreadyRequested;
-        });
-      
-      potentialMatches = potentialMatches.sort(() => Math.random() - 0.5);
-
-      if (potentialMatches.length > 0) {
-          const target = potentialMatches[0];
-          const requestData: MatchRequest = { id: user.id, name: user.name, img: user.imgs[0] || "", course: user.course };
-          await updateDoc(doc(db, "cupid_users", target.id!), { incomingRequests: arrayUnion(requestData) });
-          // Note: Reroll logic removed for infinite rerolls as requested
-          alert(`Request sent to ${target.name.split(' ')[0]}! If they accept, you will be connected.`);
-          setState('HOME'); 
-      } else {
-          alert("No new matches found right now! Try again later.");
-          setState('HOME'); 
-      }
-    } catch (e) { console.error(e); alert("Match error."); setState('HOME'); }
-  };
-
-  const handleConnect = async () => { /* Unused */ };
   const handleLogin = async () => { if (!email || !password) { setAuthError("Fill all fields."); return; } setIsCheckingAuth(true); setAuthError(""); try { await signInWithEmailAndPassword(auth, email, password); } catch (e) { setAuthError("Invalid credentials."); setIsCheckingAuth(false); } };
-  const handleSignup = async () => { if (!email.endsWith("@dlsau.edu.ph")) { setAuthError("Must use a @dlsau.edu.ph email."); return; } if (password.length < 6) { setAuthError("Password must be at least 6 characters."); return; } if (password !== confirmPassword) { setAuthError("Passwords do not match."); return; } if (!agreedToTerms) { setAuthError("You must agree to the terms."); return; } setIsCheckingAuth(true); setAuthError(""); try { await createUserWithEmailAndPassword(auth, email, password); } catch (e: any) { console.error("Signup Error:", e); if (e.code === 'auth/email-already-in-use') setAuthError("Account exists. Log In."); else if (e.code === 'auth/weak-password') setAuthError("Password too weak."); else setAuthError("Signup failed."); setIsCheckingAuth(false); } };
+  const handleSignup = async () => { if (!email.endsWith("@dlsau.edu.ph")) { setAuthError("Must use a @dlsau.edu.ph email."); return; } if (password.length < 6) { setAuthError("Password must be at least 6 characters."); return; } if (password !== confirmPassword) { setAuthError("Passwords do not match."); return; } if (!agreedToTerms) { setAuthError("You must agree to the terms."); return; } setIsCheckingAuth(true); setAuthError(""); try { await createUserWithEmailAndPassword(auth, email, password); } catch (e: any) { if (e.code === 'auth/email-already-in-use') setAuthError("Account exists. Log In."); else if (e.code === 'auth/weak-password') setAuthError("Password too weak."); else setAuthError("Signup failed."); setIsCheckingAuth(false); } };
   const handleImageSelect = (index: number, e: ChangeEvent<HTMLInputElement>) => { if (e.target.files && e.target.files[0]) { const file = e.target.files[0]; const newFiles = [...imageFiles]; newFiles[index] = file; setImageFiles(newFiles); const newPreviews = [...previewUrls]; newPreviews[index] = URL.createObjectURL(file); setPreviewUrls(newPreviews); } };
   const removeImage = (index: number) => { const newFiles = [...imageFiles]; newFiles[index] = null; setImageFiles(newFiles); const newPreviews = [...previewUrls]; newPreviews[index] = null; setPreviewUrls(newPreviews); };
-  const handleProfileSubmit = async () => { if (!firebaseUser) return; setIsUploading(true); try { const uploadedUrls: string[] = currentUser?.imgs ? [...currentUser.imgs] : []; for (let i = 0; i < 3; i++) { if (imageFiles[i]) { const storageRef = ref(storage, `cupid_avatars/${firebaseUser.uid}_${Date.now()}_${i}`); await uploadBytes(storageRef, imageFiles[i]!); const url = await getDownloadURL(storageRef); i < uploadedUrls.length ? uploadedUrls[i] = url : uploadedUrls.push(url); } } if (uploadedUrls.length === 0) uploadedUrls.push(`https://api.dicebear.com/7.x/notionists/svg?seed=${formData.name}`); const newUser: UserProfile = { ...formData, id: firebaseUser.uid, email: firebaseUser.email!, imgs: uploadedUrls, currentMatchId: currentUser?.currentMatchId || "", hasRerolled: currentUser?.hasRerolled || false }; await setDoc(doc(db, "cupid_users", firebaseUser.uid), newUser); setCurrentUser(newUser); setIsUploading(false); setState('HOME'); } catch (e) { setIsUploading(false); alert("Error saving."); } };
-  const initializeChat = async (pid: string, isLoad: boolean, myId?: string, directMatchData?: UserProfile) => { setQuest(QUESTS[0]); setState('CHAT'); const uid = myId || currentUser?.id; const targetMatch = directMatchData || match; if (!targetMatch?.isBot && pid !== 'bot') { if (!uid || !pid) return; const mid = [uid, pid].sort().join("_"); if (!isLoad) await setDoc(doc(db, "matches", mid), { users: [uid, pid], lastUpdated: serverTimestamp() }, { merge: true }); onSnapshot(query(collection(db, "matches", mid, "messages"), orderBy("createdAt", "asc")), (snap) => { setMessages(snap.docs.map(d => ({ id: d.id, ...d.data() } as ChatMessage))); setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100); }); } else { setMessages([{ id: "1", text: "Hello! I am a bot.", senderId: "bot", createdAt: new Date() }]); } };
-  const sendMessage = async () => { if (!newMessage.trim() || !currentUser || !currentUser.id || !match) return; const textToSend = newMessage; setNewMessage(""); const tempMsg: ChatMessage = { id: Date.now().toString(), text: textToSend, senderId: currentUser.id, createdAt: { seconds: Date.now() / 1000 } }; setMessages(prev => [...prev, tempMsg]); setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 10); if (!match.isBot && match.id) { const mid = [currentUser.id, match.id].sort().join("_"); await addDoc(collection(db, "matches", mid, "messages"), { text: textToSend, senderId: currentUser.id, createdAt: serverTimestamp() }); } };
+  
+  const handleProfileSubmit = async () => {
+    if (!firebaseUser) return; setIsUploading(true);
+    try {
+        let urls = currentUser?.imgs ? [...currentUser.imgs] : [];
+        for(let i=0; i<3; i++) {
+            if(imageFiles[i]) {
+                const r = ref(storage, `cupid_avatars/${firebaseUser.uid}_${Date.now()}_${i}`);
+                await uploadBytes(r, imageFiles[i]!);
+                const u = await getDownloadURL(r);
+                if(i < urls.length) urls[i] = u; else urls.push(u);
+            }
+        }
+        if(urls.length===0) urls.push(`https://api.dicebear.com/7.x/notionists/svg?seed=${formData.name}`);
+        const u: UserProfile = { ...formData, id: firebaseUser.uid, email: firebaseUser.email!, imgs: urls };
+        await setDoc(doc(db, "cupid_users", firebaseUser.uid), u);
+        setCurrentUser(u); setIsUploading(false); setState('HOME');
+    } catch(e) { setIsUploading(false); alert("Save failed. Check console."); }
+  };
+
   const handleLogout = async () => { await signOut(auth); window.location.reload(); };
 
   // --- RENDER FUNCTIONS ---
@@ -299,6 +373,7 @@ export default function CupidPage() {
       <div className="container mx-auto px-6 pt-32 pb-12 relative z-50 flex flex-col items-center justify-center min-h-[80vh]">
         <AnimatePresence mode="wait">
           <motion.div key={state} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.3 }} className="w-full">
+            
             {state === 'WELCOME' && renderWelcome()}
             
             {state === 'LOGIN' && <AuthForm mode="LOGIN" email={email} setEmail={setEmail} password={password} setPassword={setPassword} isLoading={isCheckingAuth} showPassword={showPassword} setShowPassword={setShowPassword} authError={authError} onSubmit={handleLogin} onSwitchMode={() => setState('SIGNUP')} onForgotPassword={() => setShowForgotModal(true)} />}
@@ -308,17 +383,37 @@ export default function CupidPage() {
             {state === 'HOME' && (
                 <HomeView 
                     currentUser={currentUser} 
-                    onStartMatching={() => findMatch(currentUser!)} 
-                    onContinueChat={(mid, uid) => loadExistingMatch(mid, uid)} 
+                    onStartChat={searchForPartner} 
                     onEditProfile={() => { setFormData({ name: currentUser?.name || "", studentId: currentUser?.studentId || "", course: currentUser?.course || "", bio: currentUser?.bio || "", age: currentUser?.age || "", height: currentUser?.height || "", gender: currentUser?.gender || "", preferredGender: currentUser?.preferredGender || "", minAge: currentUser?.minAge || "18", maxAge: currentUser?.maxAge || "25", instagram: currentUser?.instagram || "", facebook: currentUser?.facebook || "", tags: currentUser?.tags || [] }); const currentImgs = currentUser?.imgs || []; setPreviewUrls([...currentImgs, null, null, null].slice(0, 3)); setImageFiles([null, null, null]); setState('SETUP_PROFILE'); }} 
                     onLogout={handleLogout} 
-                    onAcceptRequest={handleAcceptRequest}
-                    onRejectRequest={handleRejectRequest}
                 />
             )}
 
-            {(state === 'SCANNING' || state === 'MATCH_FOUND' || state === 'CONNECTING' || state === 'ITS_A_MATCH') && <MatchingView state={state} match={match} currentUser={currentUser} compatibility={compatibility} hasRerolled={hasRerolled} onReroll={() => findMatch(currentUser!, true, match?.id)} onConnect={handleConnect} />}
-            {state === 'CHAT' && <ChatInterface match={match} currentUser={currentUser} messages={messages} quest={quest} newMessage={newMessage} setNewMessage={setNewMessage} onSendMessage={sendMessage} onBack={() => setState('HOME')} messagesEndRef={messagesEndRef} />}
+            {state === 'SEARCHING' && (
+                <div className="flex flex-col items-center justify-center h-64 text-center">
+                    <div className="w-20 h-20 border-4 border-rose-500 border-t-transparent rounded-full animate-spin mb-6" />
+                    <h3 className="text-2xl font-black text-zinc-900 dark:text-white animate-pulse">LOOKING FOR A MATCH...</h3>
+                    <p className="text-zinc-500 dark:text-zinc-400 mt-2">Please wait while we connect you.</p>
+                    <button onClick={handleStop} className="mt-8 px-6 py-2 rounded-full border border-zinc-300 dark:border-zinc-700 text-zinc-500 hover:text-white hover:bg-zinc-800 transition-colors">Cancel</button>
+                </div>
+            )}
+
+            {state === 'CHAT' && (
+                <ChatInterface 
+                    match={match} 
+                    currentUser={currentUser} 
+                    messages={messages} 
+                    quest={quest} 
+                    newMessage={newMessage} 
+                    setNewMessage={setNewMessage} 
+                    onSendMessage={sendMessage} 
+                    onStop={handleStop} 
+                    onNext={handleNext}
+                    messagesEndRef={messagesEndRef}
+                    isPartnerDisconnected={isPartnerDisconnected}
+                />
+            )}
+
             {state === 'LOADING' && <div className="flex items-center justify-center h-64"><FaSpinner className="text-rose-500 text-4xl animate-spin" /></div>}
           </motion.div>
         </AnimatePresence>

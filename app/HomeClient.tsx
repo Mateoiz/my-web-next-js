@@ -10,7 +10,6 @@ import {
 } from "react-icons/fa";
 
 // --- COMPONENT IMPORTS ---
-import UpcomingEventToast from "./components/UpcomingEventToast";
 import SecretGame from "./components/SecretGame"; 
 import FloatingCubes from "./components/FloatingCubes"; 
 import CircuitCursor from "./components/CircuitCursor"; 
@@ -59,7 +58,6 @@ export function HomeClient({ latestNews }: { latestNews: BlogPost[] }){
 
       {/* ================= HERO SECTION (KEPT) ================= */}
       <section className="min-h-screen flex flex-col justify-center items-center text-center px-4 relative z-10 py-12 md:py-0">
-        <UpcomingEventToast />
 
         <motion.div
           initial={{ opacity: 0, y: -10 }}

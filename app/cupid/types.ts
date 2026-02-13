@@ -1,11 +1,3 @@
-// Add this new interface
-export interface MatchRequest {
-  id: string;
-  name: string;
-  img: string;
-  course: string;
-}
-
 export interface UserProfile {
   id?: string;
   email?: string;
@@ -25,14 +17,10 @@ export interface UserProfile {
   tags: string[];
   imgs: string[];
   
-  // --- MATCHING FIELDS ---
-  currentMatchId?: string;
-  hasRerolled?: boolean;
-  isBot?: boolean;
+  // --- OMEGLE MODE FIELDS ---
+  currentMatchId?: string; // If set, they are chatting
+  isSearching?: boolean;   // If true, they are in the queue
   lastSeen?: any;
-  
-  // --- NEW: INCOMING REQUESTS ---
-  incomingRequests?: MatchRequest[]; // Array of people who want to match
 }
 
 export interface ChatMessage {
@@ -40,6 +28,7 @@ export interface ChatMessage {
   text: string;
   senderId: string;
   createdAt: any;
+  isSystem?: boolean; // For "Partner disconnected" messages
 }
 
-export type AppState = 'WELCOME' | 'LOGIN' | 'SIGNUP' | 'SETUP_PROFILE' | 'HOME' | 'SCANNING' | 'MATCH_FOUND' | 'CONNECTING' | 'ITS_A_MATCH' | 'CHAT' | 'LOADING';
+export type AppState = 'WELCOME' | 'LOGIN' | 'SIGNUP' | 'SETUP_PROFILE' | 'HOME' | 'SEARCHING' | 'CHAT' | 'LOADING';
