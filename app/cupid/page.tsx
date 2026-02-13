@@ -6,10 +6,9 @@ import { collection, query, orderBy, onSnapshot, serverTimestamp, setDoc, doc, g
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, User, sendPasswordResetEmail } from "firebase/auth";
 import { db, auth, storage } from "@/lib/db";
-import { useTheme } from "next-themes"; 
+// REMOVED: import ThemeToggle (User requested removal)
 
 // --- CUSTOM IMPORTS ---
-// FIXED: Removed MatchRequest
 import { AppState, UserProfile, ChatMessage } from "./types";
 import { QUESTS, PRIMARY_BTN_STYLE, BTN_SECONDARY_STYLE } from "./constants";
 import { ValentineBackground } from "./components/ValentineBackground";
@@ -18,7 +17,6 @@ import { ProfileForm } from "./components/ProfileForm";
 import { ChatInterface } from "./components/ChatInterface";
 import { HomeView } from "./components/HomeView"; 
 import CircuitCursor from "../components/CircuitCursor";
-import ThemeToggle from "../components/ThemeToggle"; 
 
 // BUTTON STYLES (Standard Theme)
 const BTN_BASE = "w-full md:w-48 py-4 font-black rounded-xl transition-all flex items-center justify-center gap-2 text-sm md:text-base";
@@ -26,7 +24,6 @@ const BTN_PRIMARY = `${BTN_BASE} bg-rose-600 hover:bg-rose-500 text-white shadow
 const BTN_SECONDARY = `${BTN_BASE} bg-white hover:bg-zinc-100 border border-zinc-200 text-zinc-900 dark:bg-zinc-900 dark:hover:bg-zinc-800 dark:border-zinc-700 dark:text-white backdrop-blur-md`;
 
 export default function CupidPage() {
-  const { setTheme } = useTheme(); 
   const [state, setState] = useState<AppState>('LOADING');
   const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
 
@@ -67,7 +64,7 @@ export default function CupidPage() {
 
   const initialLoadComplete = useRef(false);
 
-  // --- UI HIDING & SCROLL LOCK ---
+  // --- UI HIDING LOGIC (MODALS) ---
   useEffect(() => {
     const globalElements = document.querySelectorAll('.global-ui');
     if (showTermsModal || showForgotModal) {
@@ -77,8 +74,15 @@ export default function CupidPage() {
         globalElements.forEach(el => el.classList.remove('opacity-0', 'pointer-events-none'));
         document.body.style.overflow = 'unset';
     }
-    return () => { document.body.style.overflow = 'unset'; };
   }, [showTermsModal, showForgotModal]);
+
+  // --- GLOBAL UI REMOVAL ---
+  // This adds the 'chat-mode' class to body immediately on mount.
+  // In your globals.css, this class hides nav, footer, and .ThemeToggle.
+  useEffect(() => {
+    document.body.classList.add('chat-mode');
+    return () => document.body.classList.remove('chat-mode');
+  }, []);
 
   // --- AUTH LISTENER ---
   useEffect(() => {
@@ -220,29 +224,19 @@ export default function CupidPage() {
   };
 
 const handleStop = async () => {
-      // 1. Immediate UI Update (Feel instant)
       setState('HOME');
       setMatch(null);
-      setMessages([]); // Clear chat
+      setMessages([]);
 
       if (!currentUser?.id) return;
 
-      // 2. Background Database Cleanup
       try {
           const promises = [];
-
-          // If we were matched, free the partner (best effort)
           if (match?.id) {
               promises.push(updateDoc(doc(db, "cupid_users", match.id), { currentMatchId: null }).catch(() => {}));
           }
-
-          // Reset my own status
           promises.push(updateDoc(doc(db, "cupid_users", currentUser.id), { currentMatchId: null, isSearching: false }));
-
-          // Remove myself from the waiting queue
           promises.push(deleteDoc(doc(db, "waiting_queue", currentUser.id)).catch(() => {}));
-
-          // Run all cleanup in parallel
           await Promise.all(promises);
       } catch (e) {
           console.warn("Cleanup warning (non-fatal):", e);
@@ -367,8 +361,11 @@ const handleStop = async () => {
     <section className="min-h-screen relative overflow-hidden font-sans bg-zinc-50 dark:bg-black selection:bg-rose-500 selection:text-white transition-colors duration-300">
       <CircuitCursor />
       <ValentineBackground />
-      <ThemeToggle /> 
       
+      {/* NOTE: No <ThemeToggle /> here.
+         The global one is hidden by the 'chat-mode' class added in useEffect above.
+      */}
+
       <div className="absolute top-0 left-0 w-full h-[800px] bg-gradient-to-b from-rose-200/40 dark:from-rose-900/20 via-white/0 dark:via-black/0 to-transparent pointer-events-none z-0" />
       <div className="container mx-auto px-6 pt-32 pb-12 relative z-50 flex flex-col items-center justify-center min-h-[80vh]">
         <AnimatePresence mode="wait">

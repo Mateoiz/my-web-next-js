@@ -36,14 +36,18 @@ html {
   100% { top: 110%; }
 }
 
-/* --- SPLASH SCREEN LOGIC --- */
-/* This hides specific elements when the "splash-active" class 
-   is added to the <body> tag by page.tsx 
-*/
-body.splash-active nav,                 /* Hides the Navbar */
-body.splash-active .ThemeToggle,        /* Hides the Theme Toggle */
-body.splash-active .MusicPlayer,        /* Hides the Music Player */
-body.splash-active [data-hide-on-splash="true"] /* Hides anything else marked */
+/* --- SPLASH SCREEN & CHAT MODE LOGIC --- */
+
+/* Hides elements when splash is active OR when in chat mode */
+body.splash-active nav,
+body.splash-active .ThemeToggle,
+body.splash-active .MusicPlayer,
+body.splash-active [data-hide-on-splash="true"],
+
+/* NEW: Hide global UI when in Chat Mode to prevent blocking inputs */
+body.chat-mode nav,
+body.chat-mode .ThemeToggle,
+body.chat-mode footer
 {
   display: none !important;
 }
