@@ -165,12 +165,6 @@ export const CONTENT_TEAM = [
     name: "Shelley Kellzie Chua",
     role: "Captions / Content",
     icon: <FaPen />,
-    image: "/creatives/CAP3.jpg"
+    image: "/creatives/CAP3.JPG"
   },
-  {
-    name: "Antonette Marce",
-    role: "Captions / Writer",
-    icon: <FaPen />,
-    image: "/creatives/CAP4.jpg"
-  }
 ];
