@@ -13,9 +13,6 @@ export default function CircuitCursor() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const history = useRef<Point[]>([]);
   const mouse = useRef({ x: 0, y: 0 });
-  
-  // New: Add a "pulse" state for the heartbeat effect
-  const pulseRef = useRef(0); 
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -24,12 +21,12 @@ export default function CircuitCursor() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // --- VALENTINE CONFIGURATION ---
+    // --- CIRCUIT CONFIGURATION ---
     const config = {
-      trailLength: 20,       // Slightly shorter for a cleaner heart look
-      lineWidth: 2,          // Thicker lines for boldness
-      color: '#e11d48',      // Rose-600 (The Love Color)
-      glowBlur: 15,          // Soft romantic glow
+      trailLength: 30,       // Longer trail for circuit trace
+      lineWidth: 2,          // Trace thickness
+      color: '#10b981',      // Cyberpunk / Emerald Green
+      glowBlur: 10,          // Neon glow
       fadeSpeed: 0.10,       
     };
 
@@ -45,44 +42,6 @@ export default function CircuitCursor() {
     };
     window.addEventListener('mousemove', handleMouseMove);
 
-    // Helper: Draw a Heart Shape
-    const drawHeart = (ctx: CanvasRenderingContext2D, x: number, y: number, size: number) => {
-      ctx.save();
-      ctx.beginPath();
-      const topCurveHeight = size * 0.3;
-      ctx.moveTo(x, y + topCurveHeight);
-      // Top left curve
-      ctx.bezierCurveTo(
-        x, y, 
-        x - size / 2, y, 
-        x - size / 2, y + topCurveHeight
-      );
-      // Bottom left curve
-      ctx.bezierCurveTo(
-        x - size / 2, y + (size + topCurveHeight) / 2, 
-        x, y + (size + topCurveHeight) / 2, 
-        x, y + size
-      );
-      // Bottom right curve
-      ctx.bezierCurveTo(
-        x, y + (size + topCurveHeight) / 2, 
-        x + size / 2, y + (size + topCurveHeight) / 2, 
-        x + size / 2, y + topCurveHeight
-      );
-      // Top right curve
-      ctx.bezierCurveTo(
-        x + size / 2, y, 
-        x, y, 
-        x, y + topCurveHeight
-      );
-      ctx.closePath();
-      ctx.fillStyle = config.color;
-      ctx.shadowColor = config.color;
-      ctx.shadowBlur = 20;
-      ctx.fill();
-      ctx.restore();
-    };
-
     // --- Animation Loop ---
     let animationFrameId: number;
 
@@ -97,15 +56,12 @@ export default function CircuitCursor() {
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Pulse Logic (Heartbeat)
-      pulseRef.current += 0.1;
-      const pulse = Math.sin(pulseRef.current) * 0.5 + 1.5; // Oscillates between 1 and 2
-
-      // Draw the Trail (The "Digital String of Fate")
+      // Draw the Circuit Trail
       if (history.current.length > 1) {
         ctx.beginPath();
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
+        // Sharp, robotic corners for a circuit feel
+        ctx.lineCap = 'square';
+        ctx.lineJoin = 'miter';
         ctx.lineWidth = config.lineWidth;
         ctx.strokeStyle = config.color;
         ctx.shadowColor = config.color;
@@ -118,19 +74,26 @@ export default function CircuitCursor() {
           const current = history.current[i];
           const next = history.current[i + 1];
           
-          // Draw smoother curves instead of sharp circuit angles for "fluid love"
-          // Or keep orthogonal for "Digital Love" (I kept orthogonal but softened corners)
+          // Orthogonal circuit lines (90-degree angles)
           ctx.lineTo(next.x, current.y); // Horizontal
           ctx.lineTo(next.x, next.y);    // Vertical
         }
         ctx.stroke();
       }
 
-      // Draw the Heart Cursor Tip
+      // Draw the Circuit Node (Cursor Tip)
       if (history.current.length > 0) {
         const lastPoint = history.current[history.current.length - 1];
-        // The heart beats with the pulse variable
-        drawHeart(ctx, lastPoint.x, lastPoint.y - 10, 12 * pulse);
+        
+        ctx.beginPath();
+        // Draw a small square to act as a data node/solder pad
+        const nodeSize = 6;
+        ctx.rect(lastPoint.x - nodeSize / 2, lastPoint.y - nodeSize / 2, nodeSize, nodeSize);
+        ctx.fillStyle = config.color;
+        ctx.shadowColor = config.color;
+        ctx.shadowBlur = 15;
+        ctx.fill();
+        ctx.closePath();
       }
 
       animationFrameId = requestAnimationFrame(animate);
@@ -148,7 +111,7 @@ export default function CircuitCursor() {
   return (
     <canvas
       ref={canvasRef}
-      className="fixed inset-0 pointer-events-none z-50" // Increased Z-index to ensure it floats on top
+      className="fixed inset-0 pointer-events-none z-50"
     />
   );
 }
