@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence, type Variants } from "framer-motion";
-import { FaBars, FaTimes, FaFacebookF, FaInstagram, FaHeart } from "react-icons/fa"; 
+import { FaBars, FaTimes, FaFacebookF, FaInstagram } from "react-icons/fa"; 
 
 // --- ANIMATION VARIANTS ---
 const menuVariants: Variants = {
@@ -60,8 +60,6 @@ export default function Navbar() {
   const isActive = (path: string) => pathname === path;
 
   // --- STYLES FOR LINKS (FIXED THEME) ---
-  // Light Mode: Zinc-600 (Dark Gray) -> Hover Black
-  // Dark Mode: Zinc-300 (Light Gray) -> Hover White
   const getNavLinkClass = (path: string) => `
     relative pb-1 transition-colors duration-300 font-medium tracking-wide
     ${isActive(path) 
@@ -111,20 +109,20 @@ export default function Navbar() {
             <Link href="/Events" className={getNavLinkClass('/Events')}>Events</Link>
             <Link href="/Tools" className={getNavLinkClass('/Tools')}>Tools</Link>
             
-            {/* Cupid Link */}
+            {/* Flashing Registration Link */}
             <Link 
-              href="/cupid" 
+              href="/castweek" 
               className={`
                 relative flex items-center gap-2 font-black transition-all duration-300 hover:-translate-y-0.5
-                ${isActive('/cupid') ? 'opacity-100' : 'opacity-80 hover:opacity-100'}
+                text-green-600 dark:text-green-400 drop-shadow-sm
               `}
             >
-              <span className="relative flex h-3 w-3">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-                <FaHeart className="relative inline-flex text-rose-500" />
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
               </span>
-              <span className="bg-gradient-to-r from-rose-500 to-pink-600 bg-clip-text text-transparent uppercase tracking-wider text-sm drop-shadow-sm">
-                Cupid
+              <span className="uppercase tracking-wider text-sm animate-pulse">
+                Registration
               </span>
             </Link>
 
@@ -192,7 +190,7 @@ export default function Navbar() {
                     { name: "Blogs", path: "/Blogs" },
                     { name: "Events", path: "/Events" },
                     { name: "Tools", path: "/Tools" },
-                    { name: "Cupid", path: "/cupid", isCupid: true }, 
+                    { name: "Registration", path: "/castweek", isRegistration: true }, 
                   ].map((link, i) => (
                     <motion.div key={i} variants={linkVariants}>
                       <Link 
@@ -208,10 +206,13 @@ export default function Navbar() {
                           0{i + 1}
                         </span>
                         
-                        {link.isCupid ? (
-                          <span className="bg-gradient-to-r from-rose-500 to-pink-500 bg-clip-text text-transparent flex items-center gap-3">
+                        {link.isRegistration ? (
+                          <span className="flex items-center gap-3 text-green-600 dark:text-green-400 animate-pulse">
                             {link.name}
-                            <FaHeart className="text-rose-500 text-sm animate-pulse" />
+                            <span className="relative flex h-3 w-3">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                            </span>
                           </span>
                         ) : (
                           <span>{link.name}</span>
