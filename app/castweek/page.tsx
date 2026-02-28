@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   FaLightbulb, FaUsers, FaCheckCircle, FaSpinner, 
   FaIdCard, FaEnvelope, FaUserGraduate, FaChevronRight,
-  FaCameraRetro, FaTicketAlt
+  FaCameraRetro, FaTicketAlt, FaCalendarAlt, FaClock, FaMicrophone, FaMapMarkerAlt
 } from "react-icons/fa";
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/db"; 
@@ -23,6 +23,10 @@ const SEMINARS = [
     title: "Innovation Rooted in Legacy: Designing the Future with the Wisdom of the Past",
     color: "from-green-500 to-emerald-600",
     textColor: "text-emerald-500",
+    date: "March 6, 2026",
+    time: "9:00 AM - 12:00 PM",
+    speaker: "Ms. Marjorie Poticano",
+    venue: "Rizal Hall",
     focusAreas: [
       "The role of Arts, Sciences, and Technology in shaping the future",
       "Bridging academic knowledge to real-world application",
@@ -39,6 +43,10 @@ const SEMINARS = [
     title: "Transformative Leadership: Weaving Vision, Integrity, and Action",
     color: "from-blue-500 to-indigo-600",
     textColor: "text-blue-500",
+    date: "March 9, 2026",
+    time: "1:00 PM - 5:00 PM",
+    speaker: "Ms. Chelsea Catli",
+    venue: "Osmeña Hall",
     focusAreas: [
       "Leadership styles and self-awareness",
       "Ethical and servant leadership",
@@ -135,7 +143,7 @@ export default function CastWeekRegistration() {
       });
 
       // 5. Save to Google Sheets via Webhook
-      const GOOGLE_SHEETS_URL = "https://script.google.com/macros/s/AKfycby8DGS5iHfP20pATsaTzurrROCYd0rsTRJU1Fd6rseDwV-y9Y5hXq_a0ftJg4HfFMA/exec"; 
+      const GOOGLE_SHEETS_URL = "https://script.google.com/macros/s/AKfycbxndO0aZunt-k_7uLZ06IWsq5mmcRq3DmtfyLSlv6cqN9WvGumps31OHxn3BzGbhcb4/exec"; 
       
       await fetch(GOOGLE_SHEETS_URL, {
         method: "POST",
@@ -159,6 +167,9 @@ export default function CastWeekRegistration() {
         studentId: rawId,
         blockSection: formData.blockSection,
         seminarName: SEMINARS[activeTab].shortName,
+        date: SEMINARS[activeTab].date,
+        time: SEMINARS[activeTab].time,
+        venue: SEMINARS[activeTab].venue,
         referenceId: generatedTicketRef, 
       });
 
@@ -236,9 +247,33 @@ export default function CastWeekRegistration() {
                 {activeSeminar.type}
               </span>
               
-              <h2 className="text-2xl md:text-3xl font-black text-zinc-900 dark:text-white leading-tight mb-8">
+              <h2 className="text-2xl md:text-3xl font-black text-zinc-900 dark:text-white leading-tight mb-6">
                 {activeSeminar.title}
               </h2>
+
+              {/* NEW: SCHEDULE, SPEAKER, & VENUE INDICATORS */}
+              <div className="flex flex-col gap-3 mb-8">
+                <div className="flex flex-wrap items-center gap-5">
+                  <div className="flex items-center gap-2 text-sm font-bold text-zinc-600 dark:text-zinc-400">
+                    <FaCalendarAlt className={activeSeminar.textColor} size={16} />
+                    <span>{activeSeminar.date}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm font-bold text-zinc-600 dark:text-zinc-400">
+                    <FaClock className={activeSeminar.textColor} size={16} />
+                    <span>{activeSeminar.time}</span>
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-5">
+                  <div className="flex items-center gap-2 text-sm font-bold text-zinc-600 dark:text-zinc-400">
+                    <FaMicrophone className={activeSeminar.textColor} size={16} />
+                    <span>{activeSeminar.speaker}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm font-bold text-zinc-600 dark:text-zinc-400">
+                    <FaMapMarkerAlt className={activeSeminar.textColor} size={16} />
+                    <span>{activeSeminar.venue}</span>
+                  </div>
+                </div>
+              </div>
 
               <div>
                 <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-4 border-b border-zinc-200 dark:border-zinc-800 pb-2">
@@ -312,6 +347,22 @@ export default function CastWeekRegistration() {
                           <div>
                             <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-bold">Section</p>
                             <p className="text-base font-bold text-zinc-800 dark:text-zinc-200">{ticketDetails.blockSection}</p>
+                          </div>
+                          
+                          {/* Ticket Schedule Info */}
+                          <div>
+                            <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-bold">Date</p>
+                            <p className="text-sm font-bold text-zinc-800 dark:text-zinc-200">{ticketDetails.date}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-bold">Time</p>
+                            <p className="text-sm font-bold text-zinc-800 dark:text-zinc-200">{ticketDetails.time}</p>
+                          </div>
+                          
+                          {/* Venue info spanning the full width */}
+                          <div className="col-span-2">
+                            <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-bold">Venue</p>
+                            <p className="text-sm font-bold text-zinc-800 dark:text-zinc-200">{ticketDetails.venue}</p>
                           </div>
                         </div>
 
