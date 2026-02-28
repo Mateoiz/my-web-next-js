@@ -122,11 +122,28 @@ export default function CastWeekRegistration() {
       // 2. Check if they are already registered for THIS seminar
       const docSnap = await getDoc(registrationRef);
       if (docSnap.exists()) {
-        setError(`Student ID ${rawId} is already registered for this specific seminar.`);
+        // IF ALREADY REGISTERED: Retrieve existing data and show ticket
+        const existingData = docSnap.data();
+        
+        setTicketDetails({
+          fullName: existingData.fullName,
+          studentId: existingData.studentId,
+          blockSection: existingData.blockSection,
+          seminarName: SEMINARS[activeTab].shortName,
+          date: SEMINARS[activeTab].date,
+          time: SEMINARS[activeTab].time,
+          venue: SEMINARS[activeTab].venue,
+          referenceId: existingData.ticketRef, 
+          isExisting: true // Flag to change the UI message
+        });
+
+        setIsSuccess(true);
         setIsSubmitting(false);
-        return;
+        setFormData({ lastName: "", firstName: "", middleInitial: "", studentId: "", email: "", blockSection: "" });
+        return; // Stop execution here so we don't save duplicates
       }
 
+      // IF NOT REGISTERED: Proceed with new registration
       // 3. Generate a clean random 8-character Ticket Reference & Format Name
       const generatedTicketRef = Math.random().toString(36).substring(2, 10).toUpperCase();
       const formattedFullName = `${formData.lastName}, ${formData.firstName} ${formData.middleInitial}`.trim();
@@ -171,6 +188,7 @@ export default function CastWeekRegistration() {
         time: SEMINARS[activeTab].time,
         venue: SEMINARS[activeTab].venue,
         referenceId: generatedTicketRef, 
+        isExisting: false // Set to false for a new registration
       });
 
       setIsSuccess(true);
@@ -251,7 +269,7 @@ export default function CastWeekRegistration() {
                 {activeSeminar.title}
               </h2>
 
-              {/* NEW: SCHEDULE, SPEAKER, & VENUE INDICATORS */}
+              {/* SCHEDULE, SPEAKER, & VENUE INDICATORS */}
               <div className="flex flex-col gap-3 mb-8">
                 <div className="flex flex-wrap items-center gap-5">
                   <div className="flex items-center gap-2 text-sm font-bold text-zinc-600 dark:text-zinc-400">
@@ -319,6 +337,17 @@ export default function CastWeekRegistration() {
                       <FaCameraRetro size={24} />
                       <span className="font-black uppercase tracking-widest text-sm">Take a Screenshot!</span>
                     </div>
+
+                    {/* DYNAMIC HEADER MESSAGE */}
+                    <h3 className="text-2xl font-black text-zinc-900 dark:text-white mb-2 text-center">
+                      {ticketDetails.isExisting ? "Ticket Retrieved!" : "Registration Complete!"}
+                    </h3>
+                    <p className="text-zinc-500 dark:text-zinc-400 mb-8 px-4 text-center">
+                      {ticketDetails.isExisting 
+                        ? `You are already registered for ${activeSeminar.shortName}. Here is your event pass.`
+                        : `Your slot for ${activeSeminar.shortName} has been secured. We will send updates to your email.`
+                      }
+                    </p>
 
                     {/* TICKET CARD */}
                     <div className="w-full max-w-sm bg-zinc-50 dark:bg-zinc-950 border-2 border-zinc-200 dark:border-zinc-800 rounded-3xl overflow-hidden shadow-2xl relative">
