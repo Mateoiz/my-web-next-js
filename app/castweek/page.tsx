@@ -64,8 +64,8 @@ const BLOCK_SECTIONS = [
 ];
 
 // --- STYLES ---
-const INPUT_STYLE = "w-full bg-zinc-100 dark:bg-zinc-800/50 border border-zinc-300 dark:border-zinc-700/50 rounded-xl p-4 text-zinc-900 dark:text-white placeholder:text-zinc-500 focus:border-green-500/50 focus:ring-1 focus:ring-green-500/20 outline-none transition-all text-sm font-bold backdrop-blur-sm";
-const LABEL_STYLE = "text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase mb-2 block tracking-wider";
+const INPUT_STYLE = "w-full bg-zinc-100 dark:bg-zinc-800/50 border border-zinc-300 dark:border-zinc-700/50 rounded-xl p-3 md:p-4 text-zinc-900 dark:text-white placeholder:text-zinc-500 focus:border-green-500/50 focus:ring-1 focus:ring-green-500/20 outline-none transition-all text-sm font-bold backdrop-blur-sm";
+const LABEL_STYLE = "text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase mb-1.5 md:mb-2 block tracking-wider";
 
 export default function CastWeekRegistration() {
   const [activeTab, setActiveTab] = useState(0);
@@ -115,16 +115,12 @@ export default function CastWeekRegistration() {
     try {
       const seminarId = SEMINARS[activeTab].id;
       
-      // 1. Create a composite Document ID: [Student ID]_[Seminar ID]
       const registrationDocId = `${rawId}_${seminarId}`;
       const registrationRef = doc(db, "castweek_registrations", registrationDocId);
 
-      // 2. Check if they are already registered for THIS seminar
       const docSnap = await getDoc(registrationRef);
       if (docSnap.exists()) {
-        // IF ALREADY REGISTERED: Retrieve existing data and show ticket
         const existingData = docSnap.data();
-        
         setTicketDetails({
           fullName: existingData.fullName,
           studentId: existingData.studentId,
@@ -134,21 +130,18 @@ export default function CastWeekRegistration() {
           time: SEMINARS[activeTab].time,
           venue: SEMINARS[activeTab].venue,
           referenceId: existingData.ticketRef, 
-          isExisting: true // Flag to change the UI message
+          isExisting: true 
         });
 
         setIsSuccess(true);
         setIsSubmitting(false);
         setFormData({ lastName: "", firstName: "", middleInitial: "", studentId: "", email: "", blockSection: "" });
-        return; // Stop execution here so we don't save duplicates
+        return; 
       }
 
-      // IF NOT REGISTERED: Proceed with new registration
-      // 3. Generate a clean random 8-character Ticket Reference & Format Name
       const generatedTicketRef = Math.random().toString(36).substring(2, 10).toUpperCase();
       const formattedFullName = `${formData.lastName}, ${formData.firstName} ${formData.middleInitial}`.trim();
 
-      // 4. Save to Firebase Database
       await setDoc(registrationRef, {
         ...formData,
         fullName: formattedFullName,
@@ -159,7 +152,6 @@ export default function CastWeekRegistration() {
         registeredAt: serverTimestamp(),
       });
 
-      // 5. Save to Google Sheets via Webhook
       const GOOGLE_SHEETS_URL = "https://script.google.com/macros/s/AKfycbxndO0aZunt-k_7uLZ06IWsq5mmcRq3DmtfyLSlv6cqN9WvGumps31OHxn3BzGbhcb4/exec"; 
       
       await fetch(GOOGLE_SHEETS_URL, {
@@ -178,7 +170,6 @@ export default function CastWeekRegistration() {
         }),
       });
 
-      // 6. Setup Success UI Data
       setTicketDetails({
         fullName: formattedFullName,
         studentId: rawId,
@@ -188,7 +179,7 @@ export default function CastWeekRegistration() {
         time: SEMINARS[activeTab].time,
         venue: SEMINARS[activeTab].venue,
         referenceId: generatedTicketRef, 
-        isExisting: false // Set to false for a new registration
+        isExisting: false
       });
 
       setIsSuccess(true);
@@ -205,7 +196,7 @@ export default function CastWeekRegistration() {
   const Icon = activeSeminar.icon;
 
   return (
-    <section className="min-h-screen relative transition-colors duration-300 bg-white dark:bg-black font-sans pt-24 pb-20 overflow-hidden">
+    <section className="min-h-screen relative transition-colors duration-300 bg-white dark:bg-black font-sans pt-20 pb-16 md:pt-24 md:pb-20 overflow-hidden">
       <CircuitCursor />
       <div className="absolute inset-0 z-0 opacity-40 pointer-events-none">
          <FloatingCubes />
@@ -214,25 +205,25 @@ export default function CastWeekRegistration() {
       <div className="container mx-auto px-4 relative z-10 max-w-6xl">
         
         {/* PAGE HEADER */}
-        <div className="text-center mb-12">
-          <span className="inline-block py-1 px-3 rounded-full bg-green-100 dark:bg-green-500/10 text-green-700 dark:text-green-400 text-xs font-mono font-bold tracking-widest mb-4 border border-green-500/20">
+        <div className="text-center mb-8 md:mb-12">
+          <span className="inline-block py-1 px-3 rounded-full bg-green-100 dark:bg-green-500/10 text-green-700 dark:text-green-400 text-[10px] md:text-xs font-mono font-bold tracking-widest mb-3 md:mb-4 border border-green-500/20">
             CAST WEEK 2026
           </span>
-          <h1 className="text-4xl md:text-6xl font-black text-zinc-900 dark:text-white uppercase tracking-tighter mb-4">
+          <h1 className="text-3xl sm:text-4xl md:text-6xl font-black text-zinc-900 dark:text-white uppercase tracking-tighter mb-3 md:mb-4">
             Official <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-500 to-emerald-600">Registration</span>
           </h1>
-          <p className="text-zinc-600 dark:text-zinc-400 max-w-2xl mx-auto">
-            Secure your slot for our upcoming seminars. Please select the event you wish to attend and fill out the form below.
+          <p className="text-sm md:text-base text-zinc-600 dark:text-zinc-400 max-w-2xl mx-auto px-2">
+            Secure your slot for our upcoming seminars. Please select the event you wish to attend and fill out the form.
           </p>
         </div>
 
-        {/* TABS */}
-        <div className="flex flex-col sm:flex-row justify-center gap-4 mb-8 md:mb-12">
+        {/* TABS - Optimized for mobile: 2 columns grid instead of stacking blocks */}
+        <div className="grid grid-cols-2 md:flex md:flex-row justify-center gap-2 md:gap-4 mb-6 md:mb-12 max-w-2xl mx-auto">
           {SEMINARS.map((seminar, idx) => (
             <button
               key={seminar.id}
               onClick={() => { setActiveTab(idx); setIsSuccess(false); setError(""); }}
-              className={`relative px-8 py-4 rounded-2xl font-bold text-sm md:text-base uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-3 overflow-hidden ${
+              className={`relative px-2 py-3 md:px-8 md:py-4 rounded-xl md:rounded-2xl font-bold text-[10px] sm:text-xs md:text-base uppercase tracking-wider transition-all duration-300 flex flex-col md:flex-row items-center justify-center gap-1.5 md:gap-3 overflow-hidden text-center ${
                 activeTab === idx 
                   ? "text-white shadow-xl scale-105" 
                   : "bg-zinc-100 dark:bg-zinc-900 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800"
@@ -241,14 +232,14 @@ export default function CastWeekRegistration() {
               {activeTab === idx && (
                 <div className={`absolute inset-0 bg-gradient-to-r ${seminar.color} z-0`} />
               )}
-              <seminar.icon className={`relative z-10 ${activeTab === idx ? "animate-pulse" : ""}`} size={18} />
-              <span className="relative z-10">{seminar.shortName}</span>
+              <seminar.icon className={`relative z-10 shrink-0 ${activeTab === idx ? "animate-pulse" : ""}`} size={16} />
+              <span className="relative z-10 leading-tight">{seminar.shortName}</span>
             </button>
           ))}
         </div>
 
         {/* MAIN CONTENT SPLIT */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-12">
           
           {/* LEFT: SEMINAR DETAILS */}
           <motion.div 
@@ -258,55 +249,55 @@ export default function CastWeekRegistration() {
             transition={{ duration: 0.4 }}
             className="lg:col-span-5 flex flex-col justify-center"
           >
-            <div className="bg-zinc-50 dark:bg-zinc-900/50 rounded-3xl p-6 md:p-8 border border-zinc-200 dark:border-zinc-800 relative overflow-hidden h-full flex flex-col justify-center">
-              <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl ${activeSeminar.color} opacity-10 rounded-bl-full`} />
+            <div className="bg-zinc-50 dark:bg-zinc-900/50 rounded-2xl md:rounded-3xl p-5 md:p-8 border border-zinc-200 dark:border-zinc-800 relative overflow-hidden h-full flex flex-col justify-center">
+              <div className={`absolute top-0 right-0 w-24 md:w-32 h-24 md:h-32 bg-gradient-to-bl ${activeSeminar.color} opacity-10 rounded-bl-full`} />
               
-              <span className={`text-[10px] font-black tracking-widest uppercase mb-3 block ${activeSeminar.textColor}`}>
+              <span className={`text-[9px] md:text-[10px] font-black tracking-widest uppercase mb-2 md:mb-3 block ${activeSeminar.textColor}`}>
                 {activeSeminar.type}
               </span>
               
-              <h2 className="text-2xl md:text-3xl font-black text-zinc-900 dark:text-white leading-tight mb-6">
+              <h2 className="text-xl sm:text-2xl md:text-3xl font-black text-zinc-900 dark:text-white leading-tight mb-4 md:mb-6">
                 {activeSeminar.title}
               </h2>
 
               {/* SCHEDULE, SPEAKER, & VENUE INDICATORS */}
-              <div className="flex flex-col gap-3 mb-8">
-                <div className="flex flex-wrap items-center gap-5">
-                  <div className="flex items-center gap-2 text-sm font-bold text-zinc-600 dark:text-zinc-400">
-                    <FaCalendarAlt className={activeSeminar.textColor} size={16} />
+              <div className="flex flex-col gap-2 md:gap-3 mb-6 md:mb-8">
+                <div className="flex flex-wrap items-center gap-3 sm:gap-5">
+                  <div className="flex items-center gap-2 text-xs md:text-sm font-bold text-zinc-600 dark:text-zinc-400">
+                    <FaCalendarAlt className={activeSeminar.textColor} size={14} />
                     <span>{activeSeminar.date}</span>
                   </div>
-                  <div className="flex items-center gap-2 text-sm font-bold text-zinc-600 dark:text-zinc-400">
-                    <FaClock className={activeSeminar.textColor} size={16} />
+                  <div className="flex items-center gap-2 text-xs md:text-sm font-bold text-zinc-600 dark:text-zinc-400">
+                    <FaClock className={activeSeminar.textColor} size={14} />
                     <span>{activeSeminar.time}</span>
                   </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-5">
-                  <div className="flex items-center gap-2 text-sm font-bold text-zinc-600 dark:text-zinc-400">
-                    <FaMicrophone className={activeSeminar.textColor} size={16} />
+                <div className="flex flex-wrap items-center gap-3 sm:gap-5">
+                  <div className="flex items-center gap-2 text-xs md:text-sm font-bold text-zinc-600 dark:text-zinc-400">
+                    <FaMicrophone className={activeSeminar.textColor} size={14} />
                     <span>{activeSeminar.speaker}</span>
                   </div>
-                  <div className="flex items-center gap-2 text-sm font-bold text-zinc-600 dark:text-zinc-400">
-                    <FaMapMarkerAlt className={activeSeminar.textColor} size={16} />
+                  <div className="flex items-center gap-2 text-xs md:text-sm font-bold text-zinc-600 dark:text-zinc-400">
+                    <FaMapMarkerAlt className={activeSeminar.textColor} size={14} />
                     <span>{activeSeminar.venue}</span>
                   </div>
                 </div>
               </div>
 
               <div>
-                <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-4 border-b border-zinc-200 dark:border-zinc-800 pb-2">
+                <h3 className="text-[10px] md:text-xs font-bold text-zinc-500 uppercase tracking-widest mb-3 md:mb-4 border-b border-zinc-200 dark:border-zinc-800 pb-2">
                   Focus Areas
                 </h3>
-                <ul className="space-y-3 md:space-y-4">
+                <ul className="space-y-2 md:space-y-3">
                   {activeSeminar.focusAreas.map((area, i) => (
                     <motion.li 
                       key={i}
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: i * 0.1 }}
-                      className="flex items-start gap-3 text-zinc-700 dark:text-zinc-300 text-sm font-medium leading-relaxed"
+                      className="flex items-start gap-2 md:gap-3 text-zinc-700 dark:text-zinc-300 text-xs md:text-sm font-medium leading-relaxed"
                     >
-                      <FaChevronRight className={`mt-1 shrink-0 ${activeSeminar.textColor}`} size={12} />
+                      <FaChevronRight className={`mt-1 shrink-0 ${activeSeminar.textColor}`} size={10} />
                       {area}
                     </motion.li>
                   ))}
@@ -323,7 +314,7 @@ export default function CastWeekRegistration() {
             transition={{ duration: 0.4 }}
             className="lg:col-span-7"
           >
-            <div className="bg-white dark:bg-zinc-900/80 rounded-3xl p-6 md:p-10 border border-zinc-200 dark:border-zinc-800 shadow-2xl backdrop-blur-xl h-full">
+            <div className="bg-white dark:bg-zinc-900/80 rounded-2xl md:rounded-3xl p-5 md:p-10 border border-zinc-200 dark:border-zinc-800 shadow-2xl backdrop-blur-xl h-full">
               
               <AnimatePresence mode="wait">
                 {isSuccess && ticketDetails ? (
@@ -331,18 +322,17 @@ export default function CastWeekRegistration() {
                   <motion.div 
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    className="flex flex-col items-center justify-center h-full min-h-[450px]"
+                    className="flex flex-col items-center justify-center h-full min-h-[400px] py-4"
                   >
-                    <div className="flex items-center gap-2 text-green-600 dark:text-green-500 mb-4 animate-bounce">
-                      <FaCameraRetro size={24} />
-                      <span className="font-black uppercase tracking-widest text-sm">Take a Screenshot!</span>
+                    <div className="flex items-center gap-2 text-green-600 dark:text-green-500 mb-3 animate-bounce">
+                      <FaCameraRetro size={20} />
+                      <span className="font-black uppercase tracking-widest text-xs md:text-sm">Take a Screenshot!</span>
                     </div>
 
-                    {/* DYNAMIC HEADER MESSAGE */}
-                    <h3 className="text-2xl font-black text-zinc-900 dark:text-white mb-2 text-center">
+                    <h3 className="text-xl md:text-2xl font-black text-zinc-900 dark:text-white mb-1 md:mb-2 text-center">
                       {ticketDetails.isExisting ? "Ticket Retrieved!" : "Registration Complete!"}
                     </h3>
-                    <p className="text-zinc-500 dark:text-zinc-400 mb-8 px-4 text-center">
+                    <p className="text-xs md:text-sm text-zinc-500 dark:text-zinc-400 mb-6 px-2 text-center max-w-sm">
                       {ticketDetails.isExisting 
                         ? `You are already registered for ${activeSeminar.shortName}. Here is your event pass.`
                         : `Your slot for ${activeSeminar.shortName} has been secured. We will send updates to your email.`
@@ -350,73 +340,64 @@ export default function CastWeekRegistration() {
                     </p>
 
                     {/* TICKET CARD */}
-                    <div className="w-full max-w-sm bg-zinc-50 dark:bg-zinc-950 border-2 border-zinc-200 dark:border-zinc-800 rounded-3xl overflow-hidden shadow-2xl relative">
+                    <div className="w-full max-w-[340px] bg-zinc-50 dark:bg-zinc-950 border-2 border-zinc-200 dark:border-zinc-800 rounded-2xl md:rounded-3xl overflow-hidden shadow-2xl relative">
                       
-                      {/* Ticket Header */}
-                      <div className={`p-6 bg-gradient-to-r ${activeSeminar.color} text-white relative`}>
+                      <div className={`p-5 md:p-6 bg-gradient-to-r ${activeSeminar.color} text-white relative`}>
                         <div className="absolute top-0 right-0 opacity-10 pt-4 pr-4">
-                           <FaTicketAlt size={60} />
+                           <FaTicketAlt size={50} />
                         </div>
-                        <p className="text-[10px] font-mono tracking-widest uppercase mb-1 opacity-80">Event Pass</p>
-                        <h3 className="font-black text-xl leading-tight">{ticketDetails.seminarName}</h3>
+                        <p className="text-[9px] md:text-[10px] font-mono tracking-widest uppercase mb-1 opacity-80">Event Pass</p>
+                        <h3 className="font-black text-lg md:text-xl leading-tight pr-8">{ticketDetails.seminarName}</h3>
                       </div>
 
-                      {/* Ticket Body */}
-                      <div className="p-6 space-y-4">
+                      <div className="p-5 md:p-6 space-y-3 md:space-y-4">
                         <div>
-                          <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-bold">Participant Name</p>
-                          <p className="text-lg font-black text-zinc-900 dark:text-white uppercase truncate">{ticketDetails.fullName}</p>
+                          <p className="text-[9px] md:text-[10px] text-zinc-500 uppercase tracking-wider font-bold">Participant Name</p>
+                          <p className="text-base md:text-lg font-black text-zinc-900 dark:text-white uppercase truncate">{ticketDetails.fullName}</p>
                         </div>
                         
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-2 gap-3 md:gap-4">
                           <div>
-                            <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-bold">Student ID</p>
-                            <p className="text-base font-bold text-zinc-800 dark:text-zinc-200">{ticketDetails.studentId}</p>
+                            <p className="text-[9px] md:text-[10px] text-zinc-500 uppercase tracking-wider font-bold">Student ID</p>
+                            <p className="text-sm md:text-base font-bold text-zinc-800 dark:text-zinc-200">{ticketDetails.studentId}</p>
                           </div>
                           <div>
-                            <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-bold">Section</p>
-                            <p className="text-base font-bold text-zinc-800 dark:text-zinc-200">{ticketDetails.blockSection}</p>
-                          </div>
-                          
-                          {/* Ticket Schedule Info */}
-                          <div>
-                            <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-bold">Date</p>
-                            <p className="text-sm font-bold text-zinc-800 dark:text-zinc-200">{ticketDetails.date}</p>
-                          </div>
-                          <div>
-                            <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-bold">Time</p>
-                            <p className="text-sm font-bold text-zinc-800 dark:text-zinc-200">{ticketDetails.time}</p>
+                            <p className="text-[9px] md:text-[10px] text-zinc-500 uppercase tracking-wider font-bold">Section</p>
+                            <p className="text-sm md:text-base font-bold text-zinc-800 dark:text-zinc-200">{ticketDetails.blockSection}</p>
                           </div>
                           
-                          {/* Venue info spanning the full width */}
+                          <div>
+                            <p className="text-[9px] md:text-[10px] text-zinc-500 uppercase tracking-wider font-bold">Date</p>
+                            <p className="text-xs md:text-sm font-bold text-zinc-800 dark:text-zinc-200">{ticketDetails.date}</p>
+                          </div>
+                          <div>
+                            <p className="text-[9px] md:text-[10px] text-zinc-500 uppercase tracking-wider font-bold">Time</p>
+                            <p className="text-xs md:text-sm font-bold text-zinc-800 dark:text-zinc-200">{ticketDetails.time}</p>
+                          </div>
+                          
                           <div className="col-span-2">
-                            <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-bold">Venue</p>
-                            <p className="text-sm font-bold text-zinc-800 dark:text-zinc-200">{ticketDetails.venue}</p>
+                            <p className="text-[9px] md:text-[10px] text-zinc-500 uppercase tracking-wider font-bold">Venue</p>
+                            <p className="text-xs md:text-sm font-bold text-zinc-800 dark:text-zinc-200">{ticketDetails.venue}</p>
                           </div>
                         </div>
 
-                        <div className="border-t-2 border-dashed border-zinc-200 dark:border-zinc-800 pt-4 mt-2">
-                          <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-bold text-center mb-1">Reference Number</p>
-                          <p className="text-2xl font-mono text-center font-black tracking-widest text-zinc-900 dark:text-white">
+                        <div className="border-t-2 border-dashed border-zinc-200 dark:border-zinc-800 pt-3 md:pt-4 mt-1 md:mt-2">
+                          <p className="text-[9px] md:text-[10px] text-zinc-500 uppercase tracking-wider font-bold text-center mb-1">Reference Number</p>
+                          <p className="text-xl md:text-2xl font-mono text-center font-black tracking-widest text-zinc-900 dark:text-white">
                             {ticketDetails.referenceId}
                           </p>
                         </div>
                       </div>
                       
-                      {/* Cutout circles to look like a ticket */}
-                      <div className="absolute left-[-15px] top-[100px] w-[30px] h-[30px] bg-white dark:bg-zinc-900 rounded-full border-r-2 border-zinc-200 dark:border-zinc-800" />
-                      <div className="absolute right-[-15px] top-[100px] w-[30px] h-[30px] bg-white dark:bg-zinc-900 rounded-full border-l-2 border-zinc-200 dark:border-zinc-800" />
+                      <div className="absolute left-[-15px] top-[90px] md:top-[100px] w-[30px] h-[30px] bg-white dark:bg-zinc-900 rounded-full border-r-2 border-zinc-200 dark:border-zinc-800" />
+                      <div className="absolute right-[-15px] top-[90px] md:top-[100px] w-[30px] h-[30px] bg-white dark:bg-zinc-900 rounded-full border-l-2 border-zinc-200 dark:border-zinc-800" />
                     </div>
-
-                    <p className="text-zinc-500 dark:text-zinc-400 mt-6 text-sm text-center max-w-xs">
-                      Please present this digital pass at the registration desk for verification.
-                    </p>
 
                     <button 
                       onClick={() => setIsSuccess(false)}
-                      className="mt-6 text-xs font-bold text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors underline underline-offset-4"
+                      className="mt-6 text-[10px] md:text-xs font-bold text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors underline underline-offset-4"
                     >
-                      Register Another Student
+                      Back to Registration
                     </button>
                   </motion.div>
                 ) : (
@@ -426,53 +407,53 @@ export default function CastWeekRegistration() {
                     animate={{ opacity: 1 }} 
                     exit={{ opacity: 0 }}
                     onSubmit={handleSubmit} 
-                    className="space-y-5 md:space-y-6"
+                    className="space-y-4 md:space-y-6"
                   >
-                    <div className="flex items-center gap-3 mb-4 md:mb-6 border-b border-zinc-100 dark:border-zinc-800 pb-4">
-                      <div className={`p-3 rounded-xl bg-gradient-to-br ${activeSeminar.color} text-white`}>
-                        <Icon size={20} />
+                    <div className="flex items-center gap-3 mb-2 md:mb-4 border-b border-zinc-100 dark:border-zinc-800 pb-3 md:pb-4">
+                      <div className={`p-2.5 md:p-3 rounded-xl bg-gradient-to-br ${activeSeminar.color} text-white shrink-0`}>
+                        <Icon size={18} />
                       </div>
                       <div>
-                        <h3 className="text-xl font-black text-zinc-900 dark:text-white leading-none">Participant Details</h3>
-                        <p className="text-[10px] md:text-xs text-zinc-500 mt-1">Fields marked with * are required.</p>
+                        <h3 className="text-lg md:text-xl font-black text-zinc-900 dark:text-white leading-none">Participant Details</h3>
+                        <p className="text-[9px] md:text-xs text-zinc-500 mt-1">Fields marked with * are required.</p>
                       </div>
                     </div>
 
                     {error && (
-                      <div className="p-4 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded-xl text-red-600 dark:text-red-400 text-xs font-bold">
+                      <div className="p-3 md:p-4 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded-lg md:rounded-xl text-red-600 dark:text-red-400 text-[10px] md:text-xs font-bold">
                         {error}
                       </div>
                     )}
 
-                    {/* NAME ROW */}
-                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-                      <div className="md:col-span-5">
+                    {/* NAME ROW - Mobile Optimized Grid */}
+                    <div className="grid grid-cols-12 gap-3 md:gap-4">
+                      <div className="col-span-12 md:col-span-5">
                         <label className={LABEL_STYLE}>Surname *</label>
                         <input type="text" name="lastName" value={formData.lastName} onChange={handleInputChange} className={INPUT_STYLE} placeholder="e.g. Dela Cruz" required />
                       </div>
-                      <div className="md:col-span-5">
+                      <div className="col-span-8 md:col-span-5">
                         <label className={LABEL_STYLE}>First Name *</label>
                         <input type="text" name="firstName" value={formData.firstName} onChange={handleInputChange} className={INPUT_STYLE} placeholder="e.g. Juan" required />
                       </div>
-                      <div className="md:col-span-2">
+                      <div className="col-span-4 md:col-span-2">
                         <label className={LABEL_STYLE}>M.I.</label>
                         <input type="text" name="middleInitial" value={formData.middleInitial} onChange={handleInputChange} className={INPUT_STYLE} placeholder="A." maxLength={3} />
                       </div>
                     </div>
 
                     {/* ID & EMAIL ROW */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
                       <div>
                         <label className={LABEL_STYLE}>Student ID *</label>
                         <div className="relative">
-                          <FaIdCard className="absolute top-4 right-4 text-zinc-400" />
+                          <FaIdCard className="absolute top-3.5 md:top-4 right-4 text-zinc-400" size={14} />
                           <input type="text" name="studentId" value={formData.studentId} onChange={handleInputChange} className={INPUT_STYLE} placeholder="202XXXXXXX" maxLength={15} required />
                         </div>
                       </div>
                       <div>
                         <label className={LABEL_STYLE}>Email Address *</label>
                         <div className="relative">
-                          <FaEnvelope className="absolute top-4 right-4 text-zinc-400" />
+                          <FaEnvelope className="absolute top-3.5 md:top-4 right-4 text-zinc-400" size={14} />
                           <input type="email" name="email" value={formData.email} onChange={handleInputChange} className={INPUT_STYLE} placeholder="student@dlsau.edu.ph" required />
                         </div>
                       </div>
@@ -482,7 +463,7 @@ export default function CastWeekRegistration() {
                     <div>
                       <label className={LABEL_STYLE}>Block Section *</label>
                       <div className="relative">
-                        <FaUserGraduate className="absolute top-4 right-4 text-zinc-400 pointer-events-none" />
+                        <FaUserGraduate className="absolute top-3.5 md:top-4 right-4 text-zinc-400 pointer-events-none" size={14} />
                         <select name="blockSection" value={formData.blockSection} onChange={handleInputChange} className={`${INPUT_STYLE} appearance-none pr-10`} required>
                           <option value="" disabled className="bg-zinc-900 text-zinc-400">Select Section</option>
                           {BLOCK_SECTIONS.map(section => (
@@ -497,7 +478,7 @@ export default function CastWeekRegistration() {
                     <button 
                       type="submit" 
                       disabled={isSubmitting}
-                      className={`w-full py-4 mt-6 rounded-xl font-black text-white bg-gradient-to-r ${activeSeminar.color} hover:opacity-90 transition-all flex items-center justify-center gap-3 shadow-lg shadow-green-500/20 disabled:opacity-50`}
+                      className={`w-full py-3.5 md:py-4 mt-2 md:mt-6 rounded-xl font-black text-white bg-gradient-to-r ${activeSeminar.color} hover:opacity-90 transition-all flex items-center justify-center gap-2 md:gap-3 shadow-lg shadow-green-500/20 disabled:opacity-50 text-sm md:text-base`}
                     >
                       {isSubmitting ? <><FaSpinner className="animate-spin" /> PROCESSING...</> : "CONFIRM REGISTRATION"}
                     </button>
