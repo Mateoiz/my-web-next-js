@@ -152,7 +152,7 @@ export default function CastWeekRegistration() {
         registeredAt: serverTimestamp(),
       });
 
-      const GOOGLE_SHEETS_URL = "https://script.google.com/macros/s/AKfycbxndO0aZunt-k_7uLZ06IWsq5mmcRq3DmtfyLSlv6cqN9WvGumps31OHxn3BzGbhcb4/exec"; 
+      const GOOGLE_SHEETS_URL = "https://script.google.com/macros/s/AKfycbzGsrgkAS882Tee2WKr-c7x4BLc0Z9JxmNGqz46QVz4Nypu3FUZ8DRG2p620yVUNdMS/exec"; 
       
       await fetch(GOOGLE_SHEETS_URL, {
         method: "POST",
