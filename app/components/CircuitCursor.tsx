@@ -19,6 +19,9 @@ export default function CircuitCursor() {
   
   const isTouching = useRef(false);
   const inputType = useRef<"mouse" | "touch">("mouse");
+  
+  // Used to control the speed of the trail disappearing
+  const frameTick = useRef(0); 
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -84,11 +87,18 @@ export default function CircuitCursor() {
     let animationFrameId: number;
 
     const animate = () => {
+      frameTick.current++;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       // 1. LERP (Linear Interpolation) for buttery smooth gliding movement
       currentPos.current.x += (target.current.x - currentPos.current.x) * config.springFactor;
       currentPos.current.y += (target.current.y - currentPos.current.y) * config.springFactor;
+
+      // Calculate how far the cursor is from the actual mouse/finger target
+      const distanceToTarget = Math.hypot(
+        target.current.x - currentPos.current.x,
+        target.current.y - currentPos.current.y
+      );
 
       // 2. Manage History (Circuit Corners)
       if (inputType.current === "mouse" || isTouching.current) {
@@ -97,7 +107,7 @@ export default function CircuitCursor() {
         if (!lastPoint) {
           history.current.push({ ...currentPos.current });
         } else {
-          // Only drop a new corner if we've moved a certain distance. (Fixes all the jagged jitter/lag)
+          // Only drop a new corner if we've moved a certain distance.
           const dist = Math.hypot(currentPos.current.x - lastPoint.x, currentPos.current.y - lastPoint.y);
           if (dist > config.distanceThreshold) {
             history.current.push({ ...currentPos.current });
@@ -106,10 +116,21 @@ export default function CircuitCursor() {
             }
           }
         }
+
+        // --- NEW: IDLE CONSUMPTION LOGIC ---
+        // If the distance is < 0.5, the cursor has effectively stopped moving.
+        if (distanceToTarget < 0.5 && history.current.length > 0) {
+          // Retract/consume the tail by shifting the array every other frame for a smooth speed
+          if (frameTick.current % 2 === 0) {
+            history.current.shift();
+          }
+        }
+
       } else {
-        // If user lifted finger, quickly drain the line out
+        // If user lifted finger on mobile, quickly drain the line out
         if (history.current.length > 0) {
           history.current.shift();
+          if (history.current.length > 0) history.current.shift(); // drain twice as fast on mobile touch end
         }
       }
 
