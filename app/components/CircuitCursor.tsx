@@ -1,97 +1,161 @@
-'use client';
+"use client";
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef } from "react";
 
 // Define the structure of a point in our trail history
 interface Point {
   x: number;
   y: number;
-  age: number; // 'age' helps us fade out older parts of the trail
 }
 
 export default function CircuitCursor() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const history = useRef<Point[]>([]);
-  const mouse = useRef({ x: 0, y: 0 });
+  
+  // 'target' is where the physical mouse/finger is
+  const target = useRef({ x: 0, y: 0 });
+  // 'currentPos' is the smoothly gliding position that catches up to 'target'
+  const currentPos = useRef({ x: 0, y: 0 });
+  
+  const isTouching = useRef(false);
+  const inputType = useRef<"mouse" | "touch">("mouse");
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const ctx = canvas.getContext('2d');
+    // Use { alpha: true } but avoid other heavy composite operations for mobile performance
+    const ctx = canvas.getContext("2d", { alpha: true });
     if (!ctx) return;
 
     // --- CIRCUIT CONFIGURATION ---
     const config = {
-      trailLength: 30,       // Longer trail for circuit trace
+      trailLength: 20,       // Shorter array = better performance
       lineWidth: 2,          // Trace thickness
-      color: '#10b981',      // Cyberpunk / Emerald Green
-      glowBlur: 10,          // Neon glow
-      fadeSpeed: 0.10,       
+      color: "#10b981",      // Cyberpunk / Emerald Green
+      glowBlur: 4,           // Low blur on the trail to prevent mobile GPU lag
+      distanceThreshold: 20, // Distance (px) required before creating a new 90-degree corner
+      springFactor: 0.35,    // How fast the cursor catches up (0.1 = slow, 0.9 = fast)
     };
 
     const resizeCanvas = () => {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
     };
-    window.addEventListener('resize', resizeCanvas);
+    window.addEventListener("resize", resizeCanvas);
     resizeCanvas();
 
+    // --- EVENT LISTENERS ---
     const handleMouseMove = (e: MouseEvent) => {
-      mouse.current = { x: e.clientX, y: e.clientY };
+      if (inputType.current === "touch") return; // Prevent ghost mouse events on mobile
+      inputType.current = "mouse";
+      target.current = { x: e.clientX, y: e.clientY };
     };
-    window.addEventListener('mousemove', handleMouseMove);
+
+    const handleTouchStart = (e: TouchEvent) => {
+      inputType.current = "touch";
+      isTouching.current = true;
+      const touch = e.touches[0];
+      target.current = { x: touch.clientX, y: touch.clientY };
+      // Instantly snap the current position to the finger on first touch
+      currentPos.current = { x: touch.clientX, y: touch.clientY };
+      history.current = [{ ...target.current }]; 
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (!isTouching.current) return;
+      const touch = e.touches[0];
+      target.current = { x: touch.clientX, y: touch.clientY };
+    };
+
+    const handleTouchEnd = () => {
+      isTouching.current = false;
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("touchstart", handleTouchStart, { passive: true });
+    window.addEventListener("touchmove", handleTouchMove, { passive: true });
+    window.addEventListener("touchend", handleTouchEnd);
+
+    // Initial position setup for desktop
+    currentPos.current = { ...target.current };
 
     // --- Animation Loop ---
     let animationFrameId: number;
 
     const animate = () => {
-      // Add current mouse position
-      history.current.push({ ...mouse.current, age: 0 });
-
-      // Limit history length
-      if (history.current.length > config.trailLength) {
-        history.current.shift();
-      }
-
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Draw the Circuit Trail
-      if (history.current.length > 1) {
+      // 1. LERP (Linear Interpolation) for buttery smooth gliding movement
+      currentPos.current.x += (target.current.x - currentPos.current.x) * config.springFactor;
+      currentPos.current.y += (target.current.y - currentPos.current.y) * config.springFactor;
+
+      // 2. Manage History (Circuit Corners)
+      if (inputType.current === "mouse" || isTouching.current) {
+        const lastPoint = history.current[history.current.length - 1];
+        
+        if (!lastPoint) {
+          history.current.push({ ...currentPos.current });
+        } else {
+          // Only drop a new corner if we've moved a certain distance. (Fixes all the jagged jitter/lag)
+          const dist = Math.hypot(currentPos.current.x - lastPoint.x, currentPos.current.y - lastPoint.y);
+          if (dist > config.distanceThreshold) {
+            history.current.push({ ...currentPos.current });
+            if (history.current.length > config.trailLength) {
+              history.current.shift();
+            }
+          }
+        }
+      } else {
+        // If user lifted finger, quickly drain the line out
+        if (history.current.length > 0) {
+          history.current.shift();
+        }
+      }
+
+      // 3. Draw the Circuit Trail
+      if (history.current.length > 0) {
         ctx.beginPath();
-        // Sharp, robotic corners for a circuit feel
-        ctx.lineCap = 'square';
-        ctx.lineJoin = 'miter';
+        ctx.lineCap = "square";
+        ctx.lineJoin = "miter";
         ctx.lineWidth = config.lineWidth;
         ctx.strokeStyle = config.color;
         ctx.shadowColor = config.color;
-        ctx.shadowBlur = config.glowBlur;
+        ctx.shadowBlur = config.glowBlur; // Optimized blur
 
-        // Start from oldest
         ctx.moveTo(history.current[0].x, history.current[0].y);
 
+        // Draw saved corners
         for (let i = 0; i < history.current.length - 1; i++) {
-          const current = history.current[i];
-          const next = history.current[i + 1];
+          const curr = history.current[i];
+          const nxt = history.current[i + 1];
           
-          // Orthogonal circuit lines (90-degree angles)
-          ctx.lineTo(next.x, current.y); // Horizontal
-          ctx.lineTo(next.x, next.y);    // Vertical
+          ctx.lineTo(nxt.x, curr.y); // Horizontal
+          ctx.lineTo(nxt.x, nxt.y);  // Vertical
         }
+        
+        // Dynamically stretch the line from the last saved corner to the currently moving head
+        const last = history.current[history.current.length - 1];
+        ctx.lineTo(currentPos.current.x, last.y);
+        ctx.lineTo(currentPos.current.x, currentPos.current.y);
+
         ctx.stroke();
       }
 
-      // Draw the Circuit Node (Cursor Tip)
-      if (history.current.length > 0) {
-        const lastPoint = history.current[history.current.length - 1];
-        
+      // 4. Draw the Node (Glowing Head)
+      // Hide head on mobile if not touching, keep visible on desktop
+      if (inputType.current === "mouse" || isTouching.current || history.current.length > 0) {
         ctx.beginPath();
-        // Draw a small square to act as a data node/solder pad
         const nodeSize = 6;
-        ctx.rect(lastPoint.x - nodeSize / 2, lastPoint.y - nodeSize / 2, nodeSize, nodeSize);
+        ctx.rect(
+          currentPos.current.x - nodeSize / 2, 
+          currentPos.current.y - nodeSize / 2, 
+          nodeSize, 
+          nodeSize
+        );
         ctx.fillStyle = config.color;
         ctx.shadowColor = config.color;
-        ctx.shadowBlur = 15;
+        ctx.shadowBlur = 15; // Give the head a strong glow
         ctx.fill();
         ctx.closePath();
       }
@@ -102,8 +166,11 @@ export default function CircuitCursor() {
     animate();
 
     return () => {
-      window.removeEventListener('resize', resizeCanvas);
-      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener("resize", resizeCanvas);
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("touchstart", handleTouchStart);
+      window.removeEventListener("touchmove", handleTouchMove);
+      window.removeEventListener("touchend", handleTouchEnd);
       cancelAnimationFrame(animationFrameId);
     };
   }, []);
