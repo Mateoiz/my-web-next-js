@@ -14,10 +14,17 @@ import {
   serverTimestamp 
 } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
-import { getAuth, setPersistence, indexedDBLocalPersistence, sendEmailVerification, sendPasswordResetEmail, User } from "firebase/auth";
+import { 
+  getAuth, 
+  GoogleAuthProvider, // <-- Added for Google Sign-In
+  sendEmailVerification, 
+  sendPasswordResetEmail, 
+  User 
+} from "firebase/auth";
 
-// --- FIREBASE CONFIGURATION ---
-// I have included your hardcoded keys here as requested to fix the "invalid-api-key" error immediately.
+// ==========================================
+// 1. FIREBASE CONFIGURATION & INITIALIZATION
+// ==========================================
 const firebaseConfig = {
   apiKey: "AIzaSyCryw1dmr64bL_YVtxgjuFwRzzNRjxi9C8",
   authDomain: "jpcs-game.firebaseapp.com",
@@ -28,16 +35,22 @@ const firebaseConfig = {
   measurementId: "G-GECB5NRBSK"
 };
 
-// Initialize Firebase (Singleton Pattern)
+// Initialize Firebase (Singleton Pattern to prevent re-initialization errors)
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const storage = getStorage(app);
 const auth = getAuth(app);
 
-// Export the services so your app can use them
-export { db, storage, auth, app };
+// Initialize Google Auth Provider
+const googleProvider = new GoogleAuthProvider();
 
-// --- TYPES ---
+// Export the services so your app can use them
+export { db, storage, auth, googleProvider, app };
+
+
+// ==========================================
+// 2. TYPES & INTERFACES
+// ==========================================
 export interface BlogPost {
   id?: string;
   title: string;
@@ -52,9 +65,39 @@ export interface BlogPost {
   coverImage?: string | null;
 }
 
-// --- DATABASE FUNCTIONS ---
 
-// 1. Create a New Post
+// ==========================================
+// 3. AUTHENTICATION FUNCTIONS
+// ==========================================
+
+// Send Verification Email
+export const sendVerificationEmail = async (user: User) => {
+  try {
+    await sendEmailVerification(user);
+    return { success: true, message: "Verification email sent! Please check your inbox." };
+  } catch (error: any) {
+    console.error("Error sending verification email:", error);
+    return { success: false, message: error.message };
+  }
+};
+
+// Send Password Reset Email
+export const sendForgotPasswordEmail = async (email: string) => {
+  try {
+    await sendPasswordResetEmail(auth, email);
+    return { success: true, message: "Password reset link sent! Please check your inbox." };
+  } catch (error: any) {
+    console.error("Error sending password reset email:", error);
+    return { success: false, message: error.message };
+  }
+};
+
+
+// ==========================================
+// 4. DATABASE FUNCTIONS (BLOG)
+// ==========================================
+
+// Create a New Post
 export const createPost = async (postData: Partial<BlogPost>) => {
   try {
     const docRef = await addDoc(collection(db, "posts"), {
@@ -69,7 +112,7 @@ export const createPost = async (postData: Partial<BlogPost>) => {
   }
 };
 
-// 2. Get All Pending Posts (Admin)
+// Get All Pending Posts (Admin)
 export const getPendingPosts = async (): Promise<BlogPost[]> => {
   const q = query(collection(db, "posts"), where("status", "==", "pending"));
   const querySnapshot = await getDocs(q);
@@ -79,13 +122,13 @@ export const getPendingPosts = async (): Promise<BlogPost[]> => {
   })) as BlogPost[];
 };
 
-// 3. Update Post Status
+// Update Post Status
 export const updatePostStatus = async (id: string, status: "published" | "rejected") => {
   const postRef = doc(db, "posts", id);
   await updateDoc(postRef, { status });
 };
 
-// 4. Get User's Own Posts
+// Get User's Own Posts
 export const getMyPosts = async (userId: string): Promise<BlogPost[]> => {
   const q = query(collection(db, "posts"), where("authorId", "==", userId));
   const querySnapshot = await getDocs(q);
@@ -95,7 +138,7 @@ export const getMyPosts = async (userId: string): Promise<BlogPost[]> => {
   })) as BlogPost[];
 };
 
-// 5. Get All Published Posts (Public Blog)
+// Get All Published Posts (Public Blog)
 export async function getPublishedPosts(): Promise<BlogPost[]> {
   try {
     const q = query(
@@ -115,7 +158,7 @@ export async function getPublishedPosts(): Promise<BlogPost[]> {
   }
 }
 
-// 6. Get Single Post by Slug
+// Get Single Post by Slug
 export async function getPostBySlug(slug: string): Promise<BlogPost | null> {
   try {
     const q = query(
@@ -134,26 +177,3 @@ export async function getPostBySlug(slug: string): Promise<BlogPost | null> {
     return null;
   }
 }
-export const sendVerificationEmail = async (user: User) => {
-  try {
-    await sendEmailVerification(user);
-    return { success: true, message: "Verification email sent! Please check your inbox." };
-  } catch (error: any) {
-    console.error("Error sending verification email:", error);
-    return { success: false, message: error.message };
-  }
-};
-
-// 2. Send Password Reset Email
-export const sendForgotPasswordEmail = async (email: string) => {
-  try {
-    await sendPasswordResetEmail(auth, email);
-    return { success: true, message: "Password reset link sent! Please check your inbox." };
-  } catch (error: any) {
-    console.error("Error sending password reset email:", error);
-    // Security note: Firebase might throw an error if the email doesn't exist.
-    // Ideally, you shouldn't reveal this to the user to prevent enumeration attacks,
-    // but for internal tools, returning the error is fine for debugging.
-    return { success: false, message: error.message };
-  }
-};

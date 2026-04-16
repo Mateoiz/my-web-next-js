@@ -5,19 +5,15 @@ import { Providers } from "./providers";
 import { LoadingProvider } from "./context/LoadingContext";
 import ClientLayout from "./components/ClientLayout";
 import { AuthProvider } from "./context/AuthContext";
-import HolidayTheme from "./components/HolidayTheme";
 
 export const metadata: Metadata = {
   title: "Junior Philippine Computer Society DLSAU",
   description: "The official student organization for Computer Science at De La Salle Araneta University. We empower the next generation of tech innovators.",
   
-  // ✅ 1. ADDED: Icon Configuration
-  // Make sure you put a file named 'logo.png' in your 'public' folder!
   icons: {
     icon: "/Logo.png",
-    apple: "/Logo.png", // Optional: For iPhone/iPad home screen
+    apple: "/Logo.png", 
   },
-
   openGraph: {
     title: "JPCS DLSAU",
     description: "The official student organization for Computer Science at De La Salle Araneta University.",
@@ -46,8 +42,8 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="antialiased bg-white dark:bg-black text-zinc-900 dark:text-white transition-colors duration-300">
-        <AuthProvider>
-        {/* Google Analytics Scripts */}
+        
+        {/* Google Analytics Scripts (Safely outside the React Context tree) */}
         <Script
           src="https://www.googletagmanager.com/gtag/js?id=G-JK2XK3P10R"
           strategy="afterInteractive"
@@ -62,17 +58,15 @@ export default function RootLayout({
           `}
         </Script>
 
-        {/* Theme Providers */}
-        <Providers>
-          {/* Loading State Provider */}
-          <LoadingProvider>
-            {/* The Visual Layout */}
-            <ClientLayout>
-              {children}
-              
-            </ClientLayout>
-          </LoadingProvider>
-        </Providers>
+        {/* App State & UI Providers */}
+        <AuthProvider>
+          <Providers>
+            <LoadingProvider>
+              <ClientLayout>
+                {children}
+              </ClientLayout>
+            </LoadingProvider>
+          </Providers>
         </AuthProvider>
 
       </body>

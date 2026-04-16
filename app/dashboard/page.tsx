@@ -1,282 +1,244 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useAuth } from "../context/AuthContext";
-import { getPendingPosts, updatePostStatus, getMyPosts, type BlogPost } from "@/lib/db";
+import { useState, useEffect } from "react";
+import dynamic from 'next/dynamic'; 
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { 
-  PenTool, Clock, CheckCircle, XCircle, FileText, Layout, 
-  Loader2, ExternalLink, ShieldAlert 
-} from "lucide-react";
+  FaCalendarAlt, FaCalculator, FaLayerGroup, 
+  FaTasks, FaStickyNote, FaUserCircle, FaSignOutAlt, FaHome, FaBolt
+} from "react-icons/fa";
+
+// --- FIREBASE IMPORTS ---
+import { onAuthStateChanged, signOut, User } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
+import { auth, db } from "@/lib/db"; 
+
+// --- BACKGROUND IMPORTS ---
+import FloatingCubes from "../components/FloatingCubes"; 
+import CircuitCursor from "../components/CircuitCursor"; 
+
+// --- LAZY LOADING TOOLS ---
+const ScheduleMaker = dynamic(() => import('../components/Tools/ScheduleMaker'), { ssr: false });
+const GradeCalculator = dynamic(() => import('../components/Tools/GradeCalculator'));
+const GWACalculator = dynamic(() => import('../components/Tools/GWACalculator'));
+const FlashcardMaker = dynamic(() => import('../components/Tools/FlashcardMaker'), { ssr: false });
 
 export default function Dashboard() {
-  const { user, userData } = useAuth();
-  const router = useRouter();
+  const [activeView, setActiveView] = useState<'home' | 'schedule' | 'calc' | 'flashcards' | 'tasks' | 'notes'>('home');
+  const [isLoading, setIsLoading] = useState(true);
+  const [authUser, setAuthUser] = useState<User | null>(null);
+  const [userProfile, setUserProfile] = useState<any>(null);
   
-  // State
-  const [adminQueue, setAdminQueue] = useState<BlogPost[]>([]);
-  const [myPosts, setMyPosts] = useState<BlogPost[]>([]);
-  const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
-  // Redirect if not logged in
+  // --- ROUTE PROTECTION & DATA FETCHING ---
   useEffect(() => {
-    if (!user) router.push("/login");
-  }, [user, router]);
-
-  // Data Fetching
-  useEffect(() => {
-    const loadData = async () => {
-      if (!user) return;
-      setLoading(true);
-      
-      try {
-        // 1. If Admin, fetch the queue
-        if (userData?.role === "admin") {
-          const queue = await getPendingPosts();
-          setAdminQueue(queue);
-        }
-
-        // 2. Fetch "My Posts" for everyone
-        const mine = await getMyPosts(user.uid);
-        setMyPosts(mine);
-      } catch (error) {
-        console.error("Failed to load dashboard data", error);
-      } finally {
-        setLoading(false);
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        // If not logged in, kick them back to the public workspace
+        router.push("/workspace");
+        return;
       }
-    };
 
-    loadData();
-  }, [user, userData]);
+      setAuthUser(user);
+      
+      // Fetch their custom username and details from Firestore
+      const userDoc = await getDoc(doc(db, "users", user.uid));
+      if (userDoc.exists()) {
+        setUserProfile(userDoc.data());
+      } else {
+        // Edge case: They logged in but skipped username setup
+        router.push("/workspace"); 
+      }
+      
+      setIsLoading(false);
+    });
 
-  const handleApproval = async (id: string, status: "published" | "rejected") => {
-    await updatePostStatus(id, status);
-    setAdminQueue(prev => prev.filter(p => p.id !== id));
+    return () => unsubscribe();
+  }, [router]);
+
+  const handleSignOut = async () => {
+    await signOut(auth);
+    router.push("/Workspace");
   };
 
-  // Helper for Status Badges
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "published":
-        return <span className="flex items-center gap-1 text-green-600 dark:text-green-400 border border-green-500/30 bg-green-500/10 px-2 py-1 rounded text-[10px] md:text-xs font-mono uppercase tracking-wider"><CheckCircle className="w-3 h-3"/> Published</span>;
-      case "rejected":
-        return <span className="flex items-center gap-1 text-red-600 dark:text-red-400 border border-red-500/30 bg-red-500/10 px-2 py-1 rounded text-[10px] md:text-xs font-mono uppercase tracking-wider"><XCircle className="w-3 h-3"/> Rejected</span>;
-      default:
-        return <span className="flex items-center gap-1 text-yellow-600 dark:text-yellow-400 border border-yellow-500/30 bg-yellow-500/10 px-2 py-1 rounded text-[10px] md:text-xs font-mono uppercase tracking-wider"><Clock className="w-3 h-3"/> Pending</span>;
-    }
-  };
+  // --- NAVIGATION CONFIG ---
+  const NAV_ITEMS = [
+    { id: 'home', label: 'Overview', icon: <FaHome /> },
+    { id: 'schedule', label: 'Schedule', icon: <FaCalendarAlt /> },
+    { id: 'calc', label: 'Grades', icon: <FaCalculator /> },
+    { id: 'flashcards', label: 'Reviewer', icon: <FaLayerGroup /> },
+    { id: 'tasks', label: 'Tasks', icon: <FaTasks />, isPremium: true },
+    { id: 'notes', label: 'Notes', icon: <FaStickyNote />, isPremium: true },
+  ];
 
-  if (!user || loading) {
+  // --- LOADING SCREEN (Matches UI System) ---
+  if (isLoading) {
     return (
-      <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center text-green-600 dark:text-green-500 transition-colors">
-        <Loader2 className="w-8 h-8 animate-spin" />
+      <div className="min-h-screen pt-32 pb-32 flex flex-col items-center justify-center bg-zinc-50 dark:bg-black selection:bg-green-500/30">
+        <span className="w-12 h-12 rounded-full border-4 border-green-500/30 border-t-green-500 animate-spin mb-6" />
+        <div className="text-zinc-400 font-mono text-sm font-bold tracking-widest uppercase animate-pulse">Decrypting Secure Session...</div>
       </div>
     );
   }
 
-  // Get the display name
-  const displayName = userData?.name ? userData.name.split(' ')[0] : "Ice";
-
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 selection:bg-green-500/30 pb-20 transition-colors duration-300">
+    <section className="min-h-screen pt-28 md:pt-32 pb-24 md:pb-32 px-4 md:px-8 relative overflow-hidden bg-zinc-50 dark:bg-black font-sans selection:bg-green-500/30 transition-colors duration-300">
       
-      {/* --- HEADER --- */}
-      <header className="pt-24 md:pt-32 pb-8 md:pb-12 px-4 md:px-6 border-b border-zinc-200 dark:border-zinc-900 bg-white/50 dark:bg-zinc-950/50 backdrop-blur-sm sticky top-0 z-40 transition-colors">
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
-          <motion.div 
-            initial={{ opacity: 0, x: -20 }} 
-            animate={{ opacity: 1, x: 0 }}
-          >
-            <p className="text-zinc-500 dark:text-zinc-500 font-mono text-[10px] md:text-xs uppercase tracking-widest mb-2">
-              // Terminal_Access_Granted
-            </p>
-            <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-zinc-900 dark:text-white tracking-tight">
-              Welcome back, <br className="md:hidden" />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-600 to-green-800 dark:from-green-400 dark:to-green-700">
-                Writer {displayName}
-              </span>
-            </h1>
-          </motion.div>
+      {/* --- BACKGROUND LAYERS --- */}
+      <div className="hidden md:block"><CircuitCursor /></div>
+      <div className="absolute inset-0 z-0 pointer-events-none">
+        <div className="absolute inset-0 opacity-30 sm:opacity-60"><FloatingCubes /></div>
+        <div className="absolute top-[10%] right-[10%] w-[300px] md:w-[500px] h-[300px] md:h-[500px] bg-green-500/10 rounded-full blur-[100px] md:blur-[150px] pointer-events-none" />
+      </div>
 
-          <motion.button 
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => router.push("/dashboard/create")}
-            className="w-full md:w-auto flex items-center justify-center gap-2 bg-zinc-900 hover:bg-zinc-800 dark:bg-green-600 dark:hover:bg-green-500 text-white px-6 py-3 rounded-full font-bold shadow-lg shadow-zinc-200 dark:shadow-[0_0_20px_rgba(34,197,94,0.3)] transition-all"
-          >
-            <PenTool className="w-4 h-4" />
-            <span>New Transmission</span>
-          </motion.button>
-        </div>
-      </header>
-
-      <div className="max-w-6xl mx-auto px-4 md:px-6 mt-8 md:mt-12 grid grid-cols-1 lg:grid-cols-3 gap-8 md:gap-12">
-        
-        {/* --- LEFT COL: MAIN CONTENT --- */}
-        <div className="lg:col-span-2 space-y-8 md:space-y-12">
+      <div className="max-w-[90rem] mx-auto relative z-10">
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 lg:gap-8 items-start">
           
-          {/* 1. ADMIN SECTION (Conditional) */}
-          {userData?.role === "admin" && (
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden shadow-sm transition-colors"
-            >
-              <div className="p-4 md:p-6 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
-                <h2 className="text-lg md:text-xl font-bold flex items-center gap-2 text-zinc-900 dark:text-zinc-100">
-                  <ShieldAlert className="text-yellow-500 w-5 h-5"/> 
-                  Admin Queue
-                </h2>
-                <span className="text-[10px] md:text-xs bg-zinc-100 dark:bg-zinc-800 px-2 py-1 rounded-full text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700">
-                  {adminQueue.length}
-                </span>
+          {/* ================= LEFT SIDEBAR (COMMAND CENTER) ================= */}
+          <motion.aside 
+            initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.6 }}
+            className="xl:col-span-3 space-y-6 xl:sticky xl:top-32"
+          >
+            {/* USER PROFILE CARD */}
+            <div className="bg-white/70 dark:bg-zinc-900/80 backdrop-blur-xl border border-zinc-200 dark:border-zinc-800 rounded-[2rem] p-6 md:p-8 shadow-xl transition-colors duration-300 relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-green-500/10 blur-2xl rounded-full pointer-events-none group-hover:bg-green-500/20 transition-colors" />
+              
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center text-white shadow-[0_0_20px_rgba(34,197,94,0.3)] shrink-0">
+                  <FaUserCircle size={32} />
+                </div>
+                <div className="overflow-hidden">
+                  <h3 className="text-lg font-black text-zinc-900 dark:text-white truncate">{userProfile?.fullName || authUser?.displayName}</h3>
+                  <p className="text-sm font-mono text-green-600 dark:text-green-400 font-bold truncate">@{userProfile?.username || "student"}</p>
+                </div>
               </div>
               
-              {adminQueue.length === 0 ? (
-                <div className="p-12 text-center text-zinc-500 italic text-sm">All caught up. No posts.</div>
-              ) : (
-                <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
-                  {adminQueue.map(post => (
-                    <div key={post.id} className="p-4 md:p-6 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
-                      <div className="w-full sm:w-auto">
-                        <h3 className="font-bold text-base md:text-lg text-zinc-800 dark:text-zinc-200 line-clamp-1">{post.title}</h3>
-                        <p className="text-xs text-zinc-500 font-mono mt-1">
-                          {post.author} • {new Date(post.createdAt?.seconds * 1000).toLocaleDateString()}
-                        </p>
-                      </div>
-                      <div className="flex gap-2 w-full sm:w-auto justify-end">
-                          <button 
-                           onClick={() => window.open(`/preview/${post.id}`, '_blank')}
-                           className="flex-1 sm:flex-none p-2 rounded hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white transition-colors flex justify-center border border-zinc-200 dark:border-zinc-700"
-                           title="Preview"
-                          >
-                            <ExternalLink className="w-4 h-4"/>
-                          </button>
-                          <button 
-                           onClick={() => post.id && handleApproval(post.id, "rejected")}
-                           className="flex-1 sm:flex-none p-2 rounded bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-500 hover:bg-red-100 dark:hover:bg-red-500 hover:text-red-700 dark:hover:text-white transition-colors flex justify-center border border-red-200 dark:border-red-900/30"
-                           title="Reject"
-                          >
-                            <XCircle className="w-4 h-4"/>
-                          </button>
-                          <button 
-                           onClick={() => post.id && handleApproval(post.id, "published")}
-                           className="flex-1 sm:flex-none p-2 rounded bg-green-50 dark:bg-green-500/10 text-green-600 dark:text-green-500 hover:bg-green-100 dark:hover:bg-green-500 hover:text-green-700 dark:hover:text-white transition-colors flex justify-center border border-green-200 dark:border-green-900/30"
-                           title="Approve"
-                          >
-                            <CheckCircle className="w-4 h-4"/>
-                          </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </motion.div>
-          )}
-
-          {/* 2. MY SUBMISSIONS (Writer View) */}
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-          >
-            <div className="flex items-center gap-3 mb-6">
-              <Layout className="w-5 h-5 text-green-600 dark:text-green-500"/>
-              <h2 className="text-2xl font-bold text-zinc-900 dark:text-white">My Archives</h2>
+              <button 
+                onClick={handleSignOut}
+                className="w-full py-3 rounded-xl border border-zinc-200 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:bg-red-50 dark:hover:bg-red-500/10 hover:text-red-500 hover:border-red-200 dark:hover:border-red-500/30 font-bold text-sm transition-all duration-300 flex items-center justify-center gap-2 active:scale-95"
+              >
+                <FaSignOutAlt /> Terminate Session
+              </button>
             </div>
 
-            {myPosts.length === 0 ? (
-              <div className="bg-white dark:bg-zinc-900/30 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-8 md:p-12 text-center shadow-sm">
-                 <div className="w-16 h-16 bg-zinc-100 dark:bg-zinc-900 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <PenTool className="w-6 h-6 text-zinc-400 dark:text-zinc-600" />
-                 </div>
-                 <h3 className="text-zinc-700 dark:text-zinc-300 font-bold mb-2">No transmissions found.</h3>
-                 <p className="text-zinc-500 mb-6 text-sm">Start writing your first article to see it here.</p>
-                 <button onClick={() => router.push("/dashboard/create")} className="text-green-600 hover:underline text-sm font-mono uppercase font-bold">
-                   Initialize New Post
-                 </button>
-              </div>
-            ) : (
-              <div className="grid gap-4">
-                {myPosts.map((post) => (
-                  <div key={post.id} className="group bg-white dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 hover:border-green-500/50 dark:hover:border-green-500/50 rounded-xl p-5 md:p-6 transition-all duration-300 flex flex-col md:flex-row justify-between gap-4 shadow-sm hover:shadow-md">
-                    <div>
-                        <div className="flex items-center gap-3 mb-2">
-                          {getStatusBadge(post.status)}
-                          <span className="text-[10px] md:text-xs text-zinc-500 dark:text-zinc-500 font-mono">
-                             {new Date(post.createdAt?.seconds * 1000).toLocaleDateString()}
-                          </span>
-                        </div>
-                        <h3 className="text-lg md:text-xl font-bold text-zinc-900 dark:text-zinc-200 group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors line-clamp-1">
-                          {post.title}
-                        </h3>
-                        {post.excerpt && (
-                          <p className="text-sm text-zinc-600 dark:text-zinc-500 mt-2 line-clamp-2 max-w-xl">
-                            {post.excerpt}
-                          </p>
-                        )}
-                    </div>
-                    
-                    {/* View Button: Always visible on mobile, hover-only on desktop */}
-                    <div className="flex items-center gap-3 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity self-start md:self-center border-t md:border-none border-zinc-100 dark:border-zinc-800 pt-3 md:pt-0 w-full md:w-auto">
-                        <button 
-                          onClick={() => window.open(`/preview/${post.id}`, '_blank')}
-                          className="text-xs font-mono uppercase text-zinc-500 hover:text-zinc-900 dark:hover:text-white flex items-center gap-1 font-semibold"
-                        >
-                          View_Data <ExternalLink className="w-3 h-3"/>
-                        </button>
+            {/* NAVIGATION MENU */}
+            <div className="bg-white/70 dark:bg-zinc-900/80 backdrop-blur-xl border border-zinc-200 dark:border-zinc-800 rounded-[2rem] p-4 shadow-xl transition-colors duration-300">
+              <p className="px-4 pt-2 pb-4 text-[10px] font-mono font-bold tracking-widest text-zinc-400 uppercase">Modules</p>
+              <nav className="flex xl:flex-col gap-2 overflow-x-auto xl:overflow-visible pb-2 xl:pb-0 custom-scrollbar">
+                {NAV_ITEMS.map((item) => {
+                  const isActive = activeView === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => setActiveView(item.id as any)}
+                      className={`
+                        relative shrink-0 xl:shrink flex items-center gap-3 px-5 py-3.5 rounded-xl font-bold text-sm transition-all duration-300 active:scale-[0.98]
+                        ${isActive 
+                          ? 'text-white shadow-md' 
+                          : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100/80 dark:hover:bg-zinc-800/50'
+                        }
+                      `}
+                    >
+                      {isActive && (
+                        <motion.div layoutId="activeNav" className="absolute inset-0 bg-zinc-900 dark:bg-green-600 rounded-xl -z-10" transition={{ type: "spring", stiffness: 400, damping: 30 }} />
+                      )}
+                      <span className={`relative z-10 ${isActive ? 'text-green-400 dark:text-white' : ''}`}>
+                        {item.icon}
+                      </span>
+                      <span className="relative z-10 tracking-wide">{item.label}</span>
+                      
+                      {/* Premium Indicator Dot */}
+                      {item.isPremium && !isActive && (
+                        <div className="absolute top-3 right-3 w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_5px_#22c55e] animate-pulse" />
+                      )}
+                    </button>
+                  );
+                })}
+              </nav>
+            </div>
+          </motion.aside>
+
+          {/* ================= RIGHT SIDE (DYNAMIC CANVAS) ================= */}
+          <motion.main 
+            initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.2 }}
+            className="xl:col-span-9 min-h-[700px]"
+          >
+            <AnimatePresence mode="wait">
+              
+              {/* --- VIEW: HOME / OVERVIEW --- */}
+              {activeView === 'home' && (
+                <motion.div key="home" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ duration: 0.3 }} className="space-y-6">
+                  
+                  {/* Welcome Banner */}
+                  <div className="relative w-full rounded-[2rem] overflow-hidden shadow-2xl group border border-zinc-800 dark:border-green-500/30">
+                    <div className="absolute inset-0 bg-gradient-to-r from-zinc-900 to-black dark:from-green-900 dark:to-zinc-950 z-0" />
+                    <div className="absolute inset-0 bg-[url('/scanlines.png')] opacity-10 z-0 mix-blend-overlay" />
+                    <div className="relative z-10 p-8 md:p-12 flex flex-col justify-center min-h-[250px]">
+                      <div className="inline-flex items-center gap-2 px-3 py-1 mb-4 rounded-full bg-white/10 border border-white/20 text-[10px] font-mono font-bold tracking-widest text-zinc-300 uppercase backdrop-blur-md w-max">
+                         <FaBolt className="text-yellow-400" /> Secure Connection
+                      </div>
+                      <h1 className="text-4xl md:text-6xl font-black text-white mb-2 tracking-tight">
+                        Welcome back, <br/> <span className="text-green-400">{userProfile?.fullName?.split(' ')[0] || 'Scholar'}</span>.
+                      </h1>
+                      <p className="text-zinc-400 text-sm md:text-base max-w-xl">
+                        Your workspace is synced and ready. You have no pending tasks today. Let's make it a productive session.
+                      </p>
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
-          </motion.div>
+
+                  {/* Placeholder Live Widgets */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="bg-white/70 dark:bg-zinc-900/80 backdrop-blur-xl border border-zinc-200 dark:border-zinc-800 rounded-[2rem] p-8 shadow-lg h-[250px] flex flex-col justify-center items-center text-center">
+                      <FaTasks className="text-4xl text-zinc-300 dark:text-zinc-700 mb-4" />
+                      <h3 className="text-xl font-bold text-zinc-900 dark:text-white">Task Tracker</h3>
+                      <p className="text-zinc-500 text-sm mt-2">Module initializing in future update...</p>
+                      <button onClick={() => setActiveView('tasks')} className="mt-4 px-6 py-2 bg-zinc-100 dark:bg-zinc-800 rounded-full text-xs font-bold text-zinc-600 dark:text-zinc-300">Open Module</button>
+                    </div>
+                    <div className="bg-white/70 dark:bg-zinc-900/80 backdrop-blur-xl border border-zinc-200 dark:border-zinc-800 rounded-[2rem] p-8 shadow-lg h-[250px] flex flex-col justify-center items-center text-center">
+                      <FaStickyNote className="text-4xl text-zinc-300 dark:text-zinc-700 mb-4" />
+                      <h3 className="text-xl font-bold text-zinc-900 dark:text-white">Cloud Notes</h3>
+                      <p className="text-zinc-500 text-sm mt-2">Module initializing in future update...</p>
+                      <button onClick={() => setActiveView('notes')} className="mt-4 px-6 py-2 bg-zinc-100 dark:bg-zinc-800 rounded-full text-xs font-bold text-zinc-600 dark:text-zinc-300">Open Module</button>
+                    </div>
+                  </div>
+
+                </motion.div>
+              )}
+
+              {/* --- VIEW: TOOLS --- */}
+              {activeView === 'schedule' && (
+                <motion.div key="schedule" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.3 }}><ScheduleMaker /></motion.div>
+              )}
+              {activeView === 'calc' && (
+                <motion.div key="calc" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.3 }} className="grid grid-cols-1 2xl:grid-cols-2 gap-8 items-start">
+                  <GradeCalculator />
+                  <GWACalculator />
+                </motion.div>
+              )}
+              {activeView === 'flashcards' && (
+                <motion.div key="flashcards" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.3 }}><FlashcardMaker /></motion.div>
+              )}
+              
+              {/* --- VIEW: PREMIUM TOOLS (PLACEHOLDERS FOR NOW) --- */}
+              {(activeView === 'tasks' || activeView === 'notes') && (
+                <motion.div key="premium" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ duration: 0.3 }} className="w-full h-[600px] bg-white/70 dark:bg-zinc-900/80 backdrop-blur-xl border border-zinc-200 dark:border-zinc-800 rounded-[2rem] shadow-xl flex flex-col items-center justify-center text-center p-8">
+                  <div className="w-20 h-20 bg-green-500/10 text-green-500 rounded-full flex items-center justify-center mb-6">
+                    {activeView === 'tasks' ? <FaTasks size={32} /> : <FaStickyNote size={32} />}
+                  </div>
+                  <h2 className="text-3xl font-black text-zinc-900 dark:text-white mb-4 uppercase tracking-tight">System Updating</h2>
+                  <p className="text-zinc-500 max-w-md mx-auto">
+                    The {activeView === 'tasks' ? 'Task Tracker' : 'Cloud Notes'} module is currently being compiled by the engineering team. Check back soon.
+                  </p>
+                </motion.div>
+              )}
+
+            </AnimatePresence>
+          </motion.main>
+
         </div>
-
-        {/* --- RIGHT COL: STATS --- */}
-        <div className="space-y-6">
-          <motion.div 
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.2 }}
-            className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-sm transition-colors"
-          >
-            <h3 className="text-xs font-mono uppercase text-zinc-500 mb-6 tracking-widest">Performance_Metrics</h3>
-            
-            <div className="space-y-6">
-               <div className="flex items-center justify-between">
-                  <span className="text-zinc-600 dark:text-zinc-400 flex items-center gap-2 text-sm"><FileText className="w-4 h-4"/> Total Posts</span>
-                  <span className="text-2xl font-bold text-zinc-900 dark:text-white">{myPosts.length}</span>
-               </div>
-               
-               <div className="w-full h-px bg-zinc-100 dark:bg-zinc-800" />
-
-               <div className="flex items-center justify-between">
-                  <span className="text-zinc-600 dark:text-zinc-400 flex items-center gap-2 text-sm"><CheckCircle className="w-4 h-4 text-green-500"/> Published</span>
-                  <span className="text-xl font-bold text-green-600 dark:text-green-500">
-                    {myPosts.filter(p => p.status === 'published').length}
-                  </span>
-               </div>
-
-               <div className="flex items-center justify-between">
-                  <span className="text-zinc-600 dark:text-zinc-400 flex items-center gap-2 text-sm"><Clock className="w-4 h-4 text-yellow-500"/> Pending</span>
-                  <span className="text-xl font-bold text-yellow-600 dark:text-yellow-500">
-                    {myPosts.filter(p => p.status === 'pending').length}
-                  </span>
-               </div>
-            </div>
-
-            <div className="mt-8 pt-6 border-t border-zinc-100 dark:border-zinc-800">
-               <div className="text-[10px] md:text-xs text-zinc-500 font-mono leading-relaxed">
-                  SYSTEM NOTE:<br/>
-                  All submissions are subject to admin review before going live.
-               </div>
-            </div>
-          </motion.div>
-        </div>
-
       </div>
-    </div>
+    </section>
   );
 }

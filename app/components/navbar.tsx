@@ -107,24 +107,9 @@ export default function Navbar() {
             <Link href="/Officers" className={getNavLinkClass('/Officers')}>Officers</Link>
             <Link href="/Blogs" className={getNavLinkClass('/Blogs')}>Blogs</Link>
             <Link href="/Events" className={getNavLinkClass('/Events')}>Events</Link>
-            <Link href="/Tools" className={getNavLinkClass('/Tools')}>Tools</Link>
+            <Link href="/Workspace" className={getNavLinkClass('/Workspace')}>Workspace</Link>
             
             {/* Flashing Registration Link */}
-            <Link 
-              href="/castweek" 
-              className={`
-                relative flex items-center gap-2 font-black transition-all duration-300 hover:-translate-y-0.5
-                text-green-600 dark:text-green-400 drop-shadow-sm
-              `}
-            >
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-              </span>
-              <span className="uppercase tracking-wider text-sm animate-pulse">
-                Registration
-              </span>
-            </Link>
 
             <Link 
               href="/Contact" 
@@ -189,8 +174,7 @@ export default function Navbar() {
                     { name: "Officers", path: "/Officers" },
                     { name: "Blogs", path: "/Blogs" },
                     { name: "Events", path: "/Events" },
-                    { name: "Tools", path: "/Tools" },
-                    { name: "Registration", path: "/castweek", isRegistration: true }, 
+                    { name: "Workspace", path: "/Workspace" },
                   ].map((link, i) => (
                     <motion.div key={i} variants={linkVariants}>
                       <Link 
@@ -204,19 +188,9 @@ export default function Navbar() {
                       >
                         <span className={`text-xs font-mono font-normal mt-2 ${isActive(link.path) ? "text-green-600 dark:text-green-400" : "text-zinc-400 dark:text-zinc-600"}`}>
                           0{i + 1}
-                        </span>
-                        
-                        {link.isRegistration ? (
-                          <span className="flex items-center gap-3 text-green-600 dark:text-green-400 animate-pulse">
-                            {link.name}
-                            <span className="relative flex h-3 w-3">
-                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                              <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
-                            </span>
-                          </span>
-                        ) : (
-                          <span>{link.name}</span>
-                        )}
+                        </span> 
+                        {/* FIX: Added the missing link text here */}
+                        {link.name} 
                       </Link>
                     </motion.div>
                   ))}

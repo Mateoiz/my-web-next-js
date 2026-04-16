@@ -108,12 +108,6 @@ export const YEAR_REPS = [
 
 export const GRAPHIC_DESIGNERS = [
   { 
-    name: "Jhenelle Fern Refuerzo", 
-    role: "Graphic Designer", 
-    icon: <FaPaintBrush />,
-    image: "/creatives/GA1.JPG"
-  },
-  { 
     name: "Chelsy Mei Tuazon", 
     role: "Graphic Designer", 
     icon: <FaPaintBrush />,
@@ -123,7 +117,7 @@ export const GRAPHIC_DESIGNERS = [
     name: "Marcelino III Zapanta", 
     role: "Graphic Designer", 
     icon: <FaPaintBrush />,
-    image: "/creatives/GA3.jpg"
+    image: "/creatives/GA3.JPG"
   },
   { 
     name: "Ashley Krishan Navarro", 
@@ -144,7 +138,7 @@ export const MEDIA_TEAM = [
     name: "Jose Luis Gabo", 
     role: "Photographer", 
     icon: <FaCamera />,
-    image: "/creatives/PH3.png"
+    image: "/creatives/PH3.JPG"
   },
   { 
     name: "Carlos Alcantara", 

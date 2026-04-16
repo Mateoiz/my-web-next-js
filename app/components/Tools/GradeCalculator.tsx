@@ -2,12 +2,35 @@
 
 import { useState, useCallback, memo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { FaCalculator, FaEraser, FaArrowRight, FaExclamationTriangle, FaChevronDown, FaChevronUp } from "react-icons/fa";
+import { FaCalculator, FaEraser, FaArrowRight, FaExclamationTriangle, FaChevronDown } from "react-icons/fa";
 
 // --- HELPERS ---
-const getGpaFromScore = (score: number) => {
+const getGpaFromScore = (score: number, program: string) => {
   // STRICT COMPARISON: No rounding occurs here. 
-  // 96.99 will fail the >= 97 check and correctly return 3.5
+
+  if (program === "BSA") {
+    if (score >= 98) return 4.0;
+    if (score >= 95) return 3.5;
+    if (score >= 91) return 3.0;
+    if (score >= 87) return 2.5;
+    if (score >= 82) return 2.0;
+    if (score >= 77) return 1.5;
+    if (score >= 72) return 1.0;
+    return 0.0;
+  }
+
+  if (program === "DVM") {
+    if (score >= 97) return 4.0;
+    if (score >= 93) return 3.5;
+    if (score >= 89) return 3.0;
+    if (score >= 85) return 2.5;
+    if (score >= 80) return 2.0;
+    if (score >= 75) return 1.5;
+    if (score >= 70) return 1.0;
+    return 0.0;
+  }
+
+  // Standard Program (The rest)
   if (score >= 97) return 4.0;
   if (score >= 91) return 3.5;
   if (score >= 85) return 3.0;
@@ -20,6 +43,7 @@ const getGpaFromScore = (score: number) => {
 
 // --- COMPONENT ---
 export default function GradeCalculator() {
+  const [program, setProgram] = useState("Standard");
   const [midterms, setMidterms] = useState({ raw: "", total: "", weight: "30" });
   const [finals, setFinals] = useState({ raw: "", total: "", weight: "30" });
   const [finalProduct, setFinalProduct] = useState({ raw: "", total: "", weight: "20" });
@@ -34,17 +58,21 @@ export default function GradeCalculator() {
       const raw = parseFloat(item.raw);
       if (isNaN(raw)) return 0;
       
+      // Class Standing logic: Value is added EXACTLY as it is typed
       if (isDirect) {
         if (raw > 20) return -3;
         if (raw < 0) return -4;
-        return raw;
+        return raw; 
       }
 
       const total = parseFloat(item.total);
       const weight = parseFloat(item.weight);
+      
       if (isNaN(total) || total === 0) return raw > 0 ? -1 : 0;
       if (raw > total) return -2;
-      return (raw / total) * 100 * (weight / 100);
+      
+      // PRECISE FORMULA: (SCORE / TOTAL ITEMS) * WEIGHT
+      return (raw / total) * weight;
     };
 
     const midPts = getPoints(midterms);
@@ -52,21 +80,21 @@ export default function GradeCalculator() {
     const prodPts = getPoints(finalProduct);
     const csPts = getPoints(classStanding, true);
 
+    // Error Handling
     if ([midPts, finPts, prodPts].includes(-1)) return setResult({ ...result, error: "Please enter 'Total Items'." });
     if ([midPts, finPts, prodPts].includes(-2)) return setResult({ ...result, error: "Score cannot be higher than Total." });
     if (csPts === -3) return setResult({ ...result, error: "Class Standing max is 20." });
     if (csPts === -4) return setResult({ ...result, error: "Negative scores invalid." });
 
+    // Final Summation
     const totalScore = midPts + finPts + prodPts + csPts;
     
-    // FIX: Removed Math.round(totalScore). 
-    // Now passes the exact float (e.g., 96.6) to getGpaFromScore.
     setResult({ 
       percentage: totalScore, 
-      gpa: getGpaFromScore(totalScore), 
+      gpa: getGpaFromScore(totalScore, program), 
       error: null 
     });
-  }, [midterms, finals, finalProduct, classStanding]);
+  }, [midterms, finals, finalProduct, classStanding, program, result]);
 
   const reset = () => {
     setMidterms({ raw: "", total: "", weight: "30" });
@@ -79,10 +107,30 @@ export default function GradeCalculator() {
   return (
     <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md border border-zinc-200 dark:border-green-500/30 rounded-2xl shadow-xl relative overflow-hidden p-6 md:p-8">
       <div className="absolute top-0 left-0 w-full h-1 bg-green-500" />
-      <div className="flex items-center justify-between mb-6">
+      
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-8 gap-4">
         <div className="flex items-center gap-3">
           <div className="p-3 bg-green-500/10 rounded-lg text-green-600 dark:text-green-400"><FaCalculator size={20} /></div>
-          <div><h2 className="text-xl font-bold text-zinc-900 dark:text-white">Grade Projector</h2><p className="text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Subject Grade Calculator</p></div>
+          <div>
+            <h2 className="text-xl font-bold text-zinc-900 dark:text-white">Grade Projector</h2>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Subject Grade Calculator</p>
+          </div>
+        </div>
+
+        {/* Grading Scale Selector */}
+        <div className="relative w-full md:w-auto group">
+          <select 
+            value={program} 
+            onChange={(e) => setProgram(e.target.value)}
+            className="w-full md:w-48 bg-zinc-100 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-bold uppercase tracking-widest rounded-xl px-4 py-3 pr-10 outline-none focus:border-green-500 cursor-pointer appearance-none transition-colors group-hover:border-zinc-300 dark:group-hover:border-zinc-600"
+          >
+            <option value="Standard">Standard Program</option>
+            <option value="BSA">BS Accountancy</option>
+            <option value="DVM">Vet. Medicine</option>
+          </select>
+          <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-400">
+            <FaChevronDown size={10} />
+          </div>
         </div>
       </div>
 
