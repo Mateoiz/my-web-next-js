@@ -2,7 +2,6 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   // Fix for mobile link errors: Standardizes URLs to always end with a slash
-  // e.g. /blogs/article -> /blogs/article/
   trailingSlash: true, 
 
   images: {
@@ -14,6 +13,21 @@ const nextConfig: NextConfig = {
         pathname: '/**',
       },
     ],
+  },
+
+  async redirects() {
+    return [
+      {
+        source: '/Tools',
+        destination: '/Workspace',
+        permanent: true,
+      },
+      {
+        source: '/tools',
+        destination: '/Workspace',
+        permanent: true,
+      }
+    ];
   },
 };
 

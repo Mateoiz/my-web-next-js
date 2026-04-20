@@ -126,7 +126,7 @@ export const GRAPHIC_DESIGNERS = [
     image: "/creatives/GA4.JPG"
   },
 ];
-
+ 
 export const MEDIA_TEAM = [
   { 
     name: "Joshua Enriquez", 
