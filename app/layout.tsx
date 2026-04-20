@@ -7,9 +7,14 @@ import ClientLayout from "./components/ClientLayout";
 import { AuthProvider } from "./context/AuthContext";
 
 export const metadata: Metadata = {
-  title: "Junior Philippine Computer Society DLSAU",
-  description: "The official student organization for Computer Science at De La Salle Araneta University. We empower the next generation of tech innovators.",
+  // Put the target keyword (JPCS) first, followed by the full name and university
+  title: "JPCS | Junior Philippine Computer Society - DLSAU",
+  description: "The official Junior Philippine Computer Society (JPCS) student organization at De La Salle Araneta University. We empower the next generation of tech innovators.",
   
+  // Add search keywords (Google relies less on this now, but other search engines still check it)
+  keywords: ["JPCS", "JPCS DLSAU", "Junior Philippine Computer Society", "De La Salle Araneta University CS", "Computer Science DLSAU"],
+  
+  // ... keep your icons and openGraph stuff exactly as they are
   icons: {
     icon: "/Logo.png",
     apple: "/Logo.png", 
