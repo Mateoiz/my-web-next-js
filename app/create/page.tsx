@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { createPost, storage } from "@/lib/db"; 
 import { createSlug } from "@/lib/slugify";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../context/AuthContext";
 import { useRouter } from "next/navigation";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import dynamic from "next/dynamic";
@@ -25,7 +25,7 @@ const proseStyles = `
 
 // --- DYNAMIC IMPORT ---
 const TiptapEditor = dynamic(
-  () => import("../../components/TiptapEditor").then((mod) => mod.TiptapEditor), 
+  () => import("../components/TiptapEditor").then((mod) => mod.TiptapEditor), 
   { 
     ssr: false, 
     loading: () => (

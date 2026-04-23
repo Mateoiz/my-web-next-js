@@ -59,6 +59,13 @@ export default function Navbar() {
   const closeMenu = useCallback(() => setIsMobileMenuOpen(false), []);
   const isActive = (path: string) => pathname === path;
 
+  // ==========================================
+  // THE KILL SWITCH: Hide on Dashboard
+  // ==========================================
+  if (pathname && pathname.toLowerCase().startsWith('/dashboard')) {
+    return null;
+  }
+
   // --- STYLES FOR LINKS (FIXED THEME) ---
   const getNavLinkClass = (path: string) => `
     relative pb-1 transition-colors duration-300 font-medium tracking-wide
