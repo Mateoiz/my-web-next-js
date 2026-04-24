@@ -148,7 +148,7 @@ function LoginForm() {
       </button>
 
       <div className="mt-8 text-center text-xs font-bold text-zinc-500 uppercase tracking-wide">
-        Need an account? <Link href="/workspace" className="text-black dark:text-white hover:underline">Register in Workspace</Link>
+        Need an account? <Link href="/Workspace" className="text-black dark:text-white hover:underline">Register in Workspace</Link>
       </div>
     </div>
   );
