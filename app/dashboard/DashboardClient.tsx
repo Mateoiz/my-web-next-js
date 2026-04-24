@@ -7,12 +7,10 @@ import { useTheme } from "next-themes";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
-  FaCalendarAlt, FaCalculator, FaLayerGroup, 
-  FaTasks, FaSignOutAlt,
-  FaPlus, FaCheckCircle, FaRegCircle, FaTrashAlt, 
-  FaTachometerAlt, FaGlobe, FaClock, FaUserFriends, 
-  FaChevronRight, FaTimes, FaCog, FaSun, FaMoon, FaDesktop, FaPalette, FaIdBadge, FaSave, FaCamera,
-  FaBolt, FaFolderOpen, FaBook, FaExpandArrowsAlt, FaChevronDown, FaCalendarDay, FaExclamationCircle, FaQuoteLeft, FaTrash
+  FaCalendarAlt, FaCalculator, FaLayerGroup, FaTasks, FaSignOutAlt, FaPlus, FaCheckCircle, 
+  FaTrashAlt, FaTachometerAlt, FaGlobe, FaClock, FaUserFriends, FaChevronRight, 
+  FaCog, FaSun, FaMoon, FaDesktop, FaPalette, FaIdBadge, FaSave, FaCamera, 
+  FaFolderOpen, FaCalendarDay, FaQuoteLeft, FaBook, FaTrash
 } from "react-icons/fa";
 
 import { onAuthStateChanged, signOut, User } from "firebase/auth";
@@ -21,6 +19,7 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { auth, db, storage } from "@/lib/db"; 
 
 import FloatingCubes from "../components/FloatingCubes"; 
+import CommandCenter from "../components/Layout/CommandCenter";
 
 // --- SAFE DYNAMIC IMPORTS ---
 const DashboardScheduleMaker = dynamic(() => import('../components/Tools/DashboardScheduleMaker'), { ssr: false });
@@ -32,34 +31,21 @@ const StudyLounge = dynamic(() => import('../components/Community/StudyLounge'),
 const UniversityTracker = dynamic(() => import('../components/Tools/UniversityTracker'), { ssr: false });
 const AcademicCalendar = dynamic(() => import('../components/Community/AcademicCalendar').then(mod => mod.default), { ssr: false });
 
+
 const NAV_ITEMS = [
   { id: 'dashboard', icon: <FaTachometerAlt size={20} />, label: "Home" },
   { id: 'tracker', icon: <FaFolderOpen size={20} />, label: "Tracker" },
-  { id: 'exchange', icon: <FaGlobe size={20} />, label: "Hub" },
-  { id: 'lounge', icon: <FaUserFriends size={20} />, label: "Lounge" },
-  { id: 'flashcards', icon: <FaLayerGroup size={20} />, label: "Cards" },
-  { id: 'schedule', icon: <FaClock size={20} />, label: "Sched" }, // <-- Schedule Maker is back!
-  { id: 'tools', icon: <FaCalculator size={20} />, label: "Grades" },
+  { id: 'schedule', icon: <FaClock size={20} />, label: "Sched" },
   { id: 'calendar', icon: <FaCalendarDay size={20} />, label: "Calendar" },
+  { id: 'tools', icon: <FaCalculator size={20} />, label: "Grades" },
+  { id: 'flashcards', icon: <FaLayerGroup size={20} />, label: "Cards" },
+  { id: 'lounge', icon: <FaUserFriends size={20} />, label: "Lounge" },
+  { id: 'exchange', icon: <FaGlobe size={20} />, label: "Hub" },
   { id: 'settings', icon: <FaCog size={20} />, label: "Settings" }, 
 ];
 
-// --- ENCOURAGEMENT QUOTES ---
-const INSPIRATIONAL_QUOTES = [
-  { q: "The expert in anything was once a beginner.", a: "Helen Hayes" },
-  { q: "It always seems impossible until it's done.", a: "Nelson Mandela" },
-  { q: "Strive for progress, not perfection.", a: "Unknown" },
-  { q: "Success is the sum of small efforts, repeated day in and day out.", a: "Robert Collier" },
-  { q: "The secret of getting ahead is getting started.", a: "Mark Twain" },
-  { q: "Focus on your goal. Don't look in any direction but ahead.", a: "Anonymous" },
-  { q: "Education is the most powerful weapon which you can use to change the world.", a: "Nelson Mandela" },
-  { q: "The beautiful thing about learning is that no one can take it away from you.", a: "B.B. King" },
-  { q: "You don't have to be great to start, but you have to start to be great.", a: "Zig Ziglar" },
-  { q: "There are no shortcuts to any place worth going.", a: "Beverly Sills" }
-];
-
 export default function DashboardClient() {
-  const [activeView, setActiveView] = useState<'dashboard' | 'tracker' | 'calendar' | 'lounge' | 'tools' | 'schedule' | 'flashcards' | 'exchange' | 'settings'>('dashboard');
+  const [activeView, setActiveView] = useState('dashboard');
   const [isLoading, setIsLoading] = useState(true);
   const [authUser, setAuthUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
@@ -72,27 +58,12 @@ export default function DashboardClient() {
   const [courses, setCourses] = useState<any[]>([]);
   const [friendsList, setFriendsList] = useState<any[]>([]);
   
-  const [newTaskTitle, setNewTaskTitle] = useState("");
-  const [newTaskDeadline, setNewTaskDeadline] = useState("");
-  const [isAddingTask, setIsAddingTask] = useState(false);
-  
   const [isAddingCourse, setIsAddingCourse] = useState(false);
   const [newCourseTitle, setNewCourseTitle] = useState("");
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
 
-  // Quote State
-  const [todaysQuote, setTodaysQuote] = useState({ q: "", a: "" });
-
-  // --- CUSTOM MODAL STATE ---
-  const [modal, setModal] = useState<{
-    isOpen: boolean;
-    title: string;
-    message: string;
-    type: 'alert' | 'confirm';
-    onConfirm?: () => void;
-    confirmText?: string;
-    isDestructive?: boolean;
-  }>({ isOpen: false, title: "", message: "", type: 'alert' });
+  const [todaysQuote, setTodaysQuote] = useState({ q: "Loading...", a: "" });
+  const [modal, setModal] = useState<any>({ isOpen: false });
 
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
@@ -105,25 +76,12 @@ export default function DashboardClient() {
 
   const router = useRouter();
 
-  // ==========================================
-  // --- MODAL CONTROLLERS (FIXED) ---
-  // ==========================================
-  const showAlert = (title: string, message: string) => {
-    setModal({ isOpen: true, title, message, type: 'alert' });
-  };
-  
-  const showConfirm = (title: string, message: string, onConfirm: () => void, confirmText = "Confirm", isDestructive = true) => {
+  // --- MODALS ---
+  const showAlert = (title: string, message: string) => setModal({ isOpen: true, title, message, type: 'alert' });
+  const showConfirm = (title: string, message: string, onConfirm: () => void, confirmText = "Confirm", isDestructive = true) => 
     setModal({ isOpen: true, title, message, type: 'confirm', onConfirm, confirmText, isDestructive });
-  };
-  
-  const closeModal = () => {
-    setModal(prev => ({ ...prev, isOpen: false }));
-  };
-
-  const confirmSignOut = () => {
-    showConfirm("Log Out", "Are you sure you want to log out of your session?", () => signOut(auth), "Log Out", false);
-  };
-  // ==========================================
+  const closeModal = () => setModal({ isOpen: false });
+  const confirmSignOut = () => showConfirm("Log Out", "Are you sure you want to log out?", () => signOut(auth), "Log Out", false);
 
   const getGreeting = () => {
     const hour = currentTime.getHours();
@@ -132,20 +90,23 @@ export default function DashboardClient() {
     return "Good evening";
   };
 
-  useEffect(() => { setMounted(true); }, []);
-
-  // Cycle Quote daily based on date
+  // --- ROCK SOLID QUOTE API (DummyJSON) ---
   useEffect(() => {
-    const dayOfMonth = currentTime.getDate();
-    const quoteIndex = dayOfMonth % INSPIRATIONAL_QUOTES.length;
-    setTodaysQuote(INSPIRATIONAL_QUOTES[quoteIndex]);
-  }, [currentTime]);
-
-  useEffect(() => {
-    if (window.innerWidth >= 768) setIsQueueOpen(true);
-    const timer = setInterval(() => setCurrentTime(new Date()), 60000);
-    return () => clearInterval(timer);
+    const fetchQuote = async () => {
+      try {
+        const res = await fetch('https://dummyjson.com/quotes/random');
+        const data = await res.json();
+        if (data.quote) {
+          setTodaysQuote({ q: data.quote, a: data.author });
+        }
+      } catch (e) {
+        setTodaysQuote({ q: "Strive for progress, not perfection.", a: "Unknown" });
+      }
+    };
+    fetchQuote();
   }, []);
+
+  useEffect(() => { setMounted(true); if (window.innerWidth >= 768) setIsQueueOpen(true); }, []);
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
@@ -181,13 +142,41 @@ export default function DashboardClient() {
     return () => unsubscribeAuth();
   }, [router]);
 
+  const handleAddGeneralTask = async (title: string, deadline: string) => {
+    if (!authUser) return;
+    await addDoc(collection(db, "tasks"), { userId: authUser.uid, title, status: "pending", deadline, createdAt: serverTimestamp() });
+  };
+
+  const toggleTaskStatus = async (task: any) => {
+    if (task.isCourseTask) await updateDoc(doc(db, "course_tasks", task.id), { status: task.status === "OPEN" ? "Submitted" : "OPEN" });
+    else await updateDoc(doc(db, "tasks", task.id), { status: task.status === "pending" ? "completed" : "pending" });
+  };
+
+  const deleteTask = async (task: any) => {
+    if (task.isCourseTask) await deleteDoc(doc(db, "course_tasks", task.id));
+    else await deleteDoc(doc(db, "tasks", task.id));
+  };
+
+  const handleAddCourse = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCourseTitle.trim() || !authUser) return;
+    await addDoc(collection(db, "courses"), { userId: authUser.uid, title: newCourseTitle, createdAt: serverTimestamp() });
+    setNewCourseTitle(""); setIsAddingCourse(false);
+  };
+
+  const deleteCourse = (courseId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    showConfirm("Delete Course", "Are you sure you want to delete this course and all its tasks?", async () => {
+        if (selectedCourseId === courseId) setSelectedCourseId(null);
+        await deleteDoc(doc(db, "courses", courseId));
+        courseTasks.filter(t => t.courseId === courseId).forEach(t => deleteDoc(doc(db, "course_tasks", t.id)));
+    });
+  };
+
   const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      if (e.target.files[0].size > 5 * 1024 * 1024) {
-        return showAlert("File Too Large", "Please select an image file under 5MB.");
-      }
-      setAvatarFile(e.target.files[0]);
-      setEditAvatarUrl(URL.createObjectURL(e.target.files[0])); 
+      if (e.target.files[0].size > 5 * 1024 * 1024) return showAlert("File Too Large", "Please select an image file under 5MB.");
+      setAvatarFile(e.target.files[0]); setEditAvatarUrl(URL.createObjectURL(e.target.files[0])); 
     }
   };
 
@@ -203,70 +192,22 @@ export default function DashboardClient() {
       }
       await updateDoc(doc(db, "users", authUser.uid), { bio: editBio, yearLevel: editYearLevel, avatarUrl: finalAvatarUrl });
       setUserProfile((prev: any) => ({ ...prev, avatarUrl: finalAvatarUrl }));
-      setAvatarFile(null); 
-      showAlert("Profile Updated", "Your profile changes have been saved successfully.");
-    } catch (error) {
-      showAlert("Update Failed", "Failed to update profile. Ensure Firebase Storage is initialized.");
-    } finally { 
-      setIsSavingProfile(false); 
-    }
+      setAvatarFile(null); showAlert("Profile Updated", "Your profile has been saved.");
+    } catch (error) {} finally { setIsSavingProfile(false); }
   };
 
-  const handleAddGeneralTask = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newTaskTitle.trim() || !authUser) return;
-    await addDoc(collection(db, "tasks"), { 
-      userId: authUser.uid, 
-      title: newTaskTitle, 
-      status: "pending", 
-      deadline: newTaskDeadline,
-      createdAt: serverTimestamp() 
-    });
-    setNewTaskTitle(""); 
-    setNewTaskDeadline("");
-    setIsAddingTask(false);
-  };
-
-  const handleAddCourse = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newCourseTitle.trim() || !authUser) return;
-    await addDoc(collection(db, "courses"), { userId: authUser.uid, title: newCourseTitle, createdAt: serverTimestamp() });
-    setNewCourseTitle(""); setIsAddingCourse(false);
-  };
-
-  const deleteCourse = (courseId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    showConfirm(
-      "Delete Course", 
-      "Are you sure you want to delete this course and all its tasks? This action cannot be undone.", 
-      async () => {
-        if (selectedCourseId === courseId) { setSelectedCourseId(null); }
-        await deleteDoc(doc(db, "courses", courseId));
-        courseTasks.filter(t => t.courseId === courseId).forEach(t => deleteDoc(doc(db, "course_tasks", t.id)));
-      },
-      "Delete Course",
-      true
-    );
-  };
-
-  const toggleTaskStatus = async (task: any) => {
-    if (task.isCourseTask) await updateDoc(doc(db, "course_tasks", task.id), { status: task.status === "OPEN" ? "Submitted" : "OPEN" });
-    else await updateDoc(doc(db, "tasks", task.id), { status: task.status === "pending" ? "completed" : "pending" });
-  };
-
-  const deleteTask = async (task: any) => {
-    if (task.isCourseTask) await deleteDoc(doc(db, "course_tasks", task.id));
-    else await deleteDoc(doc(db, "tasks", task.id));
-  };
-
-  const openCourseTracker = (courseId: string) => {
-    setSelectedCourseId(courseId);
-    setActiveView('tracker');
-  };
-
-  const mergedPendingTasks = [
+const mergedActiveTasks = [
     ...generalTasks.filter(t => t.status === 'pending').map(t => ({ ...t, isCourseTask: false })),
-    ...courseTasks.filter(t => t.status === 'OPEN').map(t => ({ id: t.id, title: `${t.name || 'Untitled'} (${t.type})`, status: t.status, deadline: t.deadline, isCourseTask: true }))
+    ...courseTasks
+      .filter(t => t.status === 'OPEN' || t.status === 'Submitted')
+      .map(t => ({ 
+        id: t.id, 
+        title: t.name || 'Untitled', 
+        type: t.type, 
+        status: t.status, 
+        deadline: t.deadline, 
+        isCourseTask: true 
+      }))
   ];
 
   const allCalendarTasks = [
@@ -275,81 +216,25 @@ export default function DashboardClient() {
   ];
 
   if (isLoading) return <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-[#09090b]"><span className="w-12 h-12 rounded-full border-4 border-[#06402B]/30 border-t-[#06402B] animate-spin" /></div>;
-
-  const dateOptions: Intl.DateTimeFormatOptions = { weekday: 'long', month: 'long', day: 'numeric' };
-  const formattedDate = currentTime.toLocaleDateString('en-US', dateOptions);
-
-  const renderMiniCalendar = () => {
-    const today = new Date();
-    const month = today.getMonth();
-    const year = today.getFullYear();
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const firstDay = new Date(year, month, 1).getDay();
-
-    const days = [];
-    for (let i = 0; i < firstDay; i++) days.push(<div key={`empty-${i}`} className="w-6 h-6" />);
-
-    for (let i = 1; i <= daysInMonth; i++) {
-      const isToday = i === today.getDate();
-      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
-      const hasTask = mergedPendingTasks.some(t => t.deadline === dateStr);
-
-      days.push(
-        <div key={i} className="relative w-6 h-6 flex items-center justify-center">
-          <div className={`w-full h-full flex items-center justify-center text-[10px] font-bold rounded-full ${isToday ? 'bg-[#06402B] text-white shadow-md' : 'text-zinc-600 dark:text-zinc-300'}`}>
-            {i}
-          </div>
-          {hasTask && <span className="absolute bottom-0 right-0 w-1.5 h-1.5 bg-orange-500 border border-white dark:border-[#121214] rounded-full shadow-sm" />}
-        </div>
-      );
-    }
-    return (
-      <div onClick={() => setActiveView('calendar')} className="bg-white/50 dark:bg-[#121214]/80 p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800/80 shadow-sm cursor-pointer hover:border-[#06402B]/50 transition-colors group">
-        <div className="flex justify-between items-center mb-2">
-          <h3 className="text-xs font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-100 group-hover:text-[#06402B] dark:group-hover:text-emerald-400 transition-colors">
-            {today.toLocaleString('default', { month: 'long', year: 'numeric' })}
-          </h3>
-          <FaExpandArrowsAlt className="text-zinc-400 dark:text-zinc-500 text-[10px] group-hover:text-[#06402B] dark:group-hover:text-emerald-400 transition-colors" />
-        </div>
-        <div className="grid grid-cols-7 gap-1 text-center mb-1">
-          {['S','M','T','W','T','F','S'].map((d, i) => <div key={i} className="text-[8px] font-bold text-zinc-400 dark:text-zinc-500">{d}</div>)}
-        </div>
-        <div className="grid grid-cols-7 gap-1 justify-items-center">
-          {days}
-        </div>
-      </div>
-    );
-  };
+  const formattedDate = currentTime.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
   return (
-    <div className="flex h-screen bg-zinc-50 dark:bg-[#09090b] font-sans text-zinc-900 dark:text-zinc-100 overflow-hidden relative selection:bg-[#06402B]/30 transition-colors duration-300">
+    <div className="flex h-screen bg-zinc-50 dark:bg-[#09090b] font-sans text-zinc-900 dark:text-zinc-100 overflow-hidden relative transition-colors duration-300">
       
-      {/* --- CUSTOM GLOBAL MODAL --- */}
+      {/* MODAL */}
       <AnimatePresence>
         {modal.isOpen && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={closeModal} className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-sm bg-white dark:bg-[#121214] border border-zinc-200 dark:border-zinc-800/80 rounded-[2rem] p-6 md:p-8 shadow-2xl z-10 text-center flex flex-col items-center">
-              
-              <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-5 ${modal.type === 'confirm' && modal.isDestructive ? 'bg-red-500/10 text-red-500 dark:bg-red-500/20 dark:text-red-400' : 'bg-[#06402B]/10 text-[#06402B] dark:bg-emerald-500/20 dark:text-emerald-400'}`}>
-                {modal.type === 'confirm' && modal.isDestructive ? <FaTrashAlt size={24} /> : modal.type === 'confirm' ? <FaSignOutAlt size={24} /> : <FaCheckCircle size={24} />}
+              <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-5 ${modal.isDestructive ? 'bg-red-500/10 text-red-500 dark:bg-red-500/20 dark:text-red-400' : 'bg-[#06402B]/10 text-[#06402B] dark:bg-emerald-500/20 dark:text-emerald-400'}`}>
+                {modal.isDestructive ? <FaTrashAlt size={24} /> : modal.type === 'confirm' ? <FaSignOutAlt size={24} /> : <FaCheckCircle size={24} />}
               </div>
-              
               <h3 className="text-xl font-black uppercase tracking-tight text-zinc-900 dark:text-zinc-100 mb-2">{modal.title}</h3>
               <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400 mb-8">{modal.message}</p>
-              
               <div className="flex gap-3 w-full">
-                {modal.type === 'confirm' && (
-                  <button onClick={closeModal} className="flex-1 py-3.5 bg-zinc-100 dark:bg-[#18181b] text-zinc-600 dark:text-zinc-300 rounded-xl font-bold text-xs uppercase tracking-widest hover:opacity-80 transition-opacity">
-                    Cancel
-                  </button>
-                )}
-                <button 
-                  onClick={() => { if (modal.onConfirm) modal.onConfirm(); closeModal(); }} 
-                  className={`flex-1 py-3.5 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-md hover:scale-105 active:scale-95 transition-all ${modal.type === 'confirm' && modal.isDestructive ? 'bg-red-600 hover:bg-red-500' : 'bg-[#06402B] hover:bg-[#042d1f] dark:bg-emerald-600 dark:hover:bg-emerald-500'}`}
-                >
-                  {modal.type === 'confirm' ? modal.confirmText : 'Okay'}
-                </button>
+                {modal.type === 'confirm' && <button onClick={closeModal} className="flex-1 py-3.5 bg-zinc-100 dark:bg-[#18181b] text-zinc-600 dark:text-zinc-300 rounded-xl font-bold text-xs uppercase tracking-widest">Cancel</button>}
+                <button onClick={() => { if (modal.onConfirm) modal.onConfirm(); closeModal(); }} className={`flex-1 py-3.5 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-md ${modal.isDestructive ? 'bg-red-600 hover:bg-red-500' : 'bg-[#06402B] hover:bg-[#042d1f] dark:bg-emerald-600 dark:hover:bg-emerald-500'}`}>{modal.confirmText || 'Okay'}</button>
               </div>
             </motion.div>
           </div>
@@ -361,89 +246,51 @@ export default function DashboardClient() {
         <div className="absolute top-[10%] left-[20%] w-[300px] md:w-[500px] h-[300px] md:h-[500px] bg-[#06402B]/10 dark:bg-emerald-500/5 rounded-full blur-[100px] md:blur-[150px]" />
       </div>
 
-      <aside className="hidden md:flex w-[84px] bg-white/50 dark:bg-[#09090b]/80 backdrop-blur-2xl border-r border-zinc-200 dark:border-zinc-800/80 shrink-0 flex-col items-center py-6 z-20 relative transition-colors duration-300">
-        
-        <div className="relative w-12 h-12 mb-8 group cursor-pointer flex items-center justify-center" onClick={() => setActiveView('dashboard')}>
-          <div className="absolute inset-0 bg-[#06402B]/20 dark:bg-emerald-500/20 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-          <div className="relative w-full h-full bg-white dark:bg-[#121214] rounded-xl border border-zinc-200 dark:border-zinc-800/80 flex items-center justify-center overflow-hidden p-1 shadow-lg transition-transform group-active:scale-90">
-            <Image src="/affiliates/dlsau.png" alt="JPCS Logo" fill sizes="48px" className="object-contain p-1.5" priority />
+      <aside className="hidden md:flex w-[84px] bg-white/50 dark:bg-[#09090b]/80 backdrop-blur-2xl border-r border-zinc-200 dark:border-zinc-800/80 shrink-0 flex-col items-center py-6 z-20 relative">
+        <div className="relative w-12 h-12 mb-8 cursor-pointer flex items-center justify-center" onClick={() => setActiveView('dashboard')}>
+          <div className="absolute inset-0 bg-[#06402B]/20 dark:bg-emerald-500/20 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-opacity" />
+          <div className="relative w-full h-full bg-white dark:bg-[#121214] rounded-xl border border-zinc-200 dark:border-zinc-800/80 flex items-center justify-center p-1 shadow-lg transition-transform active:scale-90">
+            <Image src="/affiliates/dlsau.png" alt="DLSAU" fill sizes="48px" className="object-contain p-1.5" priority />
           </div>
         </div>
-
         <nav className="flex-1 w-full flex flex-col gap-4">
-          {NAV_ITEMS.map((item) => {
-            const isActive = activeView === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => setActiveView(item.id as any)}
-                className={`w-full flex flex-col items-center gap-1.5 py-3 transition-all relative group ${isActive ? 'text-[#06402B] dark:text-emerald-400' : 'text-zinc-400 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}
-              >
-                {isActive && <motion.div layoutId="navIndicatorDesktop" className="absolute left-0 top-1/4 bottom-1/4 w-1 bg-[#06402B] dark:bg-emerald-500 rounded-r-full shadow-[0_0_10px_rgba(6,64,43,0.8)] dark:shadow-[0_0_10px_rgba(16,185,129,0.5)]" />}
-                <span className="relative group-hover:scale-110 transition-transform">{item.icon}</span>
-                <span className="text-[9px] font-mono tracking-widest uppercase">{item.label}</span>
-              </button>
-            );
-          })}
+          {NAV_ITEMS.map((item) => (
+            <button key={item.id} onClick={() => setActiveView(item.id)} className={`w-full flex flex-col items-center gap-1.5 py-3 transition-all relative group ${activeView === item.id ? 'text-[#06402B] dark:text-emerald-400' : 'text-zinc-400 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}>
+              {activeView === item.id && <motion.div layoutId="navInd" className="absolute left-0 top-1/4 bottom-1/4 w-1 bg-[#06402B] dark:bg-emerald-500 rounded-r-full shadow-[0_0_10px_rgba(6,64,43,0.8)] dark:shadow-[0_0_10px_rgba(16,185,129,0.5)]" />}
+              <span className="relative group-hover:scale-110 transition-transform">{item.icon}</span>
+              <span className="text-[9px] font-mono tracking-widest uppercase">{item.label}</span>
+            </button>
+          ))}
         </nav>
-
-        <button onClick={confirmSignOut} className="w-full flex flex-col items-center gap-1.5 py-3 text-zinc-500 dark:text-zinc-600 hover:text-red-500 dark:hover:text-red-400 transition-colors group">
-          <FaSignOutAlt size={22} className="group-hover:scale-110 transition-transform" />
-        </button>
+        <button onClick={confirmSignOut} className="w-full flex flex-col items-center gap-1.5 py-3 text-zinc-500 dark:text-zinc-600 hover:text-red-500 dark:hover:text-red-400 transition-colors group"><FaSignOutAlt size={22} className="group-hover:scale-110 transition-transform" /></button>
       </aside>
 
       <main className="flex-1 flex flex-col overflow-hidden relative z-10 w-full">
-        
-        <header className="h-16 md:h-20 bg-white/30 dark:bg-[#09090b]/60 backdrop-blur-md border-b border-zinc-200 dark:border-zinc-800/80 flex items-center justify-between px-4 md:px-8 shrink-0 relative z-20 transition-colors duration-300 w-full">
+        <header className="h-16 md:h-20 bg-white/30 dark:bg-[#09090b]/60 backdrop-blur-md border-b border-zinc-200 dark:border-zinc-800/80 flex items-center justify-between px-4 md:px-8 shrink-0 relative z-20">
           <div className="flex items-center gap-3 md:gap-6 min-w-0">
-            
             <div className="flex items-center gap-2 min-w-0 shrink-0">
-              <div className="relative w-6 h-6 md:w-8 md:h-8 shrink-0 drop-shadow-sm">
-                <Image src="/affiliates/dlsau.png" alt="DLSAU" fill sizes="32px" className="object-contain" />
-              </div>
-              <div className="relative w-6 h-6 md:w-8 md:h-8 shrink-0 drop-shadow-sm hidden sm:block">
-                <Image src="/affiliates/icon.png" alt="JPCS" fill sizes="32px" className="object-contain" />
-              </div>
+              <div className="relative w-6 h-6 md:w-8 md:h-8 shrink-0 drop-shadow-sm"><Image src="/affiliates/dlsau.png" alt="DLSAU" fill sizes="32px" className="object-contain" /></div>
+              <div className="relative w-6 h-6 md:w-8 md:h-8 shrink-0 drop-shadow-sm hidden sm:block"><Image src="/affiliates/icon.png" alt="JPCS" fill sizes="32px" className="object-contain" /></div>
               <div className="flex flex-col min-w-0 ml-1">
                 <span className="hidden md:block text-[10px] font-mono font-bold text-[#06402B] dark:text-emerald-500 tracking-[0.3em] uppercase opacity-80 leading-none mb-1">The Academic</span>
-                <h1 className="text-base md:text-2xl font-light tracking-[0.1em] text-zinc-800 dark:text-zinc-100 uppercase leading-none truncate">
-                  <span className="hidden sm:inline">Lasallian</span> <span className="font-black text-[#06402B] dark:text-emerald-400">Terminal</span>
-                </h1>
+                <h1 className="text-base md:text-2xl font-light tracking-[0.1em] text-zinc-800 dark:text-zinc-100 uppercase leading-none truncate"><span className="hidden sm:inline">Lasallian</span> <span className="font-black text-[#06402B] dark:text-emerald-400">Hub</span></h1>
               </div>
             </div>
-            
             <div className="w-px h-8 bg-zinc-200 dark:bg-zinc-800 hidden md:block shrink-0" />
-            <div className="hidden md:flex items-center gap-2 px-3 py-1 bg-[#06402B]/5 dark:bg-emerald-500/10 border border-[#06402B]/10 dark:border-emerald-500/20 rounded-full text-[9px] font-mono font-bold text-[#06402B] dark:text-emerald-400 tracking-widest uppercase shrink-0">
-              System Online
-            </div>
+            <div className="hidden md:flex items-center gap-2 px-3 py-1 bg-[#06402B]/5 dark:bg-emerald-500/10 border border-[#06402B]/10 dark:border-emerald-500/20 rounded-full text-[9px] font-mono font-bold text-[#06402B] dark:text-emerald-400 tracking-widest uppercase shrink-0">System Online</div>
           </div>
-          
           <div className="flex items-center gap-3 md:gap-4 shrink-0">
              <div className="text-right hidden sm:block">
                <p className="text-sm font-bold text-zinc-800 dark:text-zinc-100 leading-none mb-1 truncate max-w-[150px]">{userProfile?.fullName || "Scholar"}</p>
                <p className="text-[9px] font-mono text-zinc-500 dark:text-zinc-400 uppercase tracking-tighter">Verified Student Account</p>
              </div>
-             
-             <div 
-               className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-zinc-200 dark:bg-[#18181b] flex items-center justify-center text-zinc-500 dark:text-zinc-400 border border-zinc-300 dark:border-zinc-700 relative cursor-pointer shrink-0 overflow-hidden shadow-sm" 
-               onClick={() => setActiveView('settings')}
-               title="Open Profile Settings"
-             >
-               {userProfile?.avatarUrl ? (
-                 <Image src={userProfile.avatarUrl} alt="Avatar" fill sizes="40px" className="object-cover" />
-               ) : (
-                 <span className="font-bold text-sm">{userProfile?.fullName?.charAt(0) || "U"}</span>
-               )}
+             <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-zinc-200 dark:bg-[#18181b] flex items-center justify-center text-zinc-500 dark:text-zinc-400 border border-zinc-300 dark:border-zinc-700 relative cursor-pointer shrink-0 overflow-hidden shadow-sm" onClick={() => setActiveView('settings')}>
+               {userProfile?.avatarUrl ? <Image src={userProfile.avatarUrl} alt="Avatar" fill sizes="40px" className="object-cover" /> : <span className="font-bold text-sm">{userProfile?.fullName?.charAt(0) || "U"}</span>}
                <div className="absolute top-0 right-0 w-2 h-2 md:w-2.5 md:h-2.5 bg-green-500 rounded-full border-2 border-white dark:border-[#09090b] z-10" />
              </div>
-
              <div className="w-px h-6 md:h-8 bg-zinc-200 dark:bg-zinc-800 mx-1 md:mx-2 shrink-0" />
-             
-             <button 
-                onClick={() => setIsQueueOpen(!isQueueOpen)}
-                className={`w-8 h-8 md:w-10 md:h-10 rounded-xl flex items-center justify-center transition-all duration-300 shrink-0 ${isQueueOpen ? 'bg-[#06402B] dark:bg-emerald-600 text-white shadow-[0_0_15px_rgba(6,64,43,0.3)] dark:shadow-[0_0_15px_rgba(16,185,129,0.3)] hover:scale-105' : 'bg-zinc-100 dark:bg-[#18181b] text-zinc-500 hover:text-[#06402B] hover:bg-[#06402B]/5'}`}
-              >
-                {isQueueOpen ? <FaChevronRight size={12} className="md:w-3.5 md:h-3.5" /> : <FaTasks size={14} className="md:w-4 md:h-4" />}
+             <button onClick={() => setIsQueueOpen(!isQueueOpen)} className={`w-8 h-8 md:w-10 md:h-10 rounded-xl flex items-center justify-center transition-all duration-300 shrink-0 ${isQueueOpen ? 'bg-[#06402B] dark:bg-emerald-600 text-white shadow-[0_0_15px_rgba(6,64,43,0.3)]' : 'bg-zinc-100 dark:bg-[#18181b] text-zinc-500 hover:text-[#06402B] dark:hover:text-emerald-400'}`}>
+                {isQueueOpen ? <FaChevronRight size={12} /> : <FaTasks size={14} />}
              </button>
           </div>
         </header>
@@ -451,29 +298,23 @@ export default function DashboardClient() {
         <div className="flex-1 overflow-x-hidden overflow-y-auto p-4 sm:p-6 md:p-8 pb-28 md:pb-8 custom-scrollbar relative z-10 w-full">
           <AnimatePresence mode="wait">
             
-            {/* === 1. HOME DASHBOARD === */}
+            {/* 1. DASHBOARD */}
             {activeView === 'dashboard' && (
               <motion.div key="dash" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-6 md:space-y-8 max-w-5xl mx-auto w-full">
-                
-                <div className="p-6 sm:p-8 md:p-10 rounded-[2rem] md:rounded-[3rem] bg-white/40 dark:bg-[#121214]/60 backdrop-blur-xl border border-zinc-200 dark:border-zinc-800/80 relative overflow-hidden shadow-xl text-center md:text-left transition-colors duration-300 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div className="p-6 sm:p-8 md:p-10 rounded-[2rem] md:rounded-[3rem] bg-white/40 dark:bg-[#121214]/60 backdrop-blur-xl border border-zinc-200 dark:border-zinc-800/80 relative overflow-hidden shadow-xl md:text-left flex flex-col md:flex-row md:items-center justify-between gap-6">
                   <div className="absolute top-0 left-0 w-64 h-64 bg-[#06402B]/5 dark:bg-emerald-500/5 blur-[100px] rounded-full pointer-events-none" />
                   <div className="relative z-10 w-full flex flex-col gap-2">
                     <div className="inline-flex self-center md:self-start items-center gap-2 px-3 py-1 mb-2 rounded-full bg-zinc-200/50 dark:bg-[#18181b]/80 text-[9px] md:text-[10px] font-mono font-bold tracking-widest text-zinc-500 dark:text-zinc-400 uppercase">
                       <FaClock /> {formattedDate}
                     </div>
-                    <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-zinc-900 dark:text-zinc-100 mb-2 tracking-tighter">
+                    <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-center md:text-left text-zinc-900 dark:text-zinc-100 mb-2 tracking-tighter">
                       {getGreeting()}, <span className="text-[#06402B] dark:text-emerald-400 font-light italic">{userProfile?.fullName?.split(' ')[0] || "Scholar"}</span>.
                     </h2>
-                    
                     <div className="flex items-start gap-3 mt-6 justify-center md:justify-start">
                       <FaQuoteLeft className="text-[#06402B]/20 dark:text-emerald-400/20 mt-1 shrink-0" size={18} />
                       <div className="space-y-1">
-                        <p className="font-light italic text-base md:text-lg text-zinc-500 dark:text-zinc-400 leading-relaxed">
-                          {todaysQuote.q}
-                        </p>
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-[#06402B] dark:text-emerald-500">
-                          — {todaysQuote.a}
-                        </p>
+                        <p className="font-light italic text-base md:text-lg text-zinc-500 dark:text-zinc-400 leading-relaxed text-center md:text-left">{todaysQuote.q}</p>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-[#06402B] dark:text-emerald-500 text-center md:text-left">— {todaysQuote.a}</p>
                       </div>
                     </div>
                   </div>
@@ -484,7 +325,7 @@ export default function DashboardClient() {
                     <motion.form initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} onSubmit={handleAddCourse} className="overflow-hidden">
                       <div className="flex gap-2 bg-white dark:bg-[#121214] p-2 rounded-2xl border border-zinc-200 dark:border-zinc-800/80 shadow-sm mb-4">
                         <input autoFocus type="text" placeholder="e.g., Computer Science 101" value={newCourseTitle} onChange={(e) => setNewCourseTitle(e.target.value)} className="flex-1 bg-transparent px-4 py-2 outline-none font-bold text-sm text-zinc-900 dark:text-zinc-100" />
-                        <button type="submit" disabled={!newCourseTitle.trim()} className="px-6 bg-[#06402B] dark:bg-emerald-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest disabled:opacity-50">Create Folder</button>
+                        <button type="submit" disabled={!newCourseTitle.trim()} className="px-6 bg-[#06402B] dark:bg-emerald-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest disabled:opacity-50">Create</button>
                       </div>
                     </motion.form>
                   )}
@@ -495,9 +336,8 @@ export default function DashboardClient() {
                     const cTasks = courseTasks.filter(t => t.courseId === course.id);
                     const completedTasks = cTasks.filter(t => t.status === "Submitted" || t.status === "Graded");
                     const progress = cTasks.length > 0 ? (completedTasks.length / cTasks.length) * 100 : 0;
-
                     return (
-                      <motion.div key={course.id} whileHover={{ y: -4 }} onClick={() => openCourseTracker(course.id)} className="bg-white/60 dark:bg-[#121214]/80 backdrop-blur-xl border border-zinc-200 dark:border-zinc-800/80 rounded-[2rem] p-6 cursor-pointer shadow-sm hover:shadow-md group transition-all relative">
+                      <motion.div key={course.id} whileHover={{ y: -4 }} onClick={() => { setSelectedCourseId(course.id); setActiveView('tracker'); }} className="bg-white/60 dark:bg-[#121214]/80 backdrop-blur-xl border border-zinc-200 dark:border-zinc-800/80 rounded-[2rem] p-6 cursor-pointer shadow-sm hover:shadow-md group transition-all relative">
                         <div className="flex justify-between items-start mb-4">
                           <div className="w-12 h-12 bg-[#06402B]/10 dark:bg-emerald-500/10 text-[#06402B] dark:text-emerald-400 rounded-2xl flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform"><FaBook size={18} /></div>
                           <button onClick={(e) => deleteCourse(course.id, e)} className="p-2 text-zinc-300 dark:text-zinc-600 hover:text-red-500 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity z-20"><FaTrash size={14} /></button>
@@ -512,92 +352,34 @@ export default function DashboardClient() {
                     );
                   })}
                   
-                  {/* --- HOLLOW ADD CARD --- */}
-                  <motion.div 
-                    whileHover={{ y: -4, scale: 1.01 }}
-                    onClick={() => setIsAddingCourse(!isAddingCourse)} 
-                    className="group border-4 border-dashed border-zinc-200 dark:border-zinc-800/80 rounded-[2rem] p-6 cursor-pointer transition-all flex flex-col items-center justify-center gap-4 py-12 md:py-16 text-center shadow-sm hover:shadow-md"
-                  >
+                  <motion.div whileHover={{ y: -4, scale: 1.01 }} onClick={() => setIsAddingCourse(!isAddingCourse)} className="group border-4 border-dashed border-zinc-200 dark:border-zinc-800/80 rounded-[2rem] p-6 cursor-pointer transition-all flex flex-col items-center justify-center gap-4 py-12 md:py-16 text-center hover:shadow-md">
                     <div className="w-16 h-16 bg-zinc-100 dark:bg-[#18181b] rounded-full flex items-center justify-center border-2 border-zinc-200 dark:border-zinc-800 group-hover:scale-110 transition-transform shadow-inner group-hover:bg-[#06402B]/10 dark:group-hover:bg-emerald-500/10">
                       <FaPlus className="text-zinc-400 dark:text-zinc-600 group-hover:text-[#06402B] dark:group-hover:text-emerald-400" size={24} />
                     </div>
                     <div className="space-y-1.5">
-                      <h3 className="text-sm font-black text-zinc-500 dark:text-zinc-500 uppercase tracking-widest group-hover:text-zinc-900 dark:group-hover:text-zinc-100 transition-colors">
-                        Add New Course
-                      </h3>
-                      <p className="text-[10px] font-bold text-zinc-400 dark:text-zinc-600 uppercase tracking-widest">
-                        Initialize a new tracker folder
-                      </p>
+                      <h3 className="text-sm font-black text-zinc-500 uppercase tracking-widest group-hover:text-zinc-900 dark:group-hover:text-zinc-100">Add New Course</h3>
                     </div>
                   </motion.div>
                 </div>
               </motion.div>
             )}
 
-            {/* === 2. TRACKER TABLE VIEW === */}
-            {activeView === 'tracker' && (
-              <motion.div key="tracker" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="w-full max-w-7xl mx-auto">
-                
-                <div className="mb-6 bg-white/40 dark:bg-[#121214]/60 p-6 md:p-8 rounded-[2rem] border border-zinc-200 dark:border-zinc-800/80 backdrop-blur-md shadow-sm transition-colors flex flex-col md:flex-row md:items-center justify-between gap-6">
-                  
-                  <div className="flex items-center gap-5">
-                    <div className="w-16 h-16 bg-[#06402B]/10 dark:bg-emerald-500/10 text-[#06402B] dark:text-emerald-400 rounded-[1.5rem] flex items-center justify-center shrink-0 border border-[#06402B]/20 dark:border-emerald-500/20 shadow-inner">
-                       <FaFolderOpen size={30} />
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 dark:text-zinc-400">Lasallian Terminal Tool</p>
-                      <h2 className="text-3xl font-black text-zinc-900 dark:text-zinc-100 tracking-tighter uppercase">
-                        Course Tracker
-                      </h2>
-                    </div>
-                  </div>
-                  
-                  {selectedCourseId ? (
-                    <button onClick={() => { setSelectedCourseId(null); setActiveView('dashboard'); }} className="w-full md:w-auto px-6 py-4 bg-zinc-200 dark:bg-[#18181b] text-zinc-600 dark:text-zinc-300 font-bold uppercase tracking-widest text-[10px] md:text-xs rounded-2xl hover:opacity-80 transition-opacity shrink-0 border dark:border-zinc-800 shadow-sm hover:scale-105 active:scale-95 transition-all">
-                       Back to Grid
-                    </button>
-                  ) : (
-                    <div className="text-right hidden md:block">
-                        <p className="text-[10px] font-bold text-zinc-400 dark:text-zinc-600 uppercase tracking-widest">Go to Home Dashboard</p>
-                        <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">to select a folder</p>
-                    </div>
-                  )}
-                </div>
-                
-                {!selectedCourseId ? (
-                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="py-24 border-4 border-dashed border-zinc-300 dark:border-zinc-800 rounded-[2rem] text-center flex flex-col items-center justify-center gap-6 bg-white/20 dark:bg-white/5 shadow-inner">
-                    <div className="w-20 h-20 bg-zinc-100 dark:bg-[#18181b] rounded-full flex items-center justify-center border-2 border-zinc-200 dark:border-zinc-800 shadow-sm relative group">
-                        <div className="absolute inset-0 bg-[#06402B]/10 rounded-full blur-xl opacity-0 group-hover:opacity-100 transition-opacity"/>
-                      <FaFolderOpen size={36} className="text-zinc-400 dark:text-zinc-700 relative z-10" />
-                    </div>
-                    <div className="space-y-1.5 px-4 max-w-sm mx-auto">
-                      <span className="font-bold uppercase tracking-widest text-base text-zinc-500 dark:text-zinc-400 block">Please Select a Course Folder</span>
-                      <p className="text-xs font-medium text-zinc-400 dark:text-zinc-600 leading-relaxed">
-                        It seems you haven't picked a course card from the <button onClick={() => setActiveView('dashboard')} className="text-[#06402B] dark:text-emerald-400 font-bold hover:underline hover:text-emerald-300">Dashboard Home</button> yet. You are about to pick one palang to view its internal deliverables.
-                      </p>
-                    </div>
-                  </motion.div>
-                ) : (
-                  <UniversityTracker courseId={selectedCourseId} />
-                )}
-              </motion.div>
-            )}
+            {/* 2. TRACKER TABLE */}
+{activeView === 'tracker' && (
+  <motion.div key="tracker" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="w-full max-w-7xl mx-auto">
+    <UniversityTracker />
+  </motion.div>
+)}
 
-            {/* === 3. MASTER CALENDAR VIEW === */}
-            {activeView === 'calendar' && (
-              <motion.div key="calendar" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="w-full max-w-7xl mx-auto">
-                 <AcademicCalendar userTasks={allCalendarTasks} />
-              </motion.div>
-            )}
-
-            {/* Other Views Wrappers */}
+            {/* OTHER VIEWS */}
+            {activeView === 'calendar' && <motion.div key="cal" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-7xl mx-auto"><AcademicCalendar userTasks={allCalendarTasks} /></motion.div>}
             {activeView === 'lounge' && <motion.div key="lounge" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="max-w-7xl mx-auto w-full"><StudyLounge /></motion.div>}
-            {activeView === 'exchange' && <motion.div key="exchange" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="w-full"><FlashcardExchange /></motion.div>}
+            {activeView === 'exchange' && <motion.div key="exch" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="w-full"><FlashcardExchange /></motion.div>}
             {activeView === 'tools' && <motion.div key="tools" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col gap-6 md:gap-8 max-w-4xl mx-auto w-full"><GradeCalculator /><GWACalculator /></motion.div>}
             {activeView === 'schedule' && <motion.div key="sched" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="max-w-6xl w-full"><DashboardScheduleMaker /></motion.div>}
             {activeView === 'flashcards' && <motion.div key="cards" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="max-w-7xl mx-auto w-full"><FlashcardMaker /></motion.div>}
             
-            {/* Settings */}
+            {/* SETTINGS */}
             {activeView === 'settings' && (
               <motion.div key="settings" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="max-w-4xl mx-auto space-y-6 md:space-y-8 w-full">
                 <div className="flex flex-col md:flex-row justify-between gap-6 items-start md:items-end mb-2">
@@ -608,21 +390,13 @@ export default function DashboardClient() {
                 </div>
 
                 <div className="bg-white/60 dark:bg-[#121214]/80 backdrop-blur-xl rounded-[2rem] border border-zinc-200 dark:border-zinc-800/80 p-6 md:p-8 shadow-xl transition-colors duration-300 w-full">
-                  <h3 className="text-sm font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-100 mb-6 flex items-center gap-2">
-                    <FaIdBadge className="text-[#06402B] dark:text-emerald-400" /> Public Profile
-                  </h3>
-
+                  <h3 className="text-sm font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-100 mb-6 flex items-center gap-2"><FaIdBadge className="text-[#06402B] dark:text-emerald-400" /> Public Profile</h3>
                   <div className="flex flex-col md:flex-row gap-8 items-center md:items-start">
                     <div className="flex flex-col items-center gap-4 shrink-0 w-full md:w-auto">
                       <div className="relative w-32 h-32 rounded-full bg-zinc-200 dark:bg-[#18181b] flex items-center justify-center text-4xl font-bold text-zinc-500 border-4 border-white dark:border-zinc-950 shadow-lg overflow-hidden group">
-                        {editAvatarUrl ? (
-                          <Image src={editAvatarUrl} alt="Avatar Preview" fill sizes="128px" className="object-cover" />
-                        ) : (
-                          <span>{userProfile?.fullName?.charAt(0) || "U"}</span>
-                        )}
+                        {editAvatarUrl ? <Image src={editAvatarUrl} alt="Avatar" fill sizes="128px" className="object-cover" /> : <span>{userProfile?.fullName?.charAt(0) || "U"}</span>}
                         <label htmlFor="avatar-upload" className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer z-10 backdrop-blur-sm">
-                          <FaCamera size={24} />
-                          <span className="text-[10px] font-bold uppercase tracking-widest mt-2">Change</span>
+                          <FaCamera size={24} /><span className="text-[10px] font-bold uppercase tracking-widest mt-2">Change</span>
                         </label>
                         <input id="avatar-upload" type="file" accept="image/*" className="hidden" onChange={handleAvatarSelect} />
                       </div>
@@ -672,17 +446,13 @@ export default function DashboardClient() {
                     })}
                   </div>
                 </div>
-                <div className="md:hidden mt-8">
-                   <button onClick={confirmSignOut} className="w-full py-4 border-2 border-red-500/20 text-red-500 dark:text-red-400 rounded-2xl font-black uppercase tracking-widest text-xs flex items-center justify-center gap-2 hover:bg-red-500/10 transition-colors"><FaSignOutAlt /> Log Out</button>
-                </div>
               </motion.div>
             )}
-
           </AnimatePresence>
         </div>
       </main>
 
-      {/* --- MOBILE DOCK --- */}
+      {/* MOBILE BOTTOM NAV */}
       <nav className="md:hidden fixed bottom-4 left-4 right-4 z-40 pb-safe">
         <div className="bg-white/90 dark:bg-[#121214]/90 backdrop-blur-2xl border border-zinc-200 dark:border-zinc-800/80 rounded-[2rem] shadow-2xl p-2 flex items-center gap-2 overflow-x-auto snap-x snap-mandatory transition-colors duration-300" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
           {NAV_ITEMS.map((item) => {
@@ -699,111 +469,17 @@ export default function DashboardClient() {
         </div>
       </nav>
 
-      {/* --- SIDEBAR OVERLAY & COMMAND CENTER --- */}
-      <AnimatePresence>
-        {isQueueOpen && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsQueueOpen(false)} className="md:hidden fixed inset-0 bg-black/40 backdrop-blur-sm z-40" />}
-      </AnimatePresence>
-
-      <aside className={`fixed md:relative top-0 right-0 h-full z-50 md:z-20 bg-white/95 dark:bg-[#09090b]/95 md:bg-white/50 md:dark:bg-[#09090b]/80 backdrop-blur-2xl border-l border-zinc-200 dark:border-zinc-800/80 shrink-0 flex flex-col transition-all duration-300 ease-in-out ${isQueueOpen ? 'translate-x-0 w-[85%] sm:w-80 shadow-2xl md:shadow-none' : 'translate-x-full md:translate-x-0 md:w-0 opacity-0 overflow-hidden border-none'}`}>
-        
-        <div className="flex md:hidden items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-800/80">
-          <h2 className="text-xs font-mono font-bold text-[#06402B] dark:text-emerald-500 uppercase tracking-widest">Command Center</h2>
-          <button onClick={() => setIsQueueOpen(false)} className="p-2 bg-zinc-200 dark:bg-[#18181b] rounded-lg text-zinc-500 hover:text-red-500"><FaTimes size={12}/></button>
-        </div>
-
-        <div className="p-5 md:p-6 flex-1 flex flex-col h-full min-w-[300px] overflow-y-auto custom-scrollbar gap-8">
-          
-          {/* LAYER 1: DELIVERABLES QUEUE */}
-          <div className="flex-1 flex flex-col min-h-[250px]">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xs font-black text-zinc-500 dark:text-zinc-400 uppercase tracking-widest flex items-center gap-2"><FaTasks className="text-[#06402B] dark:text-emerald-400" /> Deliverables</h2>
-              <button onClick={() => setIsAddingTask(!isAddingTask)} className="text-zinc-400 dark:text-zinc-500 hover:text-[#06402B] dark:hover:text-emerald-400 transition-colors"><FaPlus size={12} /></button>
-            </div>
-            <AnimatePresence>
-              {isAddingTask && (
-                <motion.form initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} onSubmit={handleAddGeneralTask} className="mb-4 overflow-hidden w-full">
-                  <div className="bg-white dark:bg-[#121214] border border-zinc-200 dark:border-zinc-800/80 rounded-xl p-3 flex flex-col gap-3 shadow-sm">
-                    <input type="text" autoFocus placeholder="What needs to be done?" value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)} className="w-full text-xs font-bold bg-transparent outline-none text-zinc-900 dark:text-zinc-100 px-1" />
-                    
-                    <div className="flex items-center justify-between border-t border-zinc-100 dark:border-zinc-800/80 pt-3">
-                      <div className="flex items-center gap-2 text-zinc-400 dark:text-zinc-500 hover:text-[#06402B] dark:hover:text-emerald-400 transition-colors relative">
-                        <FaCalendarDay size={12} className="pointer-events-none absolute left-1" />
-                        <input 
-                          type="date" 
-                          value={newTaskDeadline} 
-                          onChange={(e) => setNewTaskDeadline(e.target.value)} 
-                          className="bg-transparent text-[10px] font-mono text-zinc-500 dark:text-zinc-400 outline-none cursor-pointer pl-5" 
-                        />
-                      </div>
-                      
-                      <button type="submit" disabled={!newTaskTitle.trim()} className="bg-[#06402B] dark:bg-emerald-600 text-white rounded-lg px-4 py-1.5 text-[10px] font-bold disabled:opacity-50 hover:opacity-80 transition-colors shadow-sm">
-                        Save
-                      </button>
-                    </div>
-                  </div>
-                </motion.form>
-              )}
-            </AnimatePresence>
-            <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-2">
-              {mergedPendingTasks.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-8 text-zinc-400 dark:text-zinc-600 border-2 border-dashed border-zinc-200 dark:border-zinc-800/80 rounded-2xl w-full">
-                  <FaCheckCircle size={20} className="mb-2 opacity-50" />
-                  <p className="text-[10px] font-bold uppercase tracking-wider">All caught up!</p>
-                </div>
-              ) : (
-                mergedPendingTasks.map(task => (
-                  <div key={task.id} className={`group flex items-start gap-3 p-3 bg-white dark:bg-[#121214]/80 border ${task.isCourseTask ? 'border-[#06402B]/30 dark:border-emerald-500/30 shadow-sm' : 'border-zinc-200 dark:border-zinc-800/80'} rounded-xl hover:border-[#06402B]/50 dark:hover:border-emerald-500/50 transition-all w-full`}>
-                    <button onClick={() => toggleTaskStatus(task)} className="mt-0.5 text-zinc-400 dark:text-zinc-500 hover:text-[#06402B] dark:hover:text-emerald-400 transition-colors shrink-0"><FaRegCircle size={14} /></button>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs text-zinc-800 dark:text-zinc-200 font-bold truncate leading-tight">{task.title}</p>
-                      {task.deadline && <span className={`text-[8px] font-mono font-bold uppercase tracking-widest px-1.5 py-0.5 rounded mt-1 inline-block ${task.isCourseTask ? 'text-[#06402B] bg-[#06402B]/10 dark:text-emerald-400 dark:bg-emerald-500/10' : 'text-orange-600 dark:text-orange-400 bg-orange-500/10 dark:bg-orange-500/20'}`}>Due: {task.deadline}</span>}
-                    </div>
-                    <button onClick={() => deleteTask(task)} className="text-zinc-300 dark:text-zinc-700 hover:text-red-500 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all active:scale-90 shrink-0"><FaTrashAlt size={10} /></button>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* LAYER 2: FOCUS ZONE */}
-          <div className="bg-[#06402B]/10 dark:bg-emerald-500/10 border border-[#06402B]/20 dark:border-emerald-500/20 p-4 rounded-2xl text-center shrink-0">
-             <h3 className="text-[10px] font-black uppercase tracking-widest text-[#06402B] dark:text-emerald-400 mb-1 flex items-center justify-center gap-1"><FaBolt /> Deep Focus</h3>
-             <p className="text-[9px] text-zinc-600 dark:text-zinc-400 font-medium mb-3">Block distractions and start a Pomodoro session.</p>
-             <button className="w-full py-2 bg-[#06402B] dark:bg-emerald-600 text-white rounded-lg text-[10px] font-bold uppercase tracking-widest shadow-md hover:scale-105 active:scale-95 transition-all">Launch Timer</button>
-          </div>
-
-          {/* LAYER 3: MINI CALENDAR WITH DOTS */}
-          <div className="shrink-0">
-            {renderMiniCalendar()}
-          </div>
-
-          {/* LAYER 4: NETWORK */}
-          <div className="shrink-0">
-             <h2 className="text-xs font-black uppercase tracking-widest text-zinc-500 mb-3 flex items-center gap-2"><FaUserFriends /> Network</h2>
-             {friendsList.length === 0 ? (
-               <p className="text-[10px] font-bold text-zinc-400 dark:text-zinc-600">No friends added yet.</p>
-             ) : (
-               <div className="flex flex-col gap-3 bg-white/50 dark:bg-[#121214]/50 p-3 rounded-2xl border border-zinc-200 dark:border-zinc-800/80">
-                 {friendsList.map(friend => (
-                   <div key={friend.uid} className="flex items-center gap-3">
-                     <div className="relative">
-                       <div className="w-8 h-8 rounded-full overflow-hidden bg-zinc-200 dark:bg-[#18181b] flex items-center justify-center text-xs font-bold text-zinc-500">
-                         {friend.avatarUrl ? <img src={friend.avatarUrl} alt="Avatar" className="w-full h-full object-cover" /> : friend.fullName?.charAt(0)}
-                       </div>
-                       <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-white dark:border-[#121214]" />
-                     </div>
-                     <div className="min-w-0 flex-1">
-                       <p className="text-[10px] font-bold text-zinc-900 dark:text-zinc-100 truncate">{friend.fullName}</p>
-                       <p className="text-[8px] font-mono text-zinc-500 truncate">Online</p>
-                     </div>
-                   </div>
-                 ))}
-               </div>
-             )}
-          </div>
-
-        </div>
-      </aside>
+      {/* NEW SEPARATED COMMAND CENTER */}
+<CommandCenter 
+        isOpen={isQueueOpen}
+        onClose={() => setIsQueueOpen(false)}
+        activeTasks={mergedActiveTasks} // <-- Pass the new array here
+        friends={friendsList}
+        onAddTask={handleAddGeneralTask}
+        onToggleTask={toggleTaskStatus}
+        onDeleteTask={deleteTask}
+        onNavigate={(view) => setActiveView(view)}
+      />
 
     </div>
   );

@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   FaPlus, FaCalendarAlt, FaTimes, FaTrashAlt, 
-  FaPalette, FaDownload, FaMobileAlt, FaDesktop, FaImage
+  FaPalette, FaMobileAlt, FaDesktop, FaImage, FaUpload, FaDownload
 } from "react-icons/fa";
 
 type Day = 'M' | 'T' | 'W' | 'Th' | 'F' | 'S';
@@ -22,13 +22,21 @@ type ViewMode = 'editor' | 'canvas';
 type ThemeMode = 'light' | 'black' | 'blue' | 'pink';
 type FormatMode = 'desktop' | 'mobile';
 
-const COLORS = [
-  "bg-[#06402B]", // DLSAU Green
-  "bg-blue-600",
-  "bg-rose-600",
-  "bg-amber-500",
-  "bg-purple-600",
-  "bg-zinc-800"
+// --- NEW: EXPANDED PASTEL PALETTE ---
+// Contains background, text, and border colors for perfect contrast
+const PASTEL_COLORS = [
+  "bg-rose-200 text-rose-950 border-rose-300",
+  "bg-orange-200 text-orange-950 border-orange-300",
+  "bg-amber-200 text-amber-950 border-amber-300",
+  "bg-emerald-200 text-emerald-950 border-emerald-300",
+  "bg-teal-200 text-teal-950 border-teal-300",
+  "bg-cyan-200 text-cyan-950 border-cyan-300",
+  "bg-blue-200 text-blue-950 border-blue-300",
+  "bg-indigo-200 text-indigo-950 border-indigo-300",
+  "bg-violet-200 text-violet-950 border-violet-300",
+  "bg-purple-200 text-purple-950 border-purple-300",
+  "bg-fuchsia-200 text-fuchsia-950 border-fuchsia-300",
+  "bg-zinc-200 text-zinc-950 border-zinc-300"
 ];
 
 const THEME_STYLES = {
@@ -50,22 +58,34 @@ export default function DashboardScheduleMaker() {
   const [activeTheme, setActiveTheme] = useState<ThemeMode>('light');
   const [format, setFormat] = useState<FormatMode>('desktop');
   const [isExporting, setIsExporting] = useState(false);
+  
+  // --- NEW: Custom Background State ---
+  const [bgImage, setBgImage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [classes, setClasses] = useState<ClassSession[]>([
     {
       id: '1', code: 'CS101', name: 'Intro to Computing',
-      days: ['M', 'W'], startTime: '08:00', endTime: '09:30', color: COLORS[0]
+      days: ['M', 'W'], startTime: '08:00', endTime: '09:30', color: PASTEL_COLORS[3]
     },
     {
       id: '2', code: 'MATH20', name: 'Discrete Mathematics',
-      days: ['T', 'Th'], startTime: '10:00', endTime: '12:00', color: COLORS[1]
+      days: ['T', 'Th'], startTime: '10:00', endTime: '12:00', color: PASTEL_COLORS[6]
     }
   ]);
+
+  // --- Image Upload Handler ---
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const url = URL.createObjectURL(e.target.files[0]);
+      setBgImage(url);
+    }
+  };
 
   const addClass = () => {
     setClasses([...classes, { 
       id: Date.now().toString(), code: '', name: '', 
-      days: [], startTime: '08:00', endTime: '09:00', color: COLORS[0] 
+      days: [], startTime: '08:00', endTime: '09:00', color: PASTEL_COLORS[0] 
     }]);
   };
 
@@ -88,8 +108,8 @@ export default function DashboardScheduleMaker() {
   };
 
   const cycleColor = (id: string, currentColor: string) => {
-    const nextIndex = (COLORS.indexOf(currentColor) + 1) % COLORS.length;
-    updateClass(id, 'color', COLORS[nextIndex]);
+    const nextIndex = (PASTEL_COLORS.indexOf(currentColor) + 1) % PASTEL_COLORS.length;
+    updateClass(id, 'color', PASTEL_COLORS[nextIndex]);
   };
 
   const getPositionStyle = (start: string, end: string) => {
@@ -119,10 +139,10 @@ export default function DashboardScheduleMaker() {
     });
   };
 
-const downloadJPG = async () => {
+  const downloadJPG = async () => {
     setIsExporting(true);
     try {
-      const { toJpeg } = await import('html-to-image'); // <-- MUST BE THIS
+      const { toJpeg } = await import('html-to-image');
       const element = document.getElementById('schedule-canvas');
       if (!element) return;
       
@@ -143,10 +163,16 @@ const downloadJPG = async () => {
       setIsExporting(false);
     }
   };
+
+  // ==========================================
+  // VIEW: 1. EDITOR
+  // ==========================================
   if (view === 'editor') {
     return (
       <div className="max-w-5xl mx-auto space-y-6 md:space-y-8 pb-20 animate-in fade-in slide-in-from-bottom-4 w-full">
-        <div className="bg-white/40 dark:bg-zinc-900/40 backdrop-blur-xl border border-zinc-200 dark:border-zinc-800 rounded-[2rem] p-5 sm:p-6 md:p-8 shadow-xl flex flex-col md:flex-row justify-between gap-5 relative overflow-hidden group transition-colors duration-300">
+        
+        {/* Header Block with Actions */}
+        <div className="bg-white/40 dark:bg-zinc-900/40 backdrop-blur-xl border border-zinc-200 dark:border-zinc-800 rounded-[2rem] p-5 sm:p-6 md:p-8 shadow-xl flex flex-col lg:flex-row justify-between gap-6 relative overflow-hidden group transition-colors duration-300">
           <div className="absolute top-0 right-0 w-64 h-64 bg-[#06402B]/10 blur-[100px] rounded-full pointer-events-none" />
           
           <div className="flex-1 space-y-3 sm:space-y-4 relative z-10 w-full">
@@ -155,28 +181,43 @@ const downloadJPG = async () => {
               value={termName} onChange={e => setTermName(e.target.value)}
               className="w-full text-2xl md:text-4xl font-black bg-transparent border-none outline-none placeholder:text-zinc-400 dark:placeholder:text-zinc-600 text-zinc-900 dark:text-white tracking-tight"
             />
-            <div className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 bg-zinc-100 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl text-[10px] sm:text-xs md:text-sm font-bold uppercase tracking-widest text-[#06402B]">
+            <div className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 bg-zinc-100 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl text-[10px] sm:text-xs font-bold uppercase tracking-widest text-[#06402B]">
               {classes.length} Classes Added
             </div>
           </div>
 
-          <div className="shrink-0 relative z-10 flex flex-col justify-end w-full md:w-auto">
-            <button onClick={() => setView('canvas')} className="w-full md:w-auto px-6 sm:px-8 py-4 bg-[#06402B] text-white rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-95 transition-all shadow-[0_0_20px_rgba(6,64,43,0.3)] text-xs sm:text-sm">
-              <FaCalendarAlt size={16} /> View Timetable
+          {/* Action Buttons */}
+          <div className="shrink-0 relative z-10 flex flex-col sm:flex-row lg:flex-col justify-end gap-3 w-full lg:w-auto">
+            {/* Custom Background Uploader */}
+            <input type="file" accept="image/*" ref={fileInputRef} onChange={handleImageUpload} className="hidden" />
+            <div className="flex gap-2 w-full sm:w-auto">
+              <button onClick={() => fileInputRef.current?.click()} className="flex-1 lg:w-full px-4 py-3 bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-2xl font-bold uppercase tracking-widest flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-95 transition-all text-[10px] sm:text-xs">
+                <FaImage size={14} /> {bgImage ? 'Change Image' : 'Add Background'}
+              </button>
+              {bgImage && (
+                <button onClick={() => setBgImage(null)} className="px-4 py-3 bg-red-500/10 text-red-500 rounded-2xl font-bold hover:bg-red-500/20 transition-colors">
+                  <FaTrashAlt size={14} />
+                </button>
+              )}
+            </div>
+
+            <button onClick={() => setView('canvas')} className="w-full sm:w-auto lg:w-full px-6 sm:px-8 py-3 bg-[#06402B] text-white rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-95 transition-all shadow-[0_0_20px_rgba(6,64,43,0.3)] text-[10px] sm:text-xs">
+              <FaCalendarAlt size={14} /> View Timetable
             </button>
           </div>
         </div>
 
+        {/* Class Input List */}
         <div className="space-y-4 w-full">
           <AnimatePresence>
-            {classes.map((cls, index) => (
+            {classes.map((cls) => (
               <motion.div 
                 key={cls.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }}
                 className="bg-white/60 dark:bg-zinc-900/60 backdrop-blur-md border border-zinc-200 dark:border-zinc-800 rounded-[1.5rem] p-4 sm:p-5 flex flex-col lg:flex-row gap-4 group transition-colors hover:border-[#06402B]/30 w-full shadow-sm"
               >
                 <div className="flex items-center gap-3 w-full lg:w-48 shrink-0">
-                  <button onClick={() => cycleColor(cls.id, cls.color)} className={`w-12 h-12 lg:w-10 lg:h-10 rounded-xl lg:rounded-full ${cls.color} flex items-center justify-center text-white/50 hover:text-white transition-colors shadow-inner shrink-0`} title="Click to change color">
-                    <FaPalette size={14} />
+                  <button onClick={() => cycleColor(cls.id, cls.color)} className={`w-12 h-12 lg:w-10 lg:h-10 rounded-xl lg:rounded-full ${cls.color} flex items-center justify-center transition-colors shadow-inner shrink-0 border-2`} title="Click to change color">
+                    <FaPalette size={14} className="opacity-60" />
                   </button>
                   <input 
                     type="text" placeholder="Code" value={cls.code} onChange={(e) => updateClass(cls.id, 'code', e.target.value)}
@@ -192,14 +233,17 @@ const downloadJPG = async () => {
                 </div>
 
                 <div className="flex justify-between sm:justify-center items-center gap-1 sm:gap-2 bg-zinc-100 dark:bg-zinc-950/50 p-2 sm:p-3 lg:p-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800 w-full lg:w-auto shrink-0">
-                  {DAYS_OF_WEEK.map(day => (
-                    <button 
-                      key={day} onClick={() => toggleDay(cls.id, day)}
-                      className={`flex-1 sm:w-10 sm:h-10 lg:w-8 lg:h-8 py-2 sm:py-0 rounded-lg text-xs sm:text-sm lg:text-xs font-black transition-all ${cls.days.includes(day) ? `${cls.color} text-white shadow-md` : 'text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800'}`}
-                    >
-                      {day}
-                    </button>
-                  ))}
+                  {DAYS_OF_WEEK.map(day => {
+                    const isActive = cls.days.includes(day);
+                    return (
+                      <button 
+                        key={day} onClick={() => toggleDay(cls.id, day)}
+                        className={`flex-1 sm:w-10 sm:h-10 lg:w-8 lg:h-8 py-2 sm:py-0 rounded-lg text-xs sm:text-sm lg:text-xs font-black transition-all border ${isActive ? `${cls.color} shadow-sm` : 'border-transparent text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800'}`}
+                      >
+                        {day}
+                      </button>
+                    )
+                  })}
                 </div>
 
                 <div className="flex items-center justify-between gap-2 w-full lg:w-auto shrink-0">
@@ -230,6 +274,9 @@ const downloadJPG = async () => {
     );
   }
 
+  // ==========================================
+  // VIEW: 2. CANVAS & EXPORT
+  // ==========================================
   if (view === 'canvas') {
     const currentTheme = THEME_STYLES[activeTheme];
 
@@ -249,8 +296,7 @@ const downloadJPG = async () => {
           </div>
           
           <div className="flex items-center gap-2 md:gap-4 shrink-0">
-            
-            {/* Format Toggle - Now visible and adaptive on mobile */}
+            {/* Format Toggle */}
             <div className="flex bg-zinc-200 dark:bg-zinc-800 p-1 rounded-xl">
               <button onClick={() => setFormat('desktop')} className={`px-3 py-2 rounded-lg text-[10px] sm:text-xs font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-1.5 ${format === 'desktop' ? 'bg-white dark:bg-zinc-950 shadow-md text-zinc-900 dark:text-white' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}>
                 <FaDesktop size={12} /> <span className="hidden sm:inline">Desktop</span>
@@ -263,7 +309,7 @@ const downloadJPG = async () => {
             <div className="w-px h-6 bg-zinc-300 dark:bg-zinc-700 hidden md:block" />
 
             <button onClick={downloadJPG} disabled={isExporting} className="flex items-center justify-center gap-1.5 px-3 sm:px-4 md:px-5 py-2 md:py-2.5 bg-[#06402B] text-white font-bold text-[10px] sm:text-xs uppercase tracking-widest rounded-xl hover:scale-105 active:scale-95 transition-all shadow-md disabled:opacity-50 shrink-0">
-              <FaImage size={14} /> <span className="hidden sm:inline">{isExporting ? "Saving..." : "JPG"}</span>
+              <FaDownload size={14} /> <span className="hidden sm:inline">{isExporting ? "Saving..." : "Export"}</span>
             </button>
           </div>
         </div>
@@ -271,7 +317,7 @@ const downloadJPG = async () => {
         {/* MAIN LAYOUT (Sidebar + Canvas) */}
         <div className="flex-1 flex flex-col md:flex-row overflow-hidden relative w-full">
           
-          {/* THEME SIDEBAR (Responsive Horizontal/Vertical) */}
+          {/* THEME SIDEBAR */}
           <div className="w-full md:w-20 shrink-0 flex md:flex-col items-center md:justify-center gap-4 p-3 md:p-0 md:border-r border-b md:border-b-0 border-zinc-200 dark:border-zinc-800 bg-white/50 dark:bg-zinc-950/50 backdrop-blur-md z-20 transition-colors overflow-x-auto custom-scrollbar">
             <span className="md:hidden text-[9px] font-bold text-zinc-500 uppercase tracking-widest shrink-0 ml-2">Theme:</span>
             {[
@@ -281,9 +327,7 @@ const downloadJPG = async () => {
               { id: 'pink', color: 'bg-rose-100 border-rose-300' }
             ].map((t) => (
               <button 
-                key={t.id} 
-                onClick={() => setActiveTheme(t.id as ThemeMode)}
-                title={`${t.id} theme`}
+                key={t.id} onClick={() => setActiveTheme(t.id as ThemeMode)} title={`${t.id} theme`}
                 className={`w-8 h-8 md:w-10 md:h-10 rounded-full border-2 shrink-0 transition-all ${t.color} ${activeTheme === t.id ? 'scale-110 shadow-[0_0_15px_rgba(0,0,0,0.2)] ring-2 ring-[#06402B] ring-offset-2 dark:ring-offset-zinc-900' : 'hover:scale-105 opacity-80'}`}
               />
             ))}
@@ -292,36 +336,46 @@ const downloadJPG = async () => {
           {/* CANVAS SCROLL AREA */}
           <div className="flex-1 overflow-auto p-4 md:p-8 custom-scrollbar flex md:items-start justify-center bg-zinc-100/50 dark:bg-black/20 w-full relative">
             
-            {/* Scroll Hint for Mobile Desktop View */}
             {format === 'desktop' && (
               <div className="md:hidden absolute top-6 left-1/2 -translate-x-1/2 bg-black/70 text-white text-[10px] font-bold px-4 py-1.5 rounded-full z-40 backdrop-blur-md animate-pulse whitespace-nowrap pointer-events-none">
-                Scroll horizontally to view ↔
+                Scroll horizontally ↔
               </div>
             )}
 
+            {/* --- EXPORT TARGET CANVAS --- */}
             <div 
               id="schedule-canvas" 
-              className={`relative transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] ${currentTheme.bg} ${currentTheme.border} border shadow-2xl overflow-hidden shrink-0 flex flex-col ${
+              className={`relative transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] ${!bgImage && currentTheme.bg} ${currentTheme.border} border shadow-2xl overflow-hidden shrink-0 flex flex-col ${
                 format === 'desktop' 
                   ? 'w-full min-w-[1000px] max-w-7xl rounded-[2rem] p-8 md:p-10 h-[1000px]' 
                   : 'w-[340px] sm:w-[400px] min-h-[750px] sm:min-h-[850px] rounded-[2.5rem] sm:rounded-[3rem] p-6 sm:p-8 border-8 md:border-[12px] shadow-[0_0_50px_rgba(0,0,0,0.15)]' 
               }`}
+              style={{
+                backgroundImage: bgImage ? `url(${bgImage})` : 'none',
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+              }}
             >
               
+              {/* Dynamic Glassmorphism Overlay for uploaded images */}
+              {bgImage && (
+                <div className={`absolute inset-0 z-0 backdrop-blur-md ${activeTheme === 'black' ? 'bg-black/70' : activeTheme === 'blue' ? 'bg-slate-900/70' : activeTheme === 'pink' ? 'bg-rose-100/70' : 'bg-white/70'}`} />
+              )}
+
               {/* === DESKTOP GRID FORMAT === */}
               {format === 'desktop' ? (
                 <>
-                  <div className="mb-8 text-center">
+                  <div className="mb-8 text-center relative z-10">
                     <h2 className={`font-black uppercase tracking-tight text-3xl md:text-4xl ${currentTheme.text}`}>{termName || "My Schedule"}</h2>
-                    <p className={`font-mono font-bold uppercase tracking-widest text-xs mt-1 ${currentTheme.subText}`}>Lasallian Hub</p>
+                    <p className={`font-mono font-bold uppercase tracking-widest text-xs mt-1 ${currentTheme.text} opacity-80`}>Lasallian Hub</p>
                   </div>
 
-                  <div className={`grid grid-cols-7 gap-4 mb-4 shrink-0`}>
+                  <div className={`grid grid-cols-7 gap-4 mb-4 shrink-0 relative z-10`}>
                     <div className="col-span-1"></div> 
                     {DAYS_OF_WEEK.map(day => {
                       const fullDay = { 'M':'Monday', 'T':'Tuesday', 'W':'Wednesday', 'Th':'Thursday', 'F':'Friday', 'S':'Saturday' }[day];
                       return (
-                        <div key={day} className={`col-span-1 text-center py-3 rounded-xl border ${currentTheme.header} ${currentTheme.border}`}>
+                        <div key={day} className={`col-span-1 text-center py-3 rounded-xl border ${currentTheme.border} ${bgImage ? 'bg-black/10 dark:bg-white/10 backdrop-blur-sm' : currentTheme.header}`}>
                           <p className={`font-black uppercase tracking-wider text-sm ${currentTheme.text}`}>
                             {fullDay}
                           </p>
@@ -330,14 +384,14 @@ const downloadJPG = async () => {
                     })}
                   </div>
 
-                  <div className="grid grid-cols-7 gap-4 relative flex-1">
+                  <div className="grid grid-cols-7 gap-4 relative flex-1 z-10">
                     <div className={`col-span-1 flex flex-col justify-between border-r border-dashed ${currentTheme.border} pr-4`}>
                       {Array.from({ length: END_HOUR - START_HOUR + 1 }).map((_, i) => {
                         const hour = START_HOUR + i;
                         const ampm = hour >= 12 ? 'PM' : 'AM';
                         const displayHr = hour > 12 ? hour - 12 : hour;
                         return (
-                          <div key={i} className={`text-right font-mono font-bold uppercase relative -top-2 text-[10px] ${currentTheme.subText}`}>
+                          <div key={i} className={`text-right font-mono font-bold uppercase relative -top-2 text-[10px] ${currentTheme.text} opacity-70`}>
                             {displayHr}:00 {ampm}
                           </div>
                         );
@@ -346,7 +400,7 @@ const downloadJPG = async () => {
 
                     <div className="absolute inset-0 left-[calc(100%/7)] right-0 pointer-events-none flex flex-col justify-between z-0">
                       {Array.from({ length: END_HOUR - START_HOUR + 1 }).map((_, i) => (
-                        <div key={i} className={`w-full h-px ${currentTheme.grid}`} />
+                        <div key={i} className={`w-full h-px ${bgImage ? 'bg-black/10 dark:bg-white/10' : currentTheme.grid}`} />
                       ))}
                     </div>
 
@@ -357,13 +411,12 @@ const downloadJPG = async () => {
                           return (
                             <div 
                               key={`${cls.id}-${day}`}
-                              className={`absolute left-0 right-0 mx-1 rounded-xl shadow-md flex flex-col overflow-hidden text-white p-3 ${cls.color}`}
+                              className={`absolute left-0 right-0 mx-1 rounded-xl shadow-sm border flex flex-col overflow-hidden p-3 transition-all ${cls.color}`}
                               style={{ top: pos.top, height: pos.height }}
                             >
-                              <div className="absolute inset-0 bg-black/10 mix-blend-overlay pointer-events-none" />
-                              <h4 className={`font-black leading-tight relative z-10 text-sm truncate`}>{cls.code}</h4>
-                              <p className={`font-bold text-white/80 uppercase tracking-widest mt-0.5 relative z-10 text-[10px] truncate`}>{cls.name}</p>
-                              <p className={`font-mono font-bold mt-auto opacity-90 relative z-10 text-[10px] truncate`}>
+                              <h4 className="font-black leading-tight text-sm truncate">{cls.code}</h4>
+                              <p className="font-bold uppercase tracking-widest mt-0.5 text-[10px] truncate opacity-90">{cls.name}</p>
+                              <p className="font-mono font-bold mt-auto opacity-80 text-[10px] truncate">
                                 {formatTime12hr(cls.startTime)} - {formatTime12hr(cls.endTime)}
                               </p>
                             </div>
@@ -376,13 +429,12 @@ const downloadJPG = async () => {
               ) : (
 
                 /* === MOBILE WALLPAPER (VERTICAL LIST) FORMAT === */
-                <div className="flex flex-col h-full w-full">
-                  
+                <div className="flex flex-col h-full w-full relative z-10">
                   <div className={`mb-6 border-b-2 pb-5 sm:pb-6 ${currentTheme.border}`}>
                     <h1 className={`text-2xl sm:text-3xl font-black uppercase tracking-tighter leading-none mb-3 ${currentTheme.text}`}>
                       {termName || "My Schedule"}
                     </h1>
-                    <div className={`flex justify-between items-center opacity-80 ${currentTheme.subText}`}>
+                    <div className={`flex justify-between items-center opacity-80 ${currentTheme.text}`}>
                       <p className="text-[10px] sm:text-xs font-bold tracking-widest uppercase">Lasallian Hub</p>
                       <p className="text-[8px] sm:text-[10px] font-mono font-bold uppercase">A.Y. 2025-2026</p>
                     </div>
@@ -397,18 +449,18 @@ const downloadJPG = async () => {
                       return (
                         <div key={day} className="flex gap-3 sm:gap-4">
                           <div className="w-8 sm:w-10 pt-1 shrink-0">
-                            <span className={`text-base sm:text-xl font-black tracking-widest opacity-50 ${currentTheme.text}`}>{fullDay}</span>
+                            <span className={`text-base sm:text-xl font-black tracking-widest opacity-60 ${currentTheme.text}`}>{fullDay}</span>
                           </div>
                           
                           <div className={`flex-1 flex flex-col gap-2 sm:gap-3 border-l-2 pl-3 sm:pl-4 min-w-0 ${currentTheme.border}`}>
                             {dayClasses.map(c => (
-                              <div key={c.id} className={`p-3 sm:p-4 rounded-[1rem] ${c.color} text-white shadow-md flex justify-between items-center border-2 border-white/20 w-full`}>
+                              <div key={c.id} className={`p-3 sm:p-4 rounded-[1rem] shadow-sm flex justify-between items-center border w-full ${c.color}`}>
                                 <div className="min-w-0 pr-2">
                                   <div className="text-sm sm:text-lg font-bold truncate leading-tight mb-1">{c.code}</div>
                                   <div className="text-[8px] sm:text-[10px] uppercase tracking-widest opacity-90 font-medium truncate">{c.name}</div>
                                 </div>
                                 <div className="text-right shrink-0">
-                                  <div className="text-[8px] sm:text-[9px] font-mono font-bold opacity-90 bg-black/20 px-2 py-1.5 rounded-lg inline-block text-center leading-tight">
+                                  <div className="text-[8px] sm:text-[9px] font-mono font-bold opacity-80 mix-blend-multiply dark:mix-blend-color-burn px-2 py-1.5 rounded-lg inline-block text-center leading-tight">
                                     {formatTime12hr(c.startTime)}<br/>{formatTime12hr(c.endTime)}
                                   </div>
                                 </div>
@@ -420,13 +472,13 @@ const downloadJPG = async () => {
                     })}
 
                     {classes.length === 0 && (
-                      <div className={`flex-1 flex items-center justify-center opacity-30 ${currentTheme.text}`}>
+                      <div className={`flex-1 flex items-center justify-center opacity-40 ${currentTheme.text}`}>
                         <div className="text-xs sm:text-sm font-bold uppercase tracking-widest text-center">No Classes Added</div>
                       </div>
                     )}
                   </div>
 
-                  <div className={`mt-auto pt-5 sm:pt-6 border-t border-dashed ${currentTheme.border} text-center opacity-50 ${currentTheme.subText}`}>
+                  <div className={`mt-auto pt-5 sm:pt-6 border-t border-dashed ${currentTheme.border} text-center opacity-60 ${currentTheme.text}`}>
                     <p className="text-[7px] sm:text-[9px] font-bold tracking-[0.4em] uppercase">Generated by JPCS</p>
                   </div>
                 </div>
