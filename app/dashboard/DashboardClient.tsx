@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import dynamic from 'next/dynamic'; 
 import Image from "next/image";
+import { useTheme } from "next-themes";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
