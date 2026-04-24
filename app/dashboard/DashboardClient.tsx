@@ -10,12 +10,13 @@ import {
   FaTasks, FaUserCircle, FaSignOutAlt,
   FaPlus, FaCheckCircle, FaRegCircle, FaTrashAlt, 
   FaTachometerAlt, FaGlobe, FaClock, FaUserFriends, 
-  FaChevronRight, FaTimes, FaCog, FaSun, FaMoon, FaDesktop, FaPalette
+  FaChevronRight, FaTimes, FaCog, FaSun, FaMoon, FaDesktop, FaPalette, FaIdBadge, FaSave, FaCamera
 } from "react-icons/fa";
 
 import { onAuthStateChanged, signOut, User } from "firebase/auth";
 import { doc, getDoc, collection, query, where, orderBy, onSnapshot, addDoc, updateDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
-import { auth, db } from "@/lib/db"; 
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage"; // <-- NEW: Storage imports
+import { auth, db, storage } from "@/lib/db"; // <-- NEW: Imported storage
 
 import FloatingCubes from "../components/FloatingCubes"; 
 
@@ -53,9 +54,15 @@ export default function DashboardClient() {
 
   const [theme, setTheme] = useState<ThemeMode>('system');
 
+  // --- PROFILE EDIT STATE ---
+  const [editBio, setEditBio] = useState("");
+  const [editYearLevel, setEditYearLevel] = useState("1st Year");
+  const [editAvatarUrl, setEditAvatarUrl] = useState("");
+  const [avatarFile, setAvatarFile] = useState<File | null>(null); // <-- NEW: Holds the physical file
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+
   const router = useRouter();
 
-  // Dynamic Greeting Logic
   const getGreeting = () => {
     const hour = currentTime.getHours();
     if (hour < 12) return "Good morning";
@@ -95,7 +102,13 @@ export default function DashboardClient() {
       
       try {
         const userDoc = await getDoc(doc(db, "users", user.uid));
-        if (userDoc.exists()) setUserProfile(userDoc.data());
+        if (userDoc.exists()) {
+          const data = userDoc.data();
+          setUserProfile(data);
+          setEditBio(data.bio || "");
+          setEditYearLevel(data.yearLevel || "1st Year");
+          setEditAvatarUrl(data.avatarUrl || "");
+        }
       } catch (err) {}
 
       const q = query(collection(db, "tasks"), where("userId", "==", user.uid), orderBy("createdAt", "desc"));
@@ -110,6 +123,56 @@ export default function DashboardClient() {
     });
     return () => unsubscribeAuth();
   }, [router]);
+
+  // --- NEW: HANDLE IMAGE SELECTION ---
+  const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      if (file.size > 5 * 1024 * 1024) {
+        alert("Image is too large. Please select a file under 5MB.");
+        return;
+      }
+      setAvatarFile(file);
+      setEditAvatarUrl(URL.createObjectURL(file)); // Show a temporary local preview immediately
+    }
+  };
+
+  // --- UPDATED: SAVE PROFILE FUNCTION WITH UPLOAD LOGIC ---
+  const handleSaveProfile = async () => {
+    if (!authUser) return;
+    setIsSavingProfile(true);
+    try {
+      let finalAvatarUrl = editAvatarUrl;
+
+      // 1. If a new physical file was selected, upload it to Firebase Storage first
+      if (avatarFile) {
+        const fileRef = ref(storage, `avatars/${authUser.uid}`);
+        await uploadBytes(fileRef, avatarFile);
+        finalAvatarUrl = await getDownloadURL(fileRef); // Get the live public URL
+      }
+
+      // 2. Save everything to Firestore
+      await updateDoc(doc(db, "users", authUser.uid), {
+        bio: editBio,
+        yearLevel: editYearLevel,
+        avatarUrl: finalAvatarUrl
+      });
+      
+      setUserProfile((prev: any) => ({
+        ...prev,
+        bio: editBio,
+        yearLevel: editYearLevel,
+        avatarUrl: finalAvatarUrl
+      }));
+      setAvatarFile(null); // Clear the pending file state
+      alert("Profile updated successfully!");
+    } catch (error) {
+      console.error(error);
+      alert("Failed to update profile. Make sure Firebase Storage is initialized.");
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
 
   const handleAddTask = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -157,7 +220,6 @@ export default function DashboardClient() {
         <div className="absolute top-[10%] left-[20%] w-[300px] md:w-[500px] h-[300px] md:h-[500px] bg-[#06402B]/10 rounded-full blur-[100px] md:blur-[150px]" />
       </div>
 
-      {/* --- DESKTOP LEFT SIDEBAR --- */}
       <aside className="hidden md:flex w-[84px] bg-white/50 dark:bg-zinc-950/50 backdrop-blur-2xl border-r border-zinc-200 dark:border-zinc-800 shrink-0 flex-col items-center py-6 z-20 relative transition-colors duration-300">
         <div className="relative w-12 h-12 mb-8 group cursor-pointer" onClick={() => setActiveView('dashboard')}>
           <div className="absolute inset-0 bg-[#06402B]/20 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
@@ -188,10 +250,8 @@ export default function DashboardClient() {
         </button>
       </aside>
 
-      {/* --- MAIN CONTENT AREA --- */}
       <main className="flex-1 flex flex-col overflow-hidden relative z-10 w-full">
         
-        {/* --- RESPONSIVE HEADER --- */}
         <header className="h-16 md:h-20 bg-white/30 dark:bg-black/30 backdrop-blur-md border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between px-4 md:px-8 shrink-0 relative z-20 transition-colors duration-300 w-full">
           <div className="flex items-center gap-3 md:gap-6 min-w-0">
             <div className="flex items-center gap-3 min-w-0 shrink-0">
@@ -218,9 +278,17 @@ export default function DashboardClient() {
                <p className="text-[9px] font-mono text-zinc-500 uppercase tracking-tighter">Verified Student Account</p>
              </div>
              
-             <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center text-zinc-500 border border-zinc-300 dark:border-zinc-700 relative cursor-pointer shrink-0" onClick={() => setActiveView('settings')}>
-               <FaUserCircle size={20} className="md:w-6 md:h-6" />
-               <div className="absolute top-0 right-0 w-2 h-2 md:w-2.5 md:h-2.5 bg-green-500 rounded-full border-2 border-white dark:border-zinc-950" />
+             <div 
+               className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center text-zinc-500 border border-zinc-300 dark:border-zinc-700 relative cursor-pointer shrink-0 overflow-hidden shadow-sm" 
+               onClick={() => setActiveView('settings')}
+               title="Open Profile Settings"
+             >
+               {userProfile?.avatarUrl ? (
+                 <Image src={userProfile.avatarUrl} alt="Avatar" fill className="object-cover" />
+               ) : (
+                 <span className="font-bold text-sm">{userProfile?.fullName?.charAt(0) || "U"}</span>
+               )}
+               <div className="absolute top-0 right-0 w-2 h-2 md:w-2.5 md:h-2.5 bg-green-500 rounded-full border-2 border-white dark:border-zinc-950 z-10" />
              </div>
 
              <div className="w-px h-6 md:h-8 bg-zinc-200 dark:bg-zinc-800 mx-1 md:mx-2 shrink-0" />
@@ -234,7 +302,6 @@ export default function DashboardClient() {
           </div>
         </header>
 
-        {/* Content Area */}
         <div className="flex-1 overflow-x-hidden overflow-y-auto p-4 sm:p-6 md:p-8 pb-28 md:pb-8 custom-scrollbar relative z-10 w-full">
           <AnimatePresence mode="wait">
             
@@ -247,7 +314,7 @@ export default function DashboardClient() {
                       <FaClock /> {formattedDate}
                     </div>
                     <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-zinc-900 dark:text-white mb-2 tracking-tighter transition-colors">
-                      {getGreeting()}, <span className="text-[#06402B] font-light italic">{userProfile?.fullName?.split(' ')[0] || "Ice"}</span>.
+                      {getGreeting()}, <span className="text-[#06402B] font-light italic">{userProfile?.fullName?.split(' ')[0] || "Scholar"}</span>.
                     </h2>
                     <p className="text-zinc-500 font-medium text-sm md:text-lg">
                       {pendingTasks.length > 0 
@@ -266,16 +333,87 @@ export default function DashboardClient() {
               </motion.div>
             )}
 
-            {/* --- NEW SETTINGS VIEW --- */}
+            {/* --- SETTINGS & PROFILE VIEW --- */}
             {activeView === 'settings' && (
               <motion.div key="settings" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="max-w-4xl mx-auto space-y-6 md:space-y-8 w-full">
-                <div className="flex flex-col md:flex-row justify-between gap-6 items-start md:items-end mb-6">
+                <div className="flex flex-col md:flex-row justify-between gap-6 items-start md:items-end mb-2">
                   <div>
-                    <h2 className="text-3xl font-black tracking-tight uppercase text-zinc-900 dark:text-white">Preferences</h2>
-                    <p className="text-zinc-500 text-sm font-medium">Customize your workspace experience.</p>
+                    <h2 className="text-3xl font-black tracking-tight uppercase text-zinc-900 dark:text-white">Settings</h2>
+                    <p className="text-zinc-500 text-sm font-medium">Manage your profile and workspace preferences.</p>
                   </div>
                 </div>
 
+                {/* --- PUBLIC PROFILE CARD --- */}
+                <div className="bg-white/60 dark:bg-zinc-900/60 backdrop-blur-xl rounded-[2rem] border border-zinc-200 dark:border-zinc-800 p-6 md:p-8 shadow-xl transition-colors duration-300 w-full">
+                  <h3 className="text-sm font-black uppercase tracking-widest text-zinc-900 dark:text-white mb-6 flex items-center gap-2">
+                    <FaIdBadge className="text-[#06402B]" /> Public Profile
+                  </h3>
+
+                  <div className="flex flex-col md:flex-row gap-8 items-center md:items-start">
+                    
+                    {/* Native File Upload Avatar */}
+                    <div className="flex flex-col items-center gap-4 shrink-0 w-full md:w-auto">
+                      <div className="relative w-32 h-32 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center text-4xl font-bold text-zinc-500 border-4 border-white dark:border-zinc-950 shadow-lg overflow-hidden group">
+                        {editAvatarUrl ? (
+                          <Image src={editAvatarUrl} alt="Avatar Preview" fill className="object-cover" />
+                        ) : (
+                          <span>{userProfile?.fullName?.charAt(0) || "U"}</span>
+                        )}
+                        
+                        {/* Hidden file input wrapped by a clean label UI */}
+                        <label htmlFor="avatar-upload" className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer z-10 backdrop-blur-sm">
+                          <FaCamera size={24} />
+                          <span className="text-[10px] font-bold uppercase tracking-widest mt-2">Change</span>
+                        </label>
+                        <input id="avatar-upload" type="file" accept="image/*" className="hidden" onChange={handleAvatarSelect} />
+                      </div>
+                      <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Tap to Upload</p>
+                    </div>
+
+                    {/* Profile Form */}
+                    <div className="flex-1 space-y-5 w-full">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                        <div>
+                          <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1 mb-1 block">Full Name</label>
+                          <input type="text" value={userProfile?.fullName || ""} disabled className="w-full bg-zinc-100 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm font-bold text-zinc-500 cursor-not-allowed" />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1 mb-1 block">Year Level</label>
+                          <select 
+                            value={editYearLevel} onChange={e => setEditYearLevel(e.target.value)} 
+                            className="w-full bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm font-bold text-zinc-800 dark:text-zinc-200 outline-none focus:border-[#06402B] shadow-sm"
+                          >
+                            <option value="1st Year">1st Year</option>
+                            <option value="2nd Year">2nd Year</option>
+                            <option value="3rd Year">3rd Year</option>
+                            <option value="4th Year">4th Year</option>
+                            <option value="Irregular">Irregular</option>
+                            <option value="Alumni">Alumni</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1 mb-1 block">Short Bio</label>
+                        <textarea 
+                          value={editBio} onChange={(e) => setEditBio(e.target.value)}
+                          placeholder="Tell your classmates about yourself..."
+                          maxLength={150}
+                          className="w-full bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm font-medium text-zinc-800 dark:text-zinc-200 outline-none focus:border-[#06402B] shadow-sm resize-none h-24"
+                        />
+                        <div className="text-right text-[10px] text-zinc-400 mt-1">{editBio.length}/150</div>
+                      </div>
+
+                      <div className="flex justify-end">
+                        <button onClick={handleSaveProfile} disabled={isSavingProfile} className="w-full md:w-auto px-8 py-3 bg-[#06402B] text-white rounded-xl font-black text-xs uppercase tracking-widest disabled:opacity-50 hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-md">
+                          {isSavingProfile ? "Uploading..." : <><FaSave /> Save Profile</>}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* --- APPEARANCE CARD --- */}
                 <div className="bg-white/60 dark:bg-zinc-900/60 backdrop-blur-xl rounded-[2rem] border border-zinc-200 dark:border-zinc-800 p-6 md:p-8 shadow-xl transition-colors duration-300 w-full">
                   <h3 className="text-sm font-black uppercase tracking-widest text-zinc-900 dark:text-white mb-6 flex items-center gap-2">
                     <FaPalette className="text-[#06402B]" /> Appearance
@@ -315,7 +453,7 @@ export default function DashboardClient() {
               </motion.div>
             )}
 
-            {/* Other Views Wrappers Fixed for Mobile */}
+            {/* Other Views Wrappers */}
             {activeView === 'lounge' && <motion.div key="lounge" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="max-w-7xl mx-auto w-full"><StudyLounge /></motion.div>}
             {activeView === 'exchange' && <motion.div key="exchange" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="w-full"><FlashcardExchange /></motion.div>}
             

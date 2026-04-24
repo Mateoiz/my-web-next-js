@@ -16,7 +16,7 @@ import {
 import { getStorage } from "firebase/storage";
 import { 
   getAuth, 
-  GoogleAuthProvider, // <-- Added for Google Sign-In
+  GoogleAuthProvider, 
   sendEmailVerification, 
   sendPasswordResetEmail, 
   User 
