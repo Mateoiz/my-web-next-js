@@ -27,11 +27,7 @@ const nextConfig: NextConfig = {
         destination: '/Workspace',
         permanent: true,
       },
-      {
-        source: '/workspace', // If they type the lowercase version...
-        destination: '/Workspace', // ...automatically redirect them here!
-        permanent: true,
-      },
+
     ];
   },
 };
