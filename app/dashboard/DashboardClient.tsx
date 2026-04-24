@@ -407,7 +407,7 @@ export default function DashboardClient() {
               <div className="flex flex-col min-w-0 ml-1">
                 <span className="hidden md:block text-[10px] font-mono font-bold text-[#06402B] dark:text-emerald-500 tracking-[0.3em] uppercase opacity-80 leading-none mb-1">The Academic</span>
                 <h1 className="text-base md:text-2xl font-light tracking-[0.1em] text-zinc-800 dark:text-zinc-100 uppercase leading-none truncate">
-                  <span className="hidden sm:inline">Lasallian</span> <span className="font-black text-[#06402B] dark:text-emerald-400">Hub</span>
+                  <span className="hidden sm:inline">Lasallian</span> <span className="font-black text-[#06402B] dark:text-emerald-400">Terminal</span>
                 </h1>
               </div>
             </div>
@@ -545,7 +545,7 @@ export default function DashboardClient() {
                        <FaFolderOpen size={30} />
                     </div>
                     <div className="space-y-1">
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 dark:text-zinc-400">Lasallian Hub Tool</p>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 dark:text-zinc-400">Lasallian Terminal Tool</p>
                       <h2 className="text-3xl font-black text-zinc-900 dark:text-zinc-100 tracking-tighter uppercase">
                         Course Tracker
                       </h2>
