@@ -3,55 +3,47 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { FaUserFriends, FaInbox, FaSearch, FaUserPlus, FaCheck, FaDownload, FaPaperPlane, FaUserCheck, FaTimes } from "react-icons/fa";
-import { collection, query, where, getDocs, doc, updateDoc, arrayUnion, onSnapshot, getDoc, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, updateDoc, arrayUnion, onSnapshot, getDoc, addDoc, serverTimestamp, documentId } from "firebase/firestore";
 import { auth, db } from "@/lib/db";
 
 export default function StudyLounge() {
   const [activeTab, setActiveTab] = useState<'friends' | 'inbox'>('friends');
   
-  // Current User Profile (needed to send our name/avatar to our friends)
   const [myProfile, setMyProfile] = useState<any>(null);
 
-  // Friends State
   const [searchUsername, setSearchUsername] = useState("");
   const [friendsList, setFriendsList] = useState<any[]>([]);
   const [searchResult, setSearchResult] = useState<any | null>(null);
   
-  // UI States
   const [isAdding, setIsAdding] = useState(false);
   const [requestSent, setRequestSent] = useState(false);
 
-  // Inbox State
   const [inboxItems, setInboxItems] = useState<any[]>([]);
   const [processingId, setProcessingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!auth.currentUser) return;
+    let unsubFriends = () => {};
 
-    // 0. Fetch My Profile
-    const fetchMe = async () => {
-      const snap = await getDoc(doc(db, "users", auth.currentUser!.uid));
-      if (snap.exists()) setMyProfile(snap.data());
-    };
-    fetchMe();
+    // 1. Listen to My Profile & Friends Network (Real-time)
+    const myRef = doc(db, "users", auth.currentUser.uid);
+    const unsubMe = onSnapshot(myRef, (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        setMyProfile(data);
 
-    // 1. Fetch Friends Network
-    const fetchFriends = async () => {
-      const userRef = doc(db, "users", auth.currentUser!.uid);
-      const userSnap = await getDoc(userRef);
-      const friendUids = userSnap.exists() ? userSnap.data().friends || [] : [];
-      
-      if (friendUids.length > 0) {
-        const friendPromises = friendUids.map((id: string) => getDoc(doc(db, "users", id)));
-        const friendSnaps = await Promise.all(friendPromises);
-        const loadedFriends = friendSnaps
-          .filter(snap => snap.exists())
-          .map(snap => ({ uid: snap.id, ...snap.data() })); 
-          
-        setFriendsList(loadedFriends);
+        const friendUids = data.friends || [];
+        if (friendUids.length > 0) {
+          // Listen to friends in real-time so online statuses update instantly
+          const friendsQuery = query(collection(db, "users"), where(documentId(), "in", friendUids.slice(0, 10)));
+          unsubFriends = onSnapshot(friendsQuery, (fSnap) => {
+            setFriendsList(fSnap.docs.map(d => ({ uid: d.id, ...d.data() })));
+          });
+        } else {
+          setFriendsList([]);
+        }
       }
-    };
-    fetchFriends();
+    });
 
     // 2. Listen to Inbox (Real-time)
     const inboxQ = query(collection(db, "inbox"), where("recipientId", "==", auth.currentUser.uid));
@@ -61,10 +53,13 @@ export default function StudyLounge() {
       setInboxItems(items);
     });
 
-    return () => unsubscribeInbox();
+    return () => {
+      unsubMe();
+      unsubFriends();
+      unsubscribeInbox();
+    };
   }, []);
 
-  // --- FRIEND SEARCH LOGIC ---
   const handleSearchUser = async () => {
     if (!searchUsername.trim()) return;
     setRequestSent(false); 
@@ -80,13 +75,11 @@ export default function StudyLounge() {
     }
   };
 
-  // --- SEND FRIEND REQUEST LOGIC ---
   const handleSendFriendRequest = async () => {
     if (!auth.currentUser || !searchResult || searchResult === "NOT_FOUND" || !myProfile) return;
     setIsAdding(true);
     
     try {
-      // ONLY send a request to THEIR inbox. We DO NOT add them to our local friends array yet.
       await addDoc(collection(db, "inbox"), {
         type: "friend_request",
         recipientId: searchResult.uid,
@@ -98,10 +91,8 @@ export default function StudyLounge() {
         createdAt: serverTimestamp()
       });
       
-      // Trigger the success animation state
       setRequestSent(true);
 
-      // Wait 1.5 seconds so they can read "Sent!", then clear the search
       setTimeout(() => {
         setSearchResult(null);
         setSearchUsername("");
@@ -116,32 +107,22 @@ export default function StudyLounge() {
     }
   };
 
-  // --- ACCEPT FRIEND REQUEST LOGIC (THE MUTUAL HANDSHAKE) ---
   const handleAcceptFriend = async (item: any) => {
     if (!auth.currentUser) return;
     setProcessingId(item.id);
 
     try {
-      // 1. Add the sender to YOUR friends list
       const myRef = doc(db, "users", auth.currentUser.uid);
       await updateDoc(myRef, {
         friends: arrayUnion(item.senderId)
       });
 
-      // 2. Add YOU to the sender's friends list (Mutual Connection)
       const senderRef = doc(db, "users", item.senderId);
       await updateDoc(senderRef, {
         friends: arrayUnion(auth.currentUser.uid)
       });
 
-      // 3. Mark the inbox request as accepted
       await updateDoc(doc(db, "inbox", item.id), { status: "accepted" });
-
-      // 4. Immediately fetch their profile and add them to your local screen
-      const newFriendSnap = await getDoc(doc(db, "users", item.senderId));
-      if (newFriendSnap.exists()) {
-        setFriendsList(prev => [...prev, { uid: newFriendSnap.id, ...newFriendSnap.data() }]);
-      }
     } catch (error) {
       console.error(error);
     } finally {
@@ -149,7 +130,6 @@ export default function StudyLounge() {
     }
   };
 
-  // --- ACCEPT DECK LOGIC ---
   const handleAcceptDeck = async (item: any) => {
     if (!auth.currentUser) return;
     setProcessingId(item.id);
@@ -269,11 +249,13 @@ export default function StudyLounge() {
                         <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-white dark:border-zinc-700 bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center text-zinc-500 font-bold shadow-sm">
                           {friend.avatarUrl ? <img src={friend.avatarUrl} alt="Avatar" className="w-full h-full object-cover" /> : (friend.fullName?.charAt(0) || "U")}
                         </div>
-                        <div className="absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white dark:border-zinc-900 bg-green-500" />
+                        {/* THE DYNAMIC GREEN DOT */}
+                        <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white dark:border-[#121214] ${friend.isOnline ? 'bg-emerald-500' : 'bg-zinc-400 dark:bg-zinc-600'}`} />
                       </div>
                       <div className="min-w-0">
                         <p className="font-bold text-sm text-zinc-900 dark:text-white truncate">{friend.fullName}</p>
-                        <p className="text-[10px] font-mono text-zinc-500 truncate">@{friend.username}</p>
+                        {/* THE DYNAMIC ONLINE TEXT */}
+                        <p className="text-[10px] font-mono text-zinc-500 truncate">{friend.isOnline ? 'Online' : 'Offline'}</p>
                       </div>
                     </div>
                   ))}

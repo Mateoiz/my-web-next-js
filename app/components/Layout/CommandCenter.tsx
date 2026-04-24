@@ -196,11 +196,15 @@ export default function CommandCenter({
                        <div className="w-8 h-8 rounded-full overflow-hidden bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center text-sm font-medium text-zinc-600 dark:text-zinc-400">
                          {friend.avatarUrl ? <img src={friend.avatarUrl} alt="Avatar" className="w-full h-full object-cover" /> : friend.fullName?.charAt(0)}
                        </div>
-                       <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-[#fafafa] dark:border-[#0e0e0e]" />
+                       
+                       {/* DYNAMIC ONLINE/OFFLINE DOT */}
+                       <div className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-[#fafafa] dark:border-[#0e0e0e] ${friend.isOnline ? 'bg-emerald-500' : 'bg-zinc-400 dark:bg-zinc-600'}`} />
                      </div>
                      <div className="min-w-0 flex-1">
                        <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate">{friend.fullName}</p>
-                       <p className="text-xs text-zinc-500 truncate">Online</p>
+                       
+                       {/* DYNAMIC ONLINE/OFFLINE TEXT */}
+                       <p className="text-xs text-zinc-500 truncate">{friend.isOnline ? 'Online' : 'Offline'}</p>
                      </div>
                    </div>
                  ))}
