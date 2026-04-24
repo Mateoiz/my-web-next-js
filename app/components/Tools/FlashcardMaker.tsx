@@ -193,15 +193,27 @@ export default function FlashcardMaker() {
     }, 200); 
   };
 
+  // --- SMART IDENTIFICATION LOGIC ---
   const checkIdentificationAnswer = () => {
+    if (!userInput.trim()) return;
+
     const currentCard = cards[currentIndex];
-    const correctAnswer = currentCard.front.trim();
-    if (userInput.toLowerCase().trim() === correctAnswer.toLowerCase()) {
+    const correctTerm = currentCard.front;
+
+    // Normalizes strings: removes punctuation, standardizes casing, and trims excess spaces
+    const normalize = (str: string) => 
+      str.toLowerCase()
+         .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g,"")
+         .replace(/\s{2,}/g," ")
+         .trim();
+
+    if (normalize(userInput) === normalize(correctTerm)) {
       setShowAnswerFeedback('correct');
       setTimeout(() => handleNext(true), 1000);
     } else {
       setShowAnswerFeedback('incorrect');
-      setIsFlipped(true); 
+      // Give them a chance to retry instead of automatically failing
+      setTimeout(() => setShowAnswerFeedback('none'), 1200);
     }
   };
 
@@ -439,20 +451,46 @@ export default function FlashcardMaker() {
 
           {studyMode === 'identification' && (
             <AnimatePresence mode="wait">
-               <motion.div key={currentIndex} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="w-full max-w-2xl text-center space-y-6 md:space-y-10">
-                  <div className="bg-white dark:bg-zinc-900 border-2 border-zinc-200 dark:border-zinc-800 rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-10 shadow-2xl relative overflow-hidden min-h-[200px] md:min-h-[250px] flex flex-col justify-center items-center">
-                    {showAnswerFeedback !== 'none' && (
-                      <div className={`absolute inset-0 flex items-center justify-center z-10 opacity-95 ${showAnswerFeedback === 'correct' ? 'bg-[#06402B]' : 'bg-red-500'}`}>
-                        <h2 className="text-4xl md:text-5xl font-black text-white uppercase tracking-tighter">{showAnswerFeedback === 'correct' ? 'Correct!' : 'Incorrect'}</h2>
+               <motion.div key={currentIndex} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="w-full max-w-2xl text-center space-y-6 md:space-y-8">
+                  
+                  {/* Prompt Card: Showing the Description */}
+                  <div className={`bg-white dark:bg-zinc-900 border-2 transition-colors duration-300 rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-10 shadow-2xl relative overflow-hidden min-h-[200px] md:min-h-[250px] flex flex-col justify-center items-center ${showAnswerFeedback === 'incorrect' ? 'border-red-500/50 bg-red-500/5 dark:bg-red-500/10' : 'border-zinc-200 dark:border-zinc-800'}`}>
+                    {showAnswerFeedback === 'correct' && (
+                      <div className="absolute inset-0 flex items-center justify-center z-10 opacity-95 bg-[#06402B]">
+                        <h2 className="text-4xl md:text-5xl font-black text-white uppercase tracking-tighter">Correct!</h2>
                       </div>
                     )}
                     <div className="absolute top-4 left-4 md:top-6 md:left-6 text-[9px] md:text-[10px] font-mono font-bold text-zinc-400 uppercase tracking-widest">Description</div>
-                    <h2 className="text-xl sm:text-2xl md:text-4xl font-medium leading-relaxed mt-4 text-zinc-900 dark:text-white">{currentCard.back}</h2>
+                    <h2 className="text-xl sm:text-2xl md:text-3xl font-medium leading-relaxed mt-4 text-zinc-900 dark:text-white">{currentCard.back}</h2>
                   </div>
+
                   {!isFlipped ? (
-                    <div className="flex flex-col sm:flex-row gap-3 md:gap-4 w-full max-w-lg mx-auto">
-                      <input ref={inputRef} type="text" value={userInput} onChange={(e) => setUserInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && checkIdentificationAnswer()} placeholder="Type the exact Term..." className="flex-1 w-full bg-white dark:bg-zinc-900 border-2 border-zinc-300 dark:border-zinc-700 focus:border-[#06402B] outline-none rounded-2xl px-4 py-3 md:px-6 md:py-4 text-lg md:text-xl font-bold text-center shadow-lg transition-all text-zinc-900 dark:text-white" />
-                      <button onClick={checkIdentificationAnswer} className="w-full sm:w-auto bg-[#06402B] text-white rounded-2xl py-4 sm:py-0 px-8 font-black uppercase tracking-widest shadow-lg hover:scale-105 active:scale-95 transition-all">Submit</button>
+                    <div className="flex flex-col gap-3 w-full max-w-lg mx-auto">
+                      <div className="flex flex-col sm:flex-row gap-3 md:gap-4 w-full">
+                        <input 
+                          ref={inputRef} 
+                          type="text" 
+                          value={userInput} 
+                          onChange={(e) => setUserInput(e.target.value)} 
+                          onKeyDown={(e) => e.key === 'Enter' && checkIdentificationAnswer()} 
+                          placeholder="Type the exact Term..." 
+                          className={`flex-1 w-full bg-white dark:bg-zinc-900 border-2 outline-none rounded-2xl px-4 py-3 md:px-6 md:py-4 text-lg md:text-xl font-bold text-center shadow-lg transition-colors ${showAnswerFeedback === 'incorrect' ? 'border-red-500 text-red-500' : 'border-zinc-300 dark:border-zinc-700 focus:border-[#06402B] text-zinc-900 dark:text-white'}`} 
+                        />
+                        <button 
+                          onClick={checkIdentificationAnswer} 
+                          className="w-full sm:w-auto bg-[#06402B] text-white rounded-2xl py-4 sm:py-0 px-8 font-black uppercase tracking-widest shadow-lg hover:scale-105 active:scale-95 transition-transform"
+                        >
+                          Submit
+                        </button>
+                      </div>
+                      
+                      {/* Give Up / Show Answer Button */}
+                      <button 
+                        onClick={() => setIsFlipped(true)}
+                        className="text-[10px] md:text-xs font-bold text-zinc-400 uppercase tracking-widest hover:text-[#06402B] transition-colors py-2"
+                      >
+                        I don't know / Show Answer
+                      </button>
                     </div>
                   ) : (
                     <div className="w-full max-w-lg mx-auto space-y-4 animate-in fade-in slide-in-from-bottom-4">
