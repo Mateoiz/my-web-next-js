@@ -12,7 +12,7 @@ import {
   FaPlus, FaCheckCircle, FaRegCircle, FaTrashAlt, 
   FaTachometerAlt, FaGlobe, FaClock, FaUserFriends, 
   FaChevronRight, FaTimes, FaCog, FaSun, FaMoon, FaDesktop, FaPalette, FaIdBadge, FaSave, FaCamera,
-  FaBolt, FaFolderOpen, FaBook, FaExpandArrowsAlt, FaChevronDown, FaCalendarDay, FaExclamationCircle, FaTrash
+  FaBolt, FaFolderOpen, FaBook, FaExpandArrowsAlt, FaChevronDown, FaCalendarDay, FaExclamationCircle, FaQuoteLeft, FaTrash
 } from "react-icons/fa";
 
 import { onAuthStateChanged, signOut, User } from "firebase/auth";
@@ -35,12 +35,27 @@ const AcademicCalendar = dynamic(() => import('../components/Community/AcademicC
 const NAV_ITEMS = [
   { id: 'dashboard', icon: <FaTachometerAlt size={20} />, label: "Home" },
   { id: 'tracker', icon: <FaFolderOpen size={20} />, label: "Tracker" },
-  { id: 'tools', icon: <FaCalculator size={20} />, label: "Grades" },
-  { id: 'flashcards', icon: <FaLayerGroup size={20} />, label: "Cards" },
-  { id: 'lounge', icon: <FaUserFriends size={20} />, label: "Lounge" },
   { id: 'exchange', icon: <FaGlobe size={20} />, label: "Hub" },
-  { id: 'calendar', icon: <FaCalendarAlt size={20} />, label: "Calendar" },
+  { id: 'lounge', icon: <FaUserFriends size={20} />, label: "Lounge" },
+  { id: 'flashcards', icon: <FaLayerGroup size={20} />, label: "Cards" },
+  { id: 'schedule', icon: <FaClock size={20} />, label: "Sched" }, // <-- Schedule Maker is back!
+  { id: 'tools', icon: <FaCalculator size={20} />, label: "Grades" },
+  { id: 'calendar', icon: <FaCalendarDay size={20} />, label: "Calendar" },
   { id: 'settings', icon: <FaCog size={20} />, label: "Settings" }, 
+];
+
+// --- ENCOURAGEMENT QUOTES ---
+const INSPIRATIONAL_QUOTES = [
+  { q: "The expert in anything was once a beginner.", a: "Helen Hayes" },
+  { q: "It always seems impossible until it's done.", a: "Nelson Mandela" },
+  { q: "Strive for progress, not perfection.", a: "Unknown" },
+  { q: "Success is the sum of small efforts, repeated day in and day out.", a: "Robert Collier" },
+  { q: "The secret of getting ahead is getting started.", a: "Mark Twain" },
+  { q: "Focus on your goal. Don't look in any direction but ahead.", a: "Anonymous" },
+  { q: "Education is the most powerful weapon which you can use to change the world.", a: "Nelson Mandela" },
+  { q: "The beautiful thing about learning is that no one can take it away from you.", a: "B.B. King" },
+  { q: "You don't have to be great to start, but you have to start to be great.", a: "Zig Ziglar" },
+  { q: "There are no shortcuts to any place worth going.", a: "Beverly Sills" }
 ];
 
 export default function DashboardClient() {
@@ -65,6 +80,9 @@ export default function DashboardClient() {
   const [newCourseTitle, setNewCourseTitle] = useState("");
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
 
+  // Quote State
+  const [todaysQuote, setTodaysQuote] = useState({ q: "", a: "" });
+
   // --- CUSTOM MODAL STATE ---
   const [modal, setModal] = useState<{
     isOpen: boolean;
@@ -87,14 +105,25 @@ export default function DashboardClient() {
 
   const router = useRouter();
 
-  const showAlert = (title: string, message: string) => setModal({ isOpen: true, title, message, type: 'alert' });
-  const showConfirm = (title: string, message: string, onConfirm: () => void, confirmText = "Confirm", isDestructive = true) => 
+  // ==========================================
+  // --- MODAL CONTROLLERS (FIXED) ---
+  // ==========================================
+  const showAlert = (title: string, message: string) => {
+    setModal({ isOpen: true, title, message, type: 'alert' });
+  };
+  
+  const showConfirm = (title: string, message: string, onConfirm: () => void, confirmText = "Confirm", isDestructive = true) => {
     setModal({ isOpen: true, title, message, type: 'confirm', onConfirm, confirmText, isDestructive });
-  const closeModal = () => setModal(prev => ({ ...prev, isOpen: false }));
+  };
+  
+  const closeModal = () => {
+    setModal(prev => ({ ...prev, isOpen: false }));
+  };
 
   const confirmSignOut = () => {
     showConfirm("Log Out", "Are you sure you want to log out of your session?", () => signOut(auth), "Log Out", false);
   };
+  // ==========================================
 
   const getGreeting = () => {
     const hour = currentTime.getHours();
@@ -104,6 +133,13 @@ export default function DashboardClient() {
   };
 
   useEffect(() => { setMounted(true); }, []);
+
+  // Cycle Quote daily based on date
+  useEffect(() => {
+    const dayOfMonth = currentTime.getDate();
+    const quoteIndex = dayOfMonth % INSPIRATIONAL_QUOTES.length;
+    setTodaysQuote(INSPIRATIONAL_QUOTES[quoteIndex]);
+  }, [currentTime]);
 
   useEffect(() => {
     if (window.innerWidth >= 768) setIsQueueOpen(true);
@@ -144,12 +180,6 @@ export default function DashboardClient() {
     });
     return () => unsubscribeAuth();
   }, [router]);
-
-  useEffect(() => {
-    if (activeView === 'tracker' && !selectedCourseId && courses.length > 0) {
-      setSelectedCourseId(courses[0].id);
-    }
-  }, [activeView, courses, selectedCourseId]);
 
   const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -210,7 +240,7 @@ export default function DashboardClient() {
       "Delete Course", 
       "Are you sure you want to delete this course and all its tasks? This action cannot be undone.", 
       async () => {
-        if (selectedCourseId === courseId) { setSelectedCourseId(null); setActiveView('dashboard'); }
+        if (selectedCourseId === courseId) { setSelectedCourseId(null); }
         await deleteDoc(doc(db, "courses", courseId));
         courseTasks.filter(t => t.courseId === courseId).forEach(t => deleteDoc(doc(db, "course_tasks", t.id)));
       },
@@ -292,7 +322,6 @@ export default function DashboardClient() {
   };
 
   return (
-    // --- UPDATED BASE BACKGROUND: Softer dark mode background ---
     <div className="flex h-screen bg-zinc-50 dark:bg-[#09090b] font-sans text-zinc-900 dark:text-zinc-100 overflow-hidden relative selection:bg-[#06402B]/30 transition-colors duration-300">
       
       {/* --- CUSTOM GLOBAL MODAL --- */}
@@ -329,13 +358,11 @@ export default function DashboardClient() {
 
       <div className="absolute inset-0 z-0 pointer-events-none">
         <div className="absolute inset-0 opacity-30 sm:opacity-60"><FloatingCubes /></div>
-        {/* --- UPDATED AMBIENT GLOW: Emerald tint in dark mode instead of muddy green --- */}
         <div className="absolute top-[10%] left-[20%] w-[300px] md:w-[500px] h-[300px] md:h-[500px] bg-[#06402B]/10 dark:bg-emerald-500/5 rounded-full blur-[100px] md:blur-[150px]" />
       </div>
 
       <aside className="hidden md:flex w-[84px] bg-white/50 dark:bg-[#09090b]/80 backdrop-blur-2xl border-r border-zinc-200 dark:border-zinc-800/80 shrink-0 flex-col items-center py-6 z-20 relative transition-colors duration-300">
         
-        {/* --- MAIN SIDEBAR LOGO: JPCS Anchor --- */}
         <div className="relative w-12 h-12 mb-8 group cursor-pointer flex items-center justify-center" onClick={() => setActiveView('dashboard')}>
           <div className="absolute inset-0 bg-[#06402B]/20 dark:bg-emerald-500/20 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
           <div className="relative w-full h-full bg-white dark:bg-[#121214] rounded-xl border border-zinc-200 dark:border-zinc-800/80 flex items-center justify-center overflow-hidden p-1 shadow-lg transition-transform group-active:scale-90">
@@ -370,7 +397,6 @@ export default function DashboardClient() {
         <header className="h-16 md:h-20 bg-white/30 dark:bg-[#09090b]/60 backdrop-blur-md border-b border-zinc-200 dark:border-zinc-800/80 flex items-center justify-between px-4 md:px-8 shrink-0 relative z-20 transition-colors duration-300 w-full">
           <div className="flex items-center gap-3 md:gap-6 min-w-0">
             
-            {/* --- HEADER LOGOS: Dual Identity --- */}
             <div className="flex items-center gap-2 min-w-0 shrink-0">
               <div className="relative w-6 h-6 md:w-8 md:h-8 shrink-0 drop-shadow-sm">
                 <Image src="/affiliates/dlsau.png" alt="DLSAU" fill sizes="32px" className="object-contain" />
@@ -415,7 +441,7 @@ export default function DashboardClient() {
              
              <button 
                 onClick={() => setIsQueueOpen(!isQueueOpen)}
-                className={`w-8 h-8 md:w-10 md:h-10 rounded-xl flex items-center justify-center transition-all duration-300 shrink-0 ${isQueueOpen ? 'bg-[#06402B] dark:bg-emerald-600 text-white shadow-[0_0_15px_rgba(6,64,43,0.3)] dark:shadow-[0_0_15px_rgba(16,185,129,0.3)] hover:scale-105' : 'bg-zinc-100 dark:bg-[#18181b] text-zinc-500 hover:text-[#06402B] dark:hover:text-emerald-400 dark:border dark:border-zinc-800/80'}`}
+                className={`w-8 h-8 md:w-10 md:h-10 rounded-xl flex items-center justify-center transition-all duration-300 shrink-0 ${isQueueOpen ? 'bg-[#06402B] dark:bg-emerald-600 text-white shadow-[0_0_15px_rgba(6,64,43,0.3)] dark:shadow-[0_0_15px_rgba(16,185,129,0.3)] hover:scale-105' : 'bg-zinc-100 dark:bg-[#18181b] text-zinc-500 hover:text-[#06402B] hover:bg-[#06402B]/5'}`}
               >
                 {isQueueOpen ? <FaChevronRight size={12} className="md:w-3.5 md:h-3.5" /> : <FaTasks size={14} className="md:w-4 md:h-4" />}
              </button>
@@ -429,20 +455,27 @@ export default function DashboardClient() {
             {activeView === 'dashboard' && (
               <motion.div key="dash" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-6 md:space-y-8 max-w-5xl mx-auto w-full">
                 
-                <div className="p-6 sm:p-8 md:p-10 rounded-[2rem] md:rounded-[3rem] bg-white/40 dark:bg-[#121214]/60 backdrop-blur-xl border border-zinc-200 dark:border-zinc-800/80 relative overflow-hidden shadow-xl text-center md:text-left transition-colors duration-300">
+                <div className="p-6 sm:p-8 md:p-10 rounded-[2rem] md:rounded-[3rem] bg-white/40 dark:bg-[#121214]/60 backdrop-blur-xl border border-zinc-200 dark:border-zinc-800/80 relative overflow-hidden shadow-xl text-center md:text-left transition-colors duration-300 flex flex-col md:flex-row md:items-center justify-between gap-6">
                   <div className="absolute top-0 left-0 w-64 h-64 bg-[#06402B]/5 dark:bg-emerald-500/5 blur-[100px] rounded-full pointer-events-none" />
-                  <div className="relative z-10 w-full flex flex-col md:flex-row items-center justify-between gap-6">
-                    <div>
-                      <div className="inline-flex items-center gap-2 px-3 py-1 mb-3 md:mb-4 rounded-full bg-zinc-200/50 dark:bg-[#18181b]/80 text-[9px] md:text-[10px] font-mono font-bold tracking-widest text-zinc-500 dark:text-zinc-400 uppercase">
-                        <FaClock /> {formattedDate}
-                      </div>
-                      <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-zinc-900 dark:text-zinc-100 mb-2 tracking-tighter">
-                        {getGreeting()}, <span className="text-[#06402B] dark:text-emerald-400 font-light italic">{userProfile?.fullName?.split(' ')[0] || "Scholar"}</span>.
-                      </h2>
+                  <div className="relative z-10 w-full flex flex-col gap-2">
+                    <div className="inline-flex self-center md:self-start items-center gap-2 px-3 py-1 mb-2 rounded-full bg-zinc-200/50 dark:bg-[#18181b]/80 text-[9px] md:text-[10px] font-mono font-bold tracking-widest text-zinc-500 dark:text-zinc-400 uppercase">
+                      <FaClock /> {formattedDate}
                     </div>
-                    <button onClick={() => setIsAddingCourse(!isAddingCourse)} className="px-6 py-4 bg-[#06402B] dark:bg-emerald-600 text-white rounded-2xl text-xs font-black uppercase tracking-widest flex items-center gap-2 hover:scale-105 active:scale-95 transition-all shadow-md shrink-0">
-                      <FaPlus size={14} /> Add Course
-                    </button>
+                    <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-zinc-900 dark:text-zinc-100 mb-2 tracking-tighter">
+                      {getGreeting()}, <span className="text-[#06402B] dark:text-emerald-400 font-light italic">{userProfile?.fullName?.split(' ')[0] || "Scholar"}</span>.
+                    </h2>
+                    
+                    <div className="flex items-start gap-3 mt-6 justify-center md:justify-start">
+                      <FaQuoteLeft className="text-[#06402B]/20 dark:text-emerald-400/20 mt-1 shrink-0" size={18} />
+                      <div className="space-y-1">
+                        <p className="font-light italic text-base md:text-lg text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                          {todaysQuote.q}
+                        </p>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-[#06402B] dark:text-emerald-500">
+                          — {todaysQuote.a}
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -450,31 +483,24 @@ export default function DashboardClient() {
                   {isAddingCourse && (
                     <motion.form initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} onSubmit={handleAddCourse} className="overflow-hidden">
                       <div className="flex gap-2 bg-white dark:bg-[#121214] p-2 rounded-2xl border border-zinc-200 dark:border-zinc-800/80 shadow-sm mb-4">
-                        <input autoFocus type="text" placeholder="e.g., CS101: Intro to Computing" value={newCourseTitle} onChange={(e) => setNewCourseTitle(e.target.value)} className="flex-1 bg-transparent px-4 py-2 outline-none font-bold text-sm text-zinc-900 dark:text-zinc-100" />
-                        <button type="submit" disabled={!newCourseTitle.trim()} className="px-6 bg-[#06402B] dark:bg-emerald-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest disabled:opacity-50">Save</button>
+                        <input autoFocus type="text" placeholder="e.g., Computer Science 101" value={newCourseTitle} onChange={(e) => setNewCourseTitle(e.target.value)} className="flex-1 bg-transparent px-4 py-2 outline-none font-bold text-sm text-zinc-900 dark:text-zinc-100" />
+                        <button type="submit" disabled={!newCourseTitle.trim()} className="px-6 bg-[#06402B] dark:bg-emerald-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest disabled:opacity-50">Create Folder</button>
                       </div>
                     </motion.form>
                   )}
                 </AnimatePresence>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-                  {courses.length === 0 && !isAddingCourse && (
-                    <div className="col-span-full py-16 border-2 border-dashed border-zinc-300 dark:border-zinc-800 rounded-[2rem] text-center text-zinc-500 dark:text-zinc-600 flex flex-col items-center justify-center gap-4">
-                      <FaFolderOpen size={32} className="opacity-20" />
-                      <span className="font-bold uppercase tracking-widest text-xs">No courses added yet.</span>
-                    </div>
-                  )}
-
                   {courses.map(course => {
                     const cTasks = courseTasks.filter(t => t.courseId === course.id);
                     const completedTasks = cTasks.filter(t => t.status === "Submitted" || t.status === "Graded");
                     const progress = cTasks.length > 0 ? (completedTasks.length / cTasks.length) * 100 : 0;
 
                     return (
-                      <motion.div key={course.id} whileHover={{ y: -4 }} onClick={() => openCourseTracker(course.id)} className="bg-white/60 dark:bg-[#121214]/80 backdrop-blur-xl border border-zinc-200 dark:border-zinc-800/80 rounded-[2rem] p-6 cursor-pointer shadow-sm hover:shadow-md group transition-all">
+                      <motion.div key={course.id} whileHover={{ y: -4 }} onClick={() => openCourseTracker(course.id)} className="bg-white/60 dark:bg-[#121214]/80 backdrop-blur-xl border border-zinc-200 dark:border-zinc-800/80 rounded-[2rem] p-6 cursor-pointer shadow-sm hover:shadow-md group transition-all relative">
                         <div className="flex justify-between items-start mb-4">
                           <div className="w-12 h-12 bg-[#06402B]/10 dark:bg-emerald-500/10 text-[#06402B] dark:text-emerald-400 rounded-2xl flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform"><FaBook size={18} /></div>
-                          <button onClick={(e) => deleteCourse(course.id, e)} className="p-2 text-zinc-300 dark:text-zinc-600 hover:text-red-500 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"><FaTrash size={14} /></button>
+                          <button onClick={(e) => deleteCourse(course.id, e)} className="p-2 text-zinc-300 dark:text-zinc-600 hover:text-red-500 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity z-20"><FaTrash size={14} /></button>
                         </div>
                         <h3 className="text-lg font-black text-zinc-900 dark:text-zinc-100 leading-tight mb-1 truncate">{course.title}</h3>
                         <p className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-widest mb-6">{cTasks.length} Deliverables</p>
@@ -485,6 +511,25 @@ export default function DashboardClient() {
                       </motion.div>
                     );
                   })}
+                  
+                  {/* --- HOLLOW ADD CARD --- */}
+                  <motion.div 
+                    whileHover={{ y: -4, scale: 1.01 }}
+                    onClick={() => setIsAddingCourse(!isAddingCourse)} 
+                    className="group border-4 border-dashed border-zinc-200 dark:border-zinc-800/80 rounded-[2rem] p-6 cursor-pointer transition-all flex flex-col items-center justify-center gap-4 py-12 md:py-16 text-center shadow-sm hover:shadow-md"
+                  >
+                    <div className="w-16 h-16 bg-zinc-100 dark:bg-[#18181b] rounded-full flex items-center justify-center border-2 border-zinc-200 dark:border-zinc-800 group-hover:scale-110 transition-transform shadow-inner group-hover:bg-[#06402B]/10 dark:group-hover:bg-emerald-500/10">
+                      <FaPlus className="text-zinc-400 dark:text-zinc-600 group-hover:text-[#06402B] dark:group-hover:text-emerald-400" size={24} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <h3 className="text-sm font-black text-zinc-500 dark:text-zinc-500 uppercase tracking-widest group-hover:text-zinc-900 dark:group-hover:text-zinc-100 transition-colors">
+                        Add New Course
+                      </h3>
+                      <p className="text-[10px] font-bold text-zinc-400 dark:text-zinc-600 uppercase tracking-widest">
+                        Initialize a new tracker folder
+                      </p>
+                    </div>
+                  </motion.div>
                 </div>
               </motion.div>
             )}
@@ -492,36 +537,46 @@ export default function DashboardClient() {
             {/* === 2. TRACKER TABLE VIEW === */}
             {activeView === 'tracker' && (
               <motion.div key="tracker" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="w-full max-w-7xl mx-auto">
-                <div className="mb-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-white/40 dark:bg-[#121214]/60 p-4 md:p-6 rounded-2xl md:rounded-[2rem] border border-zinc-200 dark:border-zinc-800/80 backdrop-blur-md shadow-sm transition-colors">
-                  <div className="flex items-center gap-4 w-full md:w-auto">
-                    <div className="w-10 h-10 md:w-12 md:h-12 bg-[#06402B]/10 dark:bg-emerald-500/10 text-[#06402B] dark:text-emerald-400 rounded-xl md:rounded-2xl flex items-center justify-center shrink-0">
-                       <FaFolderOpen size={20} />
+                
+                <div className="mb-6 bg-white/40 dark:bg-[#121214]/60 p-6 md:p-8 rounded-[2rem] border border-zinc-200 dark:border-zinc-800/80 backdrop-blur-md shadow-sm transition-colors flex flex-col md:flex-row md:items-center justify-between gap-6">
+                  
+                  <div className="flex items-center gap-5">
+                    <div className="w-16 h-16 bg-[#06402B]/10 dark:bg-emerald-500/10 text-[#06402B] dark:text-emerald-400 rounded-[1.5rem] flex items-center justify-center shrink-0 border border-[#06402B]/20 dark:border-emerald-500/20 shadow-inner">
+                       <FaFolderOpen size={30} />
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[9px] md:text-[10px] font-bold uppercase tracking-widest text-zinc-500 dark:text-zinc-400">Active Course</p>
-                      <div className="relative">
-                        <select 
-                          value={selectedCourseId || ""} 
-                          onChange={(e) => setSelectedCourseId(e.target.value)}
-                          className="w-full md:w-64 appearance-none bg-transparent font-black text-xl md:text-2xl text-zinc-900 dark:text-zinc-100 outline-none cursor-pointer pr-8 truncate"
-                        >
-                          {courses.length === 0 && <option value="">No Courses Yet</option>}
-                          {courses.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
-                        </select>
-                        <FaChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-zinc-500 pointer-events-none" />
-                      </div>
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 dark:text-zinc-400">Lasallian Hub Tool</p>
+                      <h2 className="text-3xl font-black text-zinc-900 dark:text-zinc-100 tracking-tighter uppercase">
+                        Course Tracker
+                      </h2>
                     </div>
                   </div>
-                  <button onClick={() => setActiveView('dashboard')} className="w-full md:w-auto px-6 py-3 bg-zinc-200 dark:bg-[#18181b] text-zinc-600 dark:text-zinc-300 font-bold uppercase tracking-widest text-[10px] md:text-xs rounded-xl hover:opacity-80 transition-opacity shrink-0">
-                     Back to Grid
-                  </button>
+                  
+                  {selectedCourseId ? (
+                    <button onClick={() => { setSelectedCourseId(null); setActiveView('dashboard'); }} className="w-full md:w-auto px-6 py-4 bg-zinc-200 dark:bg-[#18181b] text-zinc-600 dark:text-zinc-300 font-bold uppercase tracking-widest text-[10px] md:text-xs rounded-2xl hover:opacity-80 transition-opacity shrink-0 border dark:border-zinc-800 shadow-sm hover:scale-105 active:scale-95 transition-all">
+                       Back to Grid
+                    </button>
+                  ) : (
+                    <div className="text-right hidden md:block">
+                        <p className="text-[10px] font-bold text-zinc-400 dark:text-zinc-600 uppercase tracking-widest">Go to Home Dashboard</p>
+                        <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">to select a folder</p>
+                    </div>
+                  )}
                 </div>
                 
                 {!selectedCourseId ? (
-                  <div className="py-20 border-2 border-dashed border-zinc-300 dark:border-zinc-800 rounded-[2rem] text-center text-zinc-500 dark:text-zinc-600 flex flex-col items-center justify-center gap-4">
-                    <FaBook size={32} className="opacity-20" />
-                    <span className="font-bold uppercase tracking-widest text-xs">Please add a course first.</span>
-                  </div>
+                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="py-24 border-4 border-dashed border-zinc-300 dark:border-zinc-800 rounded-[2rem] text-center flex flex-col items-center justify-center gap-6 bg-white/20 dark:bg-white/5 shadow-inner">
+                    <div className="w-20 h-20 bg-zinc-100 dark:bg-[#18181b] rounded-full flex items-center justify-center border-2 border-zinc-200 dark:border-zinc-800 shadow-sm relative group">
+                        <div className="absolute inset-0 bg-[#06402B]/10 rounded-full blur-xl opacity-0 group-hover:opacity-100 transition-opacity"/>
+                      <FaFolderOpen size={36} className="text-zinc-400 dark:text-zinc-700 relative z-10" />
+                    </div>
+                    <div className="space-y-1.5 px-4 max-w-sm mx-auto">
+                      <span className="font-bold uppercase tracking-widest text-base text-zinc-500 dark:text-zinc-400 block">Please Select a Course Folder</span>
+                      <p className="text-xs font-medium text-zinc-400 dark:text-zinc-600 leading-relaxed">
+                        It seems you haven't picked a course card from the <button onClick={() => setActiveView('dashboard')} className="text-[#06402B] dark:text-emerald-400 font-bold hover:underline hover:text-emerald-300">Dashboard Home</button> yet. You are about to pick one palang to view its internal deliverables.
+                      </p>
+                    </div>
+                  </motion.div>
                 ) : (
                   <UniversityTracker courseId={selectedCourseId} />
                 )}
