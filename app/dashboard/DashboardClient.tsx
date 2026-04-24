@@ -14,7 +14,8 @@ import {
 } from "react-icons/fa";
 
 import { onAuthStateChanged, signOut, User } from "firebase/auth";
-import { doc, getDoc, collection, query, where, orderBy, onSnapshot, addDoc, updateDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
+// ADDED: documentId imported for the live friends query
+import { doc, getDoc, collection, query, where, orderBy, onSnapshot, addDoc, updateDoc, deleteDoc, serverTimestamp, documentId } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"; 
 import { auth, db, storage } from "@/lib/db"; 
 
@@ -30,7 +31,6 @@ const FlashcardExchange = dynamic(() => import('../components/Community/Flashcar
 const StudyLounge = dynamic(() => import('../components/Community/StudyLounge'), { ssr: false });
 const UniversityTracker = dynamic(() => import('../components/Tools/UniversityTracker'), { ssr: false });
 const AcademicCalendar = dynamic(() => import('../components/Community/AcademicCalendar').then(mod => mod.default), { ssr: false });
-
 
 const NAV_ITEMS = [
   { id: 'dashboard', icon: <FaTachometerAlt size={20} />, label: "Home" },
@@ -108,11 +108,39 @@ export default function DashboardClient() {
 
   useEffect(() => { setMounted(true); if (window.innerWidth >= 768) setIsQueueOpen(true); }, []);
 
+  // --- NEW: PRESENCE SYSTEM (Less Aggressive) ---
+  useEffect(() => {
+    if (!authUser) return;
+    const userRef = doc(db, "users", authUser.uid);
+
+    const setOnline = async () => {
+      try { await updateDoc(userRef, { isOnline: true }); } catch (e) {}
+    };
+    const setOffline = async () => {
+      try { await updateDoc(userRef, { isOnline: false }); } catch (e) {}
+    };
+
+    setOnline(); 
+
+    const handleUnload = () => {
+      setOffline();
+    };
+
+    window.addEventListener('beforeunload', handleUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleUnload);
+      setOffline(); 
+    };
+  }, [authUser]);
+
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
       if (!user) return router.push("/Workspace");
       setAuthUser(user);
       
+      let unsubFriends = () => {}; // Added for cleanup
+
       try {
         const userDoc = await getDoc(doc(db, "users", user.uid));
         if (userDoc.exists()) {
@@ -123,9 +151,11 @@ export default function DashboardClient() {
           setEditAvatarUrl(data.avatarUrl || "");
 
           if (data.friends && data.friends.length > 0) {
-            const friendPromises = data.friends.slice(0, 5).map((id: string) => getDoc(doc(db, "users", id)));
-            const friendSnaps = await Promise.all(friendPromises);
-            setFriendsList(friendSnaps.filter(snap => snap.exists()).map(snap => ({ uid: snap.id, ...snap.data() })));
+            // NEW: LIVE LISTENER FOR FRIENDS
+            const friendsQuery = query(collection(db, "users"), where(documentId(), "in", data.friends.slice(0, 10)));
+            unsubFriends = onSnapshot(friendsQuery, (snap) => {
+              setFriendsList(snap.docs.map(d => ({ uid: d.id, ...d.data() })));
+            });
           }
         }
       } catch (err) {}
@@ -137,7 +167,7 @@ export default function DashboardClient() {
         setIsLoading(false);
       });
 
-      return () => { unsubTasks(); unsubCourseTasks(); unsubCourses(); };
+      return () => { unsubTasks(); unsubCourseTasks(); unsubCourses(); unsubFriends(); };
     });
     return () => unsubscribeAuth();
   }, [router]);
@@ -196,7 +226,7 @@ export default function DashboardClient() {
     } catch (error) {} finally { setIsSavingProfile(false); }
   };
 
-const mergedActiveTasks = [
+  const mergedActiveTasks = [
     ...generalTasks.filter(t => t.status === 'pending').map(t => ({ ...t, isCourseTask: false })),
     ...courseTasks
       .filter(t => t.status === 'OPEN' || t.status === 'Submitted')
@@ -365,11 +395,11 @@ const mergedActiveTasks = [
             )}
 
             {/* 2. TRACKER TABLE */}
-{activeView === 'tracker' && (
-  <motion.div key="tracker" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="w-full max-w-7xl mx-auto">
-    <UniversityTracker />
-  </motion.div>
-)}
+            {activeView === 'tracker' && (
+              <motion.div key="tracker" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="w-full max-w-7xl mx-auto">
+                <UniversityTracker />
+              </motion.div>
+            )}
 
             {/* OTHER VIEWS */}
             {activeView === 'calendar' && <motion.div key="cal" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-7xl mx-auto"><AcademicCalendar userTasks={allCalendarTasks} /></motion.div>}
@@ -470,10 +500,10 @@ const mergedActiveTasks = [
       </nav>
 
       {/* NEW SEPARATED COMMAND CENTER */}
-<CommandCenter 
+      <CommandCenter 
         isOpen={isQueueOpen}
         onClose={() => setIsQueueOpen(false)}
-        activeTasks={mergedActiveTasks} // <-- Pass the new array here
+        activeTasks={mergedActiveTasks} 
         friends={friendsList}
         onAddTask={handleAddGeneralTask}
         onToggleTask={toggleTaskStatus}
