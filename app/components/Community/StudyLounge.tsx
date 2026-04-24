@@ -17,7 +17,7 @@ export default function StudyLounge() {
   const [friendsList, setFriendsList] = useState<any[]>([]);
   const [searchResult, setSearchResult] = useState<any | null>(null);
   
-  // --- NEW: Better UI States ---
+  // UI States
   const [isAdding, setIsAdding] = useState(false);
   const [requestSent, setRequestSent] = useState(false);
 
@@ -67,7 +67,7 @@ export default function StudyLounge() {
   // --- FRIEND SEARCH LOGIC ---
   const handleSearchUser = async () => {
     if (!searchUsername.trim()) return;
-    setRequestSent(false); // Reset visual state if searching again
+    setRequestSent(false); 
     
     const q = query(collection(db, "users"), where("username", "==", searchUsername.trim()));
     const snap = await getDocs(q);
@@ -80,20 +80,13 @@ export default function StudyLounge() {
     }
   };
 
-  // --- SEND FRIEND REQUEST LOGIC (UPDATED WITH UI EFFECTS) ---
+  // --- SEND FRIEND REQUEST LOGIC ---
   const handleSendFriendRequest = async () => {
     if (!auth.currentUser || !searchResult || searchResult === "NOT_FOUND" || !myProfile) return;
     setIsAdding(true);
     
     try {
-      const userRef = doc(db, "users", auth.currentUser.uid);
-      
-      // 1. Add them to your local array immediately
-      await updateDoc(userRef, {
-        friends: arrayUnion(searchResult.uid)
-      });
-      
-      // 2. Send a Friend Request to THEIR inbox
+      // ONLY send a request to THEIR inbox. We DO NOT add them to our local friends array yet.
       await addDoc(collection(db, "inbox"), {
         type: "friend_request",
         recipientId: searchResult.uid,
@@ -105,12 +98,10 @@ export default function StudyLounge() {
         createdAt: serverTimestamp()
       });
       
-      setFriendsList(prev => [...prev, searchResult]);
-      
-      // 3. Trigger the success animation state instead of an alert
+      // Trigger the success animation state
       setRequestSent(true);
 
-      // 4. Wait 1.5 seconds so they can read "Sent!", then clear the search
+      // Wait 1.5 seconds so they can read "Sent!", then clear the search
       setTimeout(() => {
         setSearchResult(null);
         setSearchUsername("");
@@ -125,19 +116,28 @@ export default function StudyLounge() {
     }
   };
 
-  // --- ACCEPT FRIEND REQUEST LOGIC ---
+  // --- ACCEPT FRIEND REQUEST LOGIC (THE MUTUAL HANDSHAKE) ---
   const handleAcceptFriend = async (item: any) => {
     if (!auth.currentUser) return;
     setProcessingId(item.id);
 
     try {
-      const userRef = doc(db, "users", auth.currentUser.uid);
-      await updateDoc(userRef, {
+      // 1. Add the sender to YOUR friends list
+      const myRef = doc(db, "users", auth.currentUser.uid);
+      await updateDoc(myRef, {
         friends: arrayUnion(item.senderId)
       });
 
+      // 2. Add YOU to the sender's friends list (Mutual Connection)
+      const senderRef = doc(db, "users", item.senderId);
+      await updateDoc(senderRef, {
+        friends: arrayUnion(auth.currentUser.uid)
+      });
+
+      // 3. Mark the inbox request as accepted
       await updateDoc(doc(db, "inbox", item.id), { status: "accepted" });
 
+      // 4. Immediately fetch their profile and add them to your local screen
       const newFriendSnap = await getDoc(doc(db, "users", item.senderId));
       if (newFriendSnap.exists()) {
         setFriendsList(prev => [...prev, { uid: newFriendSnap.id, ...newFriendSnap.data() }]);
@@ -233,7 +233,6 @@ export default function StudyLounge() {
                       </div>
                     </div>
                     
-                    {/* --- DYNAMIC ADD FRIEND BUTTON --- */}
                     <button 
                       onClick={handleSendFriendRequest} 
                       disabled={isAdding || requestSent} 

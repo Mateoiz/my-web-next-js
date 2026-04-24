@@ -119,10 +119,10 @@ export default function DashboardScheduleMaker() {
     });
   };
 
-  const downloadJPG = async () => {
+const downloadJPG = async () => {
     setIsExporting(true);
     try {
-      const { toJpeg } = await import('html-to-image');
+      const { toJpeg } = await import('html-to-image'); // <-- MUST BE THIS
       const element = document.getElementById('schedule-canvas');
       if (!element) return;
       
@@ -143,7 +143,6 @@ export default function DashboardScheduleMaker() {
       setIsExporting(false);
     }
   };
-
   if (view === 'editor') {
     return (
       <div className="max-w-5xl mx-auto space-y-6 md:space-y-8 pb-20 animate-in fade-in slide-in-from-bottom-4 w-full">

@@ -16,8 +16,8 @@ import {
 
 import { onAuthStateChanged, signOut, User } from "firebase/auth";
 import { doc, getDoc, collection, query, where, orderBy, onSnapshot, addDoc, updateDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage"; // <-- NEW: Storage imports
-import { auth, db, storage } from "@/lib/db"; // <-- NEW: Imported storage
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage"; 
+import { auth, db, storage } from "@/lib/db"; 
 
 import FloatingCubes from "../components/FloatingCubes"; 
 
@@ -25,7 +25,6 @@ const DashboardScheduleMaker = dynamic(() => import('../components/Tools/Dashboa
 const GradeCalculator = dynamic(() => import('../components/Tools/GradeCalculator'));
 const GWACalculator = dynamic(() => import('../components/Tools/GWACalculator'));
 const FlashcardMaker = dynamic(() => import('../components/Tools/FlashcardMaker'), { ssr: false });
-const GradeArchitect = dynamic(() => import('../components/Tools/GradeArchitect'), { ssr: false });
 const FlashcardExchange = dynamic(() => import('../components/Community/FlashcardExchange'), { ssr: false });
 const StudyLounge = dynamic(() => import('../components/Community/StudyLounge'), { ssr: false });
 
@@ -53,13 +52,15 @@ export default function DashboardClient() {
   const [isAddingTask, setIsAddingTask] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
 
-  const [theme, setTheme] = useState<ThemeMode>('system');
+  // --- THEME STATE (from next-themes) ---
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
 
   // --- PROFILE EDIT STATE ---
   const [editBio, setEditBio] = useState("");
   const [editYearLevel, setEditYearLevel] = useState("1st Year");
   const [editAvatarUrl, setEditAvatarUrl] = useState("");
-  const [avatarFile, setAvatarFile] = useState<File | null>(null); // <-- NEW: Holds the physical file
+  const [avatarFile, setAvatarFile] = useState<File | null>(null); 
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
   const router = useRouter();
@@ -72,23 +73,8 @@ export default function DashboardClient() {
   };
 
   useEffect(() => {
-    const savedTheme = localStorage.getItem('lasallian-theme') as ThemeMode | null;
-    if (savedTheme) setTheme(savedTheme);
+    setMounted(true);
   }, []);
-
-  useEffect(() => {
-    const root = document.documentElement;
-    if (theme === 'system') {
-      const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      if (systemPrefersDark) root.classList.add('dark');
-      else root.classList.remove('dark');
-    } else if (theme === 'dark') {
-      root.classList.add('dark');
-    } else {
-      root.classList.remove('dark');
-    }
-    localStorage.setItem('lasallian-theme', theme);
-  }, [theme]);
 
   useEffect(() => {
     if (window.innerWidth >= 768) setIsQueueOpen(true);
@@ -125,7 +111,7 @@ export default function DashboardClient() {
     return () => unsubscribeAuth();
   }, [router]);
 
-  // --- NEW: HANDLE IMAGE SELECTION ---
+  // --- HANDLE IMAGE SELECTION ---
   const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
@@ -134,25 +120,23 @@ export default function DashboardClient() {
         return;
       }
       setAvatarFile(file);
-      setEditAvatarUrl(URL.createObjectURL(file)); // Show a temporary local preview immediately
+      setEditAvatarUrl(URL.createObjectURL(file)); 
     }
   };
 
-  // --- UPDATED: SAVE PROFILE FUNCTION WITH UPLOAD LOGIC ---
+  // --- SAVE PROFILE FUNCTION WITH UPLOAD LOGIC ---
   const handleSaveProfile = async () => {
     if (!authUser) return;
     setIsSavingProfile(true);
     try {
       let finalAvatarUrl = editAvatarUrl;
 
-      // 1. If a new physical file was selected, upload it to Firebase Storage first
       if (avatarFile) {
         const fileRef = ref(storage, `avatars/${authUser.uid}`);
         await uploadBytes(fileRef, avatarFile);
-        finalAvatarUrl = await getDownloadURL(fileRef); // Get the live public URL
+        finalAvatarUrl = await getDownloadURL(fileRef); 
       }
 
-      // 2. Save everything to Firestore
       await updateDoc(doc(db, "users", authUser.uid), {
         bio: editBio,
         yearLevel: editYearLevel,
@@ -165,7 +149,7 @@ export default function DashboardClient() {
         yearLevel: editYearLevel,
         avatarUrl: finalAvatarUrl
       }));
-      setAvatarFile(null); // Clear the pending file state
+      setAvatarFile(null); 
       alert("Profile updated successfully!");
     } catch (error) {
       console.error(error);
@@ -361,7 +345,6 @@ export default function DashboardClient() {
                           <span>{userProfile?.fullName?.charAt(0) || "U"}</span>
                         )}
                         
-                        {/* Hidden file input wrapped by a clean label UI */}
                         <label htmlFor="avatar-upload" className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer z-10 backdrop-blur-sm">
                           <FaCamera size={24} />
                           <span className="text-[10px] font-bold uppercase tracking-widest mt-2">Change</span>
@@ -421,12 +404,12 @@ export default function DashboardClient() {
                   </h3>
 
                   <div className="flex flex-col gap-4 sm:grid sm:grid-cols-3">
-                    {['light', 'dark', 'system'].map((t) => {
+                    {mounted && ['light', 'dark', 'system'].map((t) => {
                       const isSelected = theme === t;
                       return (
                         <button
                           key={t}
-                          onClick={() => setTheme(t as ThemeMode)}
+                          onClick={() => setTheme(t)}
                           className={`p-6 rounded-2xl border-2 transition-all flex flex-col items-center justify-center gap-3 active:scale-95 w-full ${
                             isSelected 
                               ? 'border-[#06402B] bg-[#06402B]/5 text-[#06402B] shadow-md dark:text-white' 
@@ -459,12 +442,9 @@ export default function DashboardClient() {
             {activeView === 'exchange' && <motion.div key="exchange" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="w-full"><FlashcardExchange /></motion.div>}
             
             {activeView === 'tools' && (
-              <motion.div key="tools" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col xl:grid xl:grid-cols-2 gap-6 md:gap-8 max-w-7xl mx-auto w-full">
-                <GradeArchitect />
-                <div className="space-y-6 md:space-y-8 w-full">
-                  <GradeCalculator />
-                  <GWACalculator />
-                </div>
+              <motion.div key="tools" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col gap-6 md:gap-8 max-w-4xl mx-auto w-full">
+                <GradeCalculator />
+                <GWACalculator />
               </motion.div>
             )}
             
@@ -597,4 +577,4 @@ export default function DashboardClient() {
 
     </div>
   );
-}
+} 
