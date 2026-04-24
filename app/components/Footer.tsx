@@ -1,8 +1,24 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { FaFacebook, FaTwitter, FaInstagram, FaYoutube, FaLinkedin, FaSnowflake } from 'react-icons/fa';
+import { usePathname } from "next/navigation";
 
+
+ 
 export default function Footer() {
+ const pathname = usePathname();
+
+  // Automatically hide the footer on the dashboard
+  if (pathname && pathname.includes("/dashboard")) {
+    return null;
+  }
+
+  return (
+    <footer>
+       {/* Your existing footer code goes here */}
+    </footer>
+  );
+
   const currentYear = new Date().getFullYear();
 
   const socialLinks = [

@@ -3,10 +3,12 @@
 import { useTheme } from "next-themes";
 import { FaSun, FaMoon } from "react-icons/fa";
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation"; // <-- ADDED THIS
 
 export default function ThemeToggle() {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
+  const pathname = usePathname(); // <-- ADDED THIS
 
   // useEffect only runs on the client, so now we can safely show the UI
   useEffect(() => {
@@ -15,15 +17,20 @@ export default function ThemeToggle() {
 
   if (!mounted) return null;
 
+  // --- NEW: HIDE THE BUTTON IF ON THE DASHBOARD ---
+  if (pathname && pathname.includes("/dashboard")) {
+    return null;
+  }
+
   return (
     <button
       onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-        className="
+      className="
         fixed bottom-6 right-6 
         z-[9999] /* Updated to be super high */
         cursor-pointer /* Forces the hand cursor */
         p-4 rounded-full shadow-lg
- 
+
         /* Light Mode Styles */
         bg-white text-yellow-500 border-2 border-yellow-400
         
