@@ -109,28 +109,50 @@ export default function DashboardClient() {
   useEffect(() => { setMounted(true); if (window.innerWidth >= 768) setIsQueueOpen(true); }, []);
 
   // --- NEW: PRESENCE SYSTEM (Less Aggressive) ---
+// --- THE "GRACE PERIOD" PRESENCE SYSTEM ---
   useEffect(() => {
     if (!authUser) return;
     const userRef = doc(db, "users", authUser.uid);
+    let offlineTimeout: NodeJS.Timeout;
 
-    const setOnline = async () => {
-      try { await updateDoc(userRef, { isOnline: true }); } catch (e) {}
-    };
-    const setOffline = async () => {
-      try { await updateDoc(userRef, { isOnline: false }); } catch (e) {}
-    };
-
-    setOnline(); 
-
-    const handleUnload = () => {
-      setOffline();
+    const goOnline = () => {
+      clearTimeout(offlineTimeout); // Cancel any pending offline triggers
+      updateDoc(userRef, { isOnline: true }).catch(() => {});
     };
 
-    window.addEventListener('beforeunload', handleUnload);
+    const goOffline = () => {
+      updateDoc(userRef, { isOnline: false }).catch(() => {});
+    };
+
+    // 1. Instantly mark online on load
+    goOnline();
+
+    // 2. The Grace Period Logic
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        // They came back! Cancel the timer and ensure they are online.
+        goOnline();
+      } else {
+        // They switched tabs or minimized. Give them 60 seconds before marking offline.
+        offlineTimeout = setTimeout(() => {
+          goOffline();
+        }, 60000); // 60,000 ms = 1 minute
+      }
+    };
+
+    // 3. Fallback for physical tab closes / navigation
+    const handlePageHide = () => {
+      goOffline();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('pagehide', handlePageHide);
 
     return () => {
-      window.removeEventListener('beforeunload', handleUnload);
-      setOffline(); 
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('pagehide', handlePageHide);
+      clearTimeout(offlineTimeout);
+      goOffline(); // Catches when they actually click the "Log Out" button
     };
   }, [authUser]);
 
