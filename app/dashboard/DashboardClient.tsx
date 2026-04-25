@@ -32,6 +32,7 @@ const StudyLounge = dynamic(() => import('../components/Community/StudyLounge'),
 const UniversityTracker = dynamic(() => import('../components/Tools/UniversityTracker'), { ssr: false });
 const AcademicCalendar = dynamic(() => import('../components/Community/AcademicCalendar').then(mod => mod.default), { ssr: false });
 
+
 const NAV_ITEMS = [
   { id: 'dashboard', icon: <FaTachometerAlt size={20} />, label: "Home" },
   { id: 'tracker', icon: <FaFolderOpen size={20} />, label: "Tracker" },

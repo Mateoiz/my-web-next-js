@@ -49,17 +49,19 @@ export const gpaLabel = (gpa: number) =>
 
 interface RowState { raw: string; total: string; weight: string; }
 
+// FIX: Pre-populate rows with placeholder/default values so the table
+// never appears cut off or empty when first rendered.
 const EMPTY_ROWS = () => ({
-  midterms:     { raw: "", total: "", weight: "30" } as RowState,
-  finals:       { raw: "", total: "", weight: "30" } as RowState,
-  finalProduct: { raw: "", total: "", weight: "20" } as RowState,
+  midterms:     { raw: "", total: "100", weight: "30" } as RowState,
+  finals:       { raw: "", total: "100", weight: "30" } as RowState,
+  finalProduct: { raw: "", total: "100", weight: "20" } as RowState,
   classStanding:{ raw: "", total: "N/A", weight: "20" } as RowState,
 });
 
 // ─── Parse grade string from tracker ("85", "85/100", "18/20") ───────────────
 
 function parseGrade(gradeStr: string | undefined, isDirect = false): { raw: string; total: string } {
-  if (!gradeStr?.trim()) return { raw: "", total: isDirect ? "N/A" : "" };
+  if (!gradeStr?.trim()) return { raw: "", total: isDirect ? "N/A" : "100" };
   if (isDirect) return { raw: gradeStr.split("/")[0].trim(), total: "N/A" };
   if (gradeStr.includes("/")) {
     const [r, t] = gradeStr.split("/");
@@ -68,7 +70,9 @@ function parseGrade(gradeStr: string | undefined, isDirect = false): { raw: stri
   return { raw: gradeStr.trim(), total: "100" };
 }
 
-// ─── Custom Dropdown (no native <select>) ────────────────────────────────────
+// ─── Custom Dropdown ──────────────────────────────────────────────────────────
+// FIX: Render dropdown via a portal-like approach using fixed positioning
+// so it is never clipped by ancestor overflow:hidden containers.
 
 function CustomSelect<T extends string>({
   value, options, onChange, renderOption, renderValue,
@@ -79,17 +83,40 @@ function CustomSelect<T extends string>({
   renderValue: (v: T) => React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
+  const buttonRef = useRef<HTMLButtonElement>(null);
   const ref = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
-    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    const h = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
   }, []);
+
+  // FIX: Calculate fixed position based on button's bounding rect
+  // so the dropdown renders above all overflow:hidden ancestors.
+  const handleOpen = () => {
+    if (buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setDropdownStyle({
+        position: "fixed",
+        top: rect.bottom + 6,
+        left: rect.left,
+        zIndex: 9999,
+        minWidth: Math.max(rect.width, 180),
+      });
+    }
+    setOpen(o => !o);
+  };
+
   return (
     <div ref={ref} className="relative">
       <button
+        ref={buttonRef}
         type="button"
-        onClick={() => setOpen(o => !o)}
+        onClick={handleOpen}
         className="flex items-center gap-2 cursor-pointer select-none focus:outline-none w-full"
       >
         {renderValue(value)}
@@ -102,7 +129,9 @@ function CustomSelect<T extends string>({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -4, scale: 0.97 }}
             transition={{ duration: 0.11 }}
-            className="absolute z-50 top-full mt-1.5 left-0 min-w-[180px] bg-white dark:bg-[#1c1c1f] border border-zinc-200 dark:border-zinc-700 rounded-2xl shadow-2xl overflow-hidden"
+            // FIX: Use fixed positioning style calculated from button rect
+            style={dropdownStyle}
+            className="bg-white dark:bg-[#1c1c1f] border border-zinc-200 dark:border-zinc-700 rounded-2xl shadow-2xl overflow-hidden"
           >
             <div className="p-1.5 space-y-0.5">
               {options.map(opt => (
@@ -195,15 +224,14 @@ const PROGRAM_LABELS: Record<Program, string> = {
 export default function GradeCalculator({ courses = [], tasks = [] }: GradeCalculatorProps) {
   const [selectedCourseId, setSelectedCourseId] = useState("");
   const [program, setProgram] = useState<Program>("Standard");
+  // FIX: Start with EMPTY_ROWS which now has "100" pre-filled for total fields
   const [rows, setRows] = useState(EMPTY_ROWS());
-  // Track which rows were populated by import
   const [importedRows, setImportedRows] = useState<Set<string>>(new Set());
 
   const [result, setResult] = useState<{
     percentage: number | null; gpa: number | null; error: string | null;
   }>({ percentage: null, gpa: null, error: null });
 
-  // Mark rows as dirty (manually edited) when changed
   const setRow = (key: keyof ReturnType<typeof EMPTY_ROWS>, val: RowState) => {
     setRows(r => ({ ...r, [key]: val }));
     setImportedRows(s => { const n = new Set(s); n.delete(key); return n; });
@@ -280,13 +308,15 @@ export default function GradeCalculator({ courses = [], tasks = [] }: GradeCalcu
   const gpaColor = gpa === null ? "" : gpa >= 3.0 ? "text-[#06402B] dark:text-emerald-400" : gpa >= 1.0 ? "text-yellow-500" : "text-red-500";
 
   return (
+    // FIX: Removed overflow-hidden from wrapper so dropdowns inside can escape
+    // the container boundary. overflow-hidden was the root cause of clipping.
     <motion.div
       initial={{ opacity: 0, scale: 0.97 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="max-w-4xl mx-auto bg-white/80 dark:bg-[#18181b]/80 backdrop-blur-md border border-zinc-200 dark:border-[#06402B]/30 rounded-[2rem] shadow-sm relative overflow-hidden p-6 md:p-8 w-full"
+      className="max-w-4xl mx-auto bg-white/80 dark:bg-[#18181b]/80 backdrop-blur-md border border-zinc-200 dark:border-[#06402B]/30 rounded-[2rem] shadow-sm relative p-6 md:p-8 w-full"
     >
-      {/* Top accent bar */}
-      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#06402B] to-emerald-400 dark:from-emerald-600 dark:to-emerald-400" />
+      {/* Top accent bar — use a pseudo element via a child div instead of relying on overflow:hidden on parent */}
+      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#06402B] to-emerald-400 dark:from-emerald-600 dark:to-emerald-400 rounded-t-[2rem]" />
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="flex flex-col md:flex-row items-start justify-between mb-8 gap-5">
@@ -356,6 +386,7 @@ export default function GradeCalculator({ courses = [], tasks = [] }: GradeCalcu
           <span className="col-span-2 text-center">W%</span>
         </div>
 
+        {/* FIX: All 4 rows always rendered — no conditional rendering that could cut rows off */}
         <GradeRow label="Midterm Exam"   values={rows.midterms}      setValues={v => setRow("midterms", v)}      type="exam"   imported={importedRows.has("midterms")} />
         <GradeRow label="Final Exam"     values={rows.finals}        setValues={v => setRow("finals", v)}        type="exam"   imported={importedRows.has("finals")} />
         <GradeRow label="Final Product"  values={rows.finalProduct}  setValues={v => setRow("finalProduct", v)}  type="exam"   imported={importedRows.has("finalProduct")} />

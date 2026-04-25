@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   FaPlus, FaBook, FaTrash, FaChevronDown, FaCalendarDay,
   FaArrowLeft, FaFolderOpen, FaExclamationTriangle, FaCheckCircle,
-  FaClipboardList, FaTimes, FaPencilAlt
+  FaClipboardList, FaTimes, FaPencilAlt, FaCalendarAlt
 } from "react-icons/fa";
 import {
   collection, query, where, orderBy, onSnapshot,
@@ -60,7 +60,7 @@ const safeType = (type: string): TaskType => (TASK_TYPES.includes(type as TaskTy
 const safeStatus = (status: string): TaskStatus => (TASK_STATUSES_SET.has(status) ? (status as TaskStatus) : "OPEN");
 const TASK_STATUSES: TaskStatus[] = ["OPEN","Submitted","Graded"];
 
-// ─── Reusable Dropdown ────────────────────────────────────────────────────────
+// ─── Reusable Dropdown — FIXED: uses fixed positioning to escape overflow:hidden ──
 
 interface DropdownProps<T extends string> {
   value: T;
@@ -73,7 +73,9 @@ interface DropdownProps<T extends string> {
 
 function Dropdown<T extends string>({ value, options, onChange, renderOption, renderValue, align = "left" }: DropdownProps<T>) {
   const [open, setOpen] = useState(false);
+  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
   const ref = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
@@ -81,11 +83,26 @@ function Dropdown<T extends string>({ value, options, onChange, renderOption, re
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
+  const handleOpen = () => {
+    if (buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setDropdownStyle({
+        position: "fixed",
+        top: rect.bottom + 6,
+        ...(align === "right" ? { right: window.innerWidth - rect.right } : { left: rect.left }),
+        zIndex: 9999,
+        minWidth: Math.max(rect.width, 160),
+      });
+    }
+    setOpen(o => !o);
+  };
+
   return (
     <div ref={ref} className="relative w-full">
       <button
+        ref={buttonRef}
         type="button"
-        onClick={() => setOpen(o => !o)}
+        onClick={handleOpen}
         className="w-full flex items-center justify-between gap-1.5 cursor-pointer select-none focus:outline-none"
       >
         {renderValue(value)}
@@ -99,7 +116,8 @@ function Dropdown<T extends string>({ value, options, onChange, renderOption, re
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -4, scale: 0.97 }}
             transition={{ duration: 0.12 }}
-            className={`absolute z-50 mt-1.5 min-w-[160px] bg-white dark:bg-[#1c1c1f] border border-zinc-200 dark:border-zinc-700/80 rounded-2xl shadow-2xl shadow-black/10 dark:shadow-black/40 overflow-hidden ${align === "right" ? "right-0" : "left-0"}`}
+            style={dropdownStyle}
+            className="bg-white dark:bg-[#1c1c1f] border border-zinc-200 dark:border-zinc-700/80 rounded-2xl shadow-2xl shadow-black/10 dark:shadow-black/40 overflow-hidden"
           >
             <div className="p-1.5 space-y-0.5">
               {options.map(opt => (
@@ -170,7 +188,7 @@ function InlineEdit({ value, onSave, placeholder, mono = false, center = false }
   );
 }
 
-// ─── Date Input (freeform typing + optional picker) ───────────────────────────
+// ─── Date Input ───────────────────────────────────────────────────────────────
 
 function parseDateInput(raw: string): string {
   if (!raw.trim()) return "";
@@ -270,24 +288,22 @@ function DateInput({ value, onChange }: { value: string; onChange: (v: string) =
         {display || "Set date"}
       </span>
       {value && (
-        <button
-          type="button"
+        <div
+        
           onClick={e => { e.stopPropagation(); onChange(""); }}
           className="ml-auto opacity-0 group-hover/date:opacity-100 text-zinc-400 hover:text-red-400 transition-all"
         >
           <FaTimes size={9} />
-        </button>
+        </div>
       )}
     </button>
   );
 }
 
-// ─── Type Picker (2-step: category → exam sub-type) ──────────────────────────
+// ─── Type Picker — FIXED: uses fixed positioning to escape overflow:hidden ────
 
-// Top-level categories shown in the dropdown
 type TypeCategory = "Quiz" | "Activity" | "Exams" | "Final Product";
 
-// Maps category → which TaskType to save (except Exams, which needs a sub-step)
 const CATEGORY_TYPE_MAP: Record<Exclude<TypeCategory, "Exams">, TaskType> = {
   Quiz: "Quiz",
   Activity: "Assignment",
@@ -301,18 +317,19 @@ const CATEGORY_META: Record<TypeCategory, { dot: string }> = {
   "Final Product": { dot: "bg-purple-600" },
 };
 
-// Derive display category from stored TaskType
 function typeToCategory(t: TaskType): TypeCategory {
   if (t === "Quiz") return "Quiz";
   if (t === "Midterm Exam" || t === "Final Exam") return "Exams";
   if (t === "Final Product") return "Final Product";
-  return "Activity"; // Assignment, Project, Presentation, Class Standing → Activity
+  return "Activity";
 }
 
 function TypePicker({ value, onChange }: { value: TaskType; onChange: (v: TaskType) => void }) {
   const [open, setOpen] = useState(false);
   const [examStep, setExamStep] = useState(false);
+  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
   const ref = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
 
   const category = typeToCategory(value);
   const meta = safeTypeMeta(value);
@@ -327,6 +344,21 @@ function TypePicker({ value, onChange }: { value: TaskType; onChange: (v: TaskTy
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
+
+  const handleOpen = () => {
+    if (buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setDropdownStyle({
+        position: "fixed",
+        top: rect.bottom + 6,
+        left: rect.left,
+        zIndex: 9999,
+        minWidth: Math.max(rect.width, 160),
+      });
+    }
+    setOpen(o => !o);
+    setExamStep(false);
+  };
 
   const selectCategory = (cat: TypeCategory) => {
     if (cat === "Exams") {
@@ -348,13 +380,13 @@ function TypePicker({ value, onChange }: { value: TaskType; onChange: (v: TaskTy
   return (
     <div ref={ref} className="relative w-full">
       <button
+        ref={buttonRef}
         type="button"
-        onClick={() => { setOpen(o => !o); setExamStep(false); }}
+        onClick={handleOpen}
         className={`w-full flex items-center justify-between gap-1.5 px-2.5 py-1.5 rounded-xl border text-[10px] font-bold uppercase tracking-wider cursor-pointer select-none focus:outline-none ${meta.color}`}
       >
         <span className="flex items-center gap-1.5 truncate">
           <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${meta.dot}`} />
-          {/* Show the full stored type (e.g. "Midterm Exam") not just the category */}
           {value}
         </span>
         <FaChevronDown size={8} className={`shrink-0 opacity-50 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
@@ -367,7 +399,8 @@ function TypePicker({ value, onChange }: { value: TaskType; onChange: (v: TaskTy
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -4, scale: 0.97 }}
             transition={{ duration: 0.12 }}
-            className="absolute z-50 mt-1.5 min-w-[160px] bg-white dark:bg-[#1c1c1f] border border-zinc-200 dark:border-zinc-700/80 rounded-2xl shadow-2xl shadow-black/10 dark:shadow-black/40 overflow-hidden left-0"
+            style={dropdownStyle}
+            className="bg-white dark:bg-[#1c1c1f] border border-zinc-200 dark:border-zinc-700/80 rounded-2xl shadow-2xl shadow-black/10 dark:shadow-black/40 overflow-hidden"
           >
             <AnimatePresence mode="wait">
               {!examStep ? (
@@ -436,7 +469,7 @@ function TypePicker({ value, onChange }: { value: TaskType; onChange: (v: TaskTy
   );
 }
 
-// ─── Confirm Modal ─────────────────────────────────────────────────────────────
+// ─── Confirm Modal ────────────────────────────────────────────────────────────
 
 interface ModalState {
   isOpen: boolean; title: string; message: string;
@@ -474,7 +507,7 @@ function ConfirmModal({ modal, onClose }: { modal: ModalState; onClose: () => vo
   );
 }
 
-// ─── Stats Bar ─────────────────────────────────────────────────────────────────
+// ─── Stats Bar ────────────────────────────────────────────────────────────────
 
 function StatsBar({ tasks }: { tasks: CourseTask[] }) {
   const open = tasks.filter(t => t.status === "OPEN").length;
@@ -515,7 +548,7 @@ function StatsBar({ tasks }: { tasks: CourseTask[] }) {
   );
 }
 
-// ─── Live GPA Calculator (mirrors GradeCalculator logic) ──────────────────────
+// ─── Live GPA Calculator ──────────────────────────────────────────────────────
 
 function parseGradeStr(g: string | undefined, isDirect = false): { raw: number; total: number } | null {
   if (!g?.trim()) return null;
@@ -544,7 +577,6 @@ function computeCourseGpa(tasks: CourseTask[], program = "Standard"): { gpa: num
   const prodParsed = prod ? parseGradeStr(prod.grade) : null;
   const csParsed   = cs   ? parseGradeStr(cs.grade, true) : null;
 
-  // Need at least one graded key component
   if (!midParsed && !finParsed && !prodParsed && !csParsed) return null;
 
   const pts = (p: typeof midParsed, weight: number) =>
@@ -559,6 +591,135 @@ function computeCourseGpa(tasks: CourseTask[], program = "Standard"): { gpa: num
   return { score, gpa: getGpaFromScore(score, program) };
 }
 
+// ─── Schedule Sync Modal ──────────────────────────────────────────────────────
+// Lets users push upcoming deadlines from a course into the Schedule Maker
+// as time blocks, or open the Schedule Maker pre-seeded with course codes.
+
+interface ScheduleSyncPayload {
+  courseTitle: string;
+  deadlines: { name: string; type: string; date: string }[];
+}
+
+function ScheduleSyncModal({
+  isOpen,
+  onClose,
+  payload,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  payload: ScheduleSyncPayload | null;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  if (!payload) return null;
+
+  const upcomingDeadlines = payload.deadlines.filter(d => d.date);
+
+  const handleCopyToClipboard = () => {
+    const text = upcomingDeadlines
+      .map(d => `${d.type}: ${d.name} — Due ${formatDateDisplay(d.date)}`)
+      .join("\n");
+    navigator.clipboard.writeText(
+      `📚 ${payload.courseTitle} — Upcoming Deadlines\n\n${text}`
+    );
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+          />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 8 }}
+            transition={{ type: "spring", stiffness: 400, damping: 30 }}
+            className="relative w-full max-w-md bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800 rounded-3xl p-7 shadow-2xl z-10 flex flex-col gap-5"
+          >
+            {/* Header */}
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-[#06402B]/10 text-[#06402B] dark:text-emerald-400 flex items-center justify-center shrink-0">
+                  <FaCalendarAlt size={18} />
+                </div>
+                <div>
+                  <h3 className="text-base font-black uppercase tracking-tight text-zinc-900 dark:text-white leading-none">Sync to Schedule</h3>
+                  <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mt-0.5">{payload.courseTitle}</p>
+                </div>
+              </div>
+              <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors p-1">
+                <FaTimes size={14} />
+              </button>
+            </div>
+
+            {/* Deadline list */}
+            <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+              {upcomingDeadlines.length === 0 ? (
+                <div className="py-8 text-center text-zinc-400 text-sm font-bold">
+                  No deadlines set for this course yet.
+                </div>
+              ) : (
+                upcomingDeadlines.map((d, i) => {
+                  const overdue = isOverdueDate(d.date);
+                  return (
+                    <div key={i} className={`flex items-center gap-3 p-3 rounded-xl border ${
+                      overdue
+                        ? "bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/20"
+                        : "bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800"
+                    }`}>
+                      <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${safeTypeMeta(d.type).dot}`} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-bold text-zinc-800 dark:text-zinc-200 truncate">{d.name || "Untitled"}</p>
+                        <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{d.type}</p>
+                      </div>
+                      <span className={`text-[10px] font-mono font-bold shrink-0 ${overdue ? "text-red-500" : "text-zinc-500 dark:text-zinc-400"}`}>
+                        {formatDateDisplay(d.date)}
+                      </span>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Info note */}
+            <div className="bg-[#06402B]/5 dark:bg-emerald-500/10 border border-[#06402B]/20 dark:border-emerald-500/20 rounded-xl p-3.5">
+              <p className="text-[11px] text-[#06402B] dark:text-emerald-400 font-semibold leading-relaxed">
+                <span className="font-black">Tip:</span> Open the Schedule Maker, then paste these deadlines into your notes or use the course code to add this subject as a class block.
+              </p>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-2.5">
+              <button
+                onClick={handleCopyToClipboard}
+                className={`flex-1 py-3 rounded-xl font-bold text-xs uppercase tracking-widest transition-all border ${
+                  copied
+                    ? "bg-[#06402B] text-white border-[#06402B]"
+                    : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                }`}
+              >
+                {copied ? "✓ Copied!" : "Copy Deadlines"}
+              </button>
+              <button
+                onClick={onClose}
+                className="flex-1 py-3 bg-[#06402B] dark:bg-emerald-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-[#0a5a38] dark:hover:bg-emerald-500 shadow-md transition-colors"
+              >
+                Got it
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
+  );
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function UniversityTracker() {
@@ -568,6 +729,11 @@ export default function UniversityTracker() {
   const [isAddingCourse, setIsAddingCourse] = useState(false);
   const [newCourseTitle, setNewCourseTitle] = useState("");
   const [modal, setModal] = useState<ModalState>({ isOpen: false, title: "", message: "", confirmText: "Confirm", onConfirm: () => {} });
+
+  // Schedule sync modal
+  const [syncModal, setSyncModal] = useState<{ isOpen: boolean; payload: ScheduleSyncPayload | null }>({
+    isOpen: false, payload: null,
+  });
 
   const closeModal = useCallback(() => setModal(m => ({ ...m, isOpen: false })), []);
 
@@ -627,12 +793,32 @@ export default function UniversityTracker() {
     });
   }, [selectedCourseId, tasks, closeModal]);
 
+  // ── Open the schedule sync modal for a course ──────────────────────────────
+  const handleOpenSync = useCallback((course: Course, courseTasks: CourseTask[], e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSyncModal({
+      isOpen: true,
+      payload: {
+        courseTitle: course.title,
+        deadlines: courseTasks
+          .filter(t => t.deadline)
+          .sort((a, b) => a.deadline.localeCompare(b.deadline))
+          .map(t => ({ name: t.name, type: t.type, date: t.deadline })),
+      },
+    });
+  }, []);
+
   // ── Course Grid View ────────────────────────────────────────────────────────
 
   if (!selectedCourseId) {
     return (
       <div className="w-full max-w-6xl mx-auto space-y-8 relative">
         <ConfirmModal modal={modal} onClose={closeModal} />
+        <ScheduleSyncModal
+          isOpen={syncModal.isOpen}
+          onClose={() => setSyncModal(s => ({ ...s, isOpen: false }))}
+          payload={syncModal.payload}
+        />
 
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 bg-white/50 dark:bg-[#121214]/50 p-6 md:p-8 rounded-[2rem] border border-zinc-200 dark:border-zinc-800/80 backdrop-blur-xl shadow-sm">
@@ -730,6 +916,14 @@ export default function UniversityTracker() {
                           {gpaResult.gpa.toFixed(1)}
                         </div>
                       )}
+                      {/* ── SCHEDULE SYNC BUTTON ── */}
+                      <button
+                        onClick={e => handleOpenSync(course, ct, e)}
+                        className="p-2 text-zinc-300 dark:text-zinc-700 hover:text-[#06402B] dark:hover:text-emerald-400 hover:bg-[#06402B]/10 dark:hover:bg-emerald-500/10 rounded-xl opacity-0 group-hover:opacity-100 transition-all"
+                        title="Sync deadlines to Schedule Maker"
+                      >
+                        <FaCalendarAlt size={13} />
+                      </button>
                       <button
                         onClick={e => triggerDeleteCourse(course.id, e)}
                         className="p-2 text-zinc-300 dark:text-zinc-700 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl opacity-0 group-hover:opacity-100 transition-all"
@@ -788,15 +982,29 @@ export default function UniversityTracker() {
   return (
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-6xl mx-auto space-y-6 relative">
       <ConfirmModal modal={modal} onClose={closeModal} />
+      <ScheduleSyncModal
+        isOpen={syncModal.isOpen}
+        onClose={() => setSyncModal(s => ({ ...s, isOpen: false }))}
+        payload={syncModal.payload}
+      />
 
       {/* Course header */}
       <div className="bg-white/60 dark:bg-[#121214]/80 backdrop-blur-xl p-6 md:p-8 rounded-[2rem] border border-zinc-200 dark:border-zinc-800/80 shadow-sm">
-        <button
-          onClick={() => setSelectedCourseId(null)}
-          className="mb-5 px-4 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 shadow-sm text-[10px] font-bold text-zinc-600 dark:text-zinc-300 uppercase tracking-widest hover:text-[#06402B] dark:hover:text-emerald-400 hover:border-[#06402B]/30 rounded-xl transition-all flex items-center gap-2 w-fit"
-        >
-          <FaArrowLeft size={10} /> Back to Folders
-        </button>
+        <div className="flex items-center gap-3 mb-5">
+          <button
+            onClick={() => setSelectedCourseId(null)}
+            className="px-4 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 shadow-sm text-[10px] font-bold text-zinc-600 dark:text-zinc-300 uppercase tracking-widest hover:text-[#06402B] dark:hover:text-emerald-400 hover:border-[#06402B]/30 rounded-xl transition-all flex items-center gap-2 w-fit"
+          >
+            <FaArrowLeft size={10} /> Back to Folders
+          </button>
+          {/* Sync button in detail view header */}
+          <button
+            onClick={e => handleOpenSync(activeCourse, courseTasks, e)}
+            className="px-4 py-2 bg-[#06402B]/10 dark:bg-emerald-500/10 text-[#06402B] dark:text-emerald-400 border border-[#06402B]/20 dark:border-emerald-500/20 shadow-sm text-[10px] font-bold uppercase tracking-widest hover:bg-[#06402B]/20 dark:hover:bg-emerald-500/20 rounded-xl transition-all flex items-center gap-2 w-fit"
+          >
+            <FaCalendarAlt size={10} /> Sync to Schedule
+          </button>
+        </div>
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div>
             <h2 className="text-3xl md:text-5xl font-black uppercase tracking-tighter text-zinc-900 dark:text-white">{activeCourse.title}</h2>
@@ -809,12 +1017,12 @@ export default function UniversityTracker() {
         </div>
       </div>
 
-      {/* Tasks table */}
+      {/* Tasks table — FIXED: removed overflow-hidden so dropdowns aren't clipped */}
       <div className="w-full overflow-x-auto pb-4">
-        <div className="min-w-[960px] w-full bg-white dark:bg-[#18181b] rounded-[2rem] border border-zinc-200 dark:border-zinc-800 shadow-lg overflow-hidden">
+        <div className="min-w-[960px] w-full bg-white dark:bg-[#18181b] rounded-[2rem] border border-zinc-200 dark:border-zinc-800 shadow-lg">
 
           {/* Column headers */}
-          <div className="grid grid-cols-[2fr_1.4fr_1.2fr_1.4fr_0.7fr_0.5fr] gap-3 px-5 py-3.5 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/80 dark:bg-[#111113] text-[10px] font-black uppercase tracking-widest text-zinc-400 select-none">
+          <div className="grid grid-cols-[2fr_1.4fr_1.2fr_1.4fr_0.7fr_0.5fr] gap-3 px-5 py-3.5 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/80 dark:bg-[#111113] rounded-t-[2rem] text-[10px] font-black uppercase tracking-widest text-zinc-400 select-none">
             <div className="pl-2">Deliverable</div>
             <div>Type</div>
             <div>Status</div>
@@ -889,7 +1097,7 @@ export default function UniversityTracker() {
           </div>
 
           {/* Add row footer */}
-          <div className="px-4 py-3 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-[#111113] flex justify-center">
+          <div className="px-4 py-3 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-[#111113] rounded-b-[2rem] flex justify-center">
             <button
               onClick={() => handleAddTask(activeCourse.id)}
               className="flex items-center gap-2 px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-zinc-400 hover:text-[#06402B] dark:hover:text-emerald-400 hover:bg-white dark:hover:bg-zinc-900 rounded-xl transition-all border border-transparent hover:border-zinc-200 dark:hover:border-zinc-800 shadow-sm hover:shadow-md"
