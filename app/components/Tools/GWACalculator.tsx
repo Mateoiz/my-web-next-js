@@ -6,7 +6,7 @@ import {
   FaGraduationCap, FaEraser, FaArrowRight, FaPlus, FaTrash, 
   FaAward, FaChevronDown, FaInfoCircle, FaSync, FaCheckCircle, FaTimes, FaExclamationTriangle
 } from "react-icons/fa";
-
+import { useModal } from "../../context/ModalContext";
 interface GWACalculatorProps {
   autoGrades?: { courseId: string, title: string, average: string | null }[];
 }
@@ -14,6 +14,7 @@ interface GWACalculatorProps {
 // --- STRICT GRADING LOGIC ---
 const getGpaFromScore = (score: number, program: string, isMajor: boolean) => {
   const activeProgram = isMajor ? program : "Standard";
+  
 
   if (activeProgram === "BSA") {
     if (score >= 98) return 4.0; if (score >= 95) return 3.5;
@@ -35,7 +36,6 @@ const getGpaFromScore = (score: number, program: string, isMajor: boolean) => {
   if (score >= 72) return 2.0; if (score >= 66) return 1.5;
   if (score >= 60) return 1.0; return 0.0;
 };
-
 // --- CUSTOM HEADLESS UI DROPDOWN ---
 function CustomSelect<T extends string>({
   value, options, onChange, renderOption, renderValue,
@@ -98,6 +98,8 @@ const PROGRAM_LABELS: Record<Program, string> = {
 };
 
 export default function GWACalculator({ autoGrades = [] }: GWACalculatorProps) {
+  const { showAlert } = useModal();
+
   const [program, setProgram] = useState<Program>("Standard");
   const [subjects, setSubjects] = useState([
     { id: 1, name: "", raw: "", units: "3", isMajor: true }, 
@@ -111,7 +113,8 @@ export default function GWACalculator({ autoGrades = [] }: GWACalculatorProps) {
 
   const handleSyncWorkspace = () => {
     if (autoGrades.length === 0) {
-      alert("No courses or graded tasks found in your workspace tracker.");
+      showAlert("Nothing to Sync", "No courses or graded tasks found in your workspace tracker.");
+
       return;
     }
     

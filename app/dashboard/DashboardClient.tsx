@@ -6,19 +6,19 @@ import Image from "next/image";
 import { useTheme } from "next-themes";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  FaCalendarAlt, FaCalculator, FaLayerGroup, FaTasks, FaSignOutAlt, FaPlus, FaCheckCircle, 
+import {  FaCalculator, FaLayerGroup, FaTasks, FaSignOutAlt, FaPlus, FaCheckCircle, 
   FaTrashAlt, FaTachometerAlt, FaGlobe, FaClock, FaUserFriends, FaChevronRight, 
   FaCog, FaSun, FaMoon, FaDesktop, FaPalette, FaIdBadge, FaSave, FaCamera, 
-  FaFolderOpen, FaCalendarDay, FaQuoteLeft, FaBook, FaBullhorn, FaFire, FaChartBar
+  FaFolderOpen, FaCalendarDay, FaQuoteLeft, FaBook, FaFire, FaChartBar
 } from "react-icons/fa";
 import { FaBrain } from "react-icons/fa6";
-import { createPortal } from "react-dom";
+import { ModalProvider, useModal } from "../context/ModalContext";
 
 import { onAuthStateChanged, signOut, User } from "firebase/auth";
 import { doc, getDoc, collection, query, where, orderBy, onSnapshot, addDoc, updateDoc, deleteDoc, serverTimestamp, documentId } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"; 
 import { auth, db, storage } from "@/lib/db"; 
+
 
 import FloatingCubes from "../components/FloatingCubes"; 
 import CommandCenter from "../components/Layout/CommandCenter";
@@ -102,7 +102,10 @@ const useCourseAverages = (courses: any[], tasks: any[]) => {
 };
 
 
-export default function DashboardClient() {
+// Rename the function and add useModal hook
+function DashboardInner() {
+  const { showAlert, showConfirm } = useModal();  // ← ADD THIS
+
   const [activeView, setActiveView] = useState('dashboard');
   const [academicTab, setAcademicTab] = useState<'schedule' | 'grades'>('schedule');
   const [studyTab, setStudyTab] = useState<'cards' | 'exchange' | 'lounge'>('cards');
@@ -120,7 +123,6 @@ export default function DashboardClient() {
   const [friendsList, setFriendsList] = useState<any[]>([]);
   
   const [todaysQuote, setTodaysQuote] = useState({ q: "Loading...", a: "" });
-  const [modal, setModal] = useState<any>({ isOpen: false });
 
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
@@ -132,30 +134,35 @@ export default function DashboardClient() {
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
   const router = useRouter();
-
-  const showAlert = (title: string, message: string) => setModal({ isOpen: true, title, message, type: 'alert' });
-  const showConfirm = (title: string, message: string, onConfirm: () => void, confirmText = "Confirm", isDestructive = true) => 
-    setModal({ isOpen: true, title, message, type: 'confirm', onConfirm, confirmText, isDestructive });
-  const closeModal = () => setModal({ isOpen: false });
   const confirmSignOut = () => showConfirm("Log Out", "Are you sure you want to log out?", () => signOut(auth), "Log Out", false);
 
   const getGreeting = () => {
-    const hour = currentTime.getHours();
+    const hour = currentTime.getHours();  
     if (hour < 12) return "Good morning";
     if (hour < 18) return "Good afternoon";
     return "Good evening";
   };
 
-  useEffect(() => {
-    const fetchQuote = async () => {
-      try {
-        const res = await fetch('https://dummyjson.com/quotes/random');
-        const data = await res.json();
-        if (data.quote) setTodaysQuote({ q: data.quote, a: data.author });
-      } catch (e) {
-        setTodaysQuote({ q: "Strive for progress, not perfection.", a: "Unknown" });
-      }
+  // ... rest of the component unchanged, then close with }
+
+// New default export at the very bottom of the file:
+// ... last line inside DashboardInner (probably the closing of the return JSX)
+
+useEffect(() => {
+    const fetchQuote = () => {
+      const quotes = [
+        { q: "Goodness gracious", a: "Vice Ganda" },
+        { q: "First, solve the problem. Then, write the code.", a: "John Johnson" },
+        { q: "Make it work, make it right, make it fast.", a: "Kent Beck" },
+        { q: "Strive for progress, not perfection.", a: "Unknown" },
+        { q: "It always seems impossible until it's done.", a: "Nelson Mandela" }
+      ];
+      
+      // Pick a random quote from your list
+      const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
+      setTodaysQuote(randomQuote);
     };
+    
     fetchQuote();
   }, []);
 
@@ -325,24 +332,6 @@ export default function DashboardClient() {
     <div className="flex h-screen bg-zinc-50 dark:bg-[#09090b] font-sans text-zinc-900 dark:text-zinc-100 overflow-hidden relative transition-colors duration-300">
       
       {/* MODAL */}
-      <AnimatePresence>
-        {modal.isOpen && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={closeModal} className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-            <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-sm bg-white dark:bg-[#121214] border border-zinc-200 dark:border-zinc-800/80 rounded-[2rem] p-6 md:p-8 shadow-2xl z-10 text-center flex flex-col items-center">
-              <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-5 ${modal.isDestructive ? 'bg-red-500/10 text-red-500 dark:bg-red-500/20 dark:text-red-400' : 'bg-[#06402B]/10 text-[#06402B] dark:bg-emerald-500/20 dark:text-emerald-400'}`}>
-                {modal.isDestructive ? <FaTrashAlt size={24} /> : modal.type === 'confirm' ? <FaSignOutAlt size={24} /> : <FaCheckCircle size={24} />}
-              </div>
-              <h3 className="text-xl font-black uppercase tracking-tight text-zinc-900 dark:text-zinc-100 mb-2">{modal.title}</h3>
-              <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400 mb-8">{modal.message}</p>
-              <div className="flex gap-3 w-full">
-                {modal.type === 'confirm' && <button onClick={closeModal} className="flex-1 py-3.5 bg-zinc-100 dark:bg-[#18181b] text-zinc-600 dark:text-zinc-300 rounded-xl font-bold text-xs uppercase tracking-widest">Cancel</button>}
-                <button onClick={() => { if (modal.onConfirm) modal.onConfirm(); closeModal(); }} className={`flex-1 py-3.5 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-md ${modal.isDestructive ? 'bg-red-600 hover:bg-red-500' : 'bg-[#06402B] hover:bg-[#042d1f] dark:bg-emerald-600 dark:hover:bg-emerald-500'}`}>{modal.confirmText || 'Okay'}</button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
 
       <div className="absolute inset-0 z-0 pointer-events-none">
         <div className="absolute inset-0 opacity-30 sm:opacity-60"><FloatingCubes /></div>
@@ -819,7 +808,7 @@ export default function DashboardClient() {
       </nav>
 
       {/* COMMAND CENTER */}
-      <CommandCenter 
+<CommandCenter 
         isOpen={isQueueOpen}
         onClose={() => setIsQueueOpen(false)}
         activeTasks={mergedActiveTasks} 
@@ -831,5 +820,13 @@ export default function DashboardClient() {
       />
 
     </div>
+  );
+}  // ← closes DashboardInner
+
+export default function DashboardClient() {
+  return (
+    <ModalProvider>
+      <DashboardInner />
+    </ModalProvider>
   );
 }

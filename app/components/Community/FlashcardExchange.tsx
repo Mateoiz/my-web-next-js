@@ -6,13 +6,15 @@ import { FaSearch, FaArrowUp, FaDownload, FaUserCircle, FaCheck, FaTrashAlt, FaS
 import { collection, query, where, getDocs, orderBy, updateDoc, doc, increment, addDoc, serverTimestamp, deleteDoc, getDoc } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth"; // <-- ADDED THIS
 import { auth, db } from "@/lib/db";
+import { useModal } from "../../context/ModalContext";
+
 
 export default function FlashcardExchange() {
   const [decks, setDecks] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [collegeFilter, setCollegeFilter] = useState("All");
   const [yearFilter, setYearFilter] = useState("All");
-  
+  const { showAlert, showConfirm } = useModal();
   const [importingId, setImportingId] = useState<string | null>(null);
   const [importedDecks, setImportedDecks] = useState<string[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -46,7 +48,7 @@ export default function FlashcardExchange() {
   };
 
   const handleImport = async (deck: any) => {
-    if (!auth.currentUser) return alert("You must be logged in to import.");
+    if (!auth.currentUser) return showAlert("Not Logged In", "You must be logged in to import.");
     setImportingId(deck.id);
 
     try {
@@ -70,16 +72,23 @@ export default function FlashcardExchange() {
     }
   };
 
-  const handleAdminDelete = async (deckId: string) => {
-    if (!confirm("ADMIN ACTION: Are you sure you want to permanently delete this public flashcard deck?")) return;
-    try {
-      await deleteDoc(doc(db, "flashcard_decks", deckId));
-      setDecks(prev => prev.filter(d => d.id !== deckId));
-    } catch (error) {
-      alert("Failed to delete. Ensure your Firebase Rules are updated for Admins.");
-      console.error(error);
-    }
-  };
+const handleAdminDelete = (deckId: string) => {
+  showConfirm(
+    "Delete Deck",
+    "Are you sure you want to permanently delete this public flashcard deck?",
+    async () => {
+      try {
+        await deleteDoc(doc(db, "flashcard_decks", deckId));
+        setDecks(prev => prev.filter(d => d.id !== deckId));
+      } catch (error) {
+        showAlert("Delete Failed", "Ensure your Firebase Rules are updated for Admins.");
+        console.error(error);
+      }
+    },
+    "Delete",
+    true
+  );
+};
 
   const filteredDecks = decks.filter(deck => {
     const matchesSearch = (deck.title?.toLowerCase() || "").includes(searchQuery.toLowerCase()) || 

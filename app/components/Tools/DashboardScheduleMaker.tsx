@@ -7,6 +7,7 @@ import {
   FaPalette, FaMobileAlt, FaDesktop, FaImage, FaDownload,
   FaBook, FaCheckCircle
 } from "react-icons/fa";
+import { useModal } from "../../context/ModalContext";
 
 type Day = 'M' | 'T' | 'W' | 'Th' | 'F' | 'S';
 type ClassSession = {
@@ -34,7 +35,6 @@ interface DashboardScheduleMakerProps {
   /** Courses from UniversityTracker — used for the "Import from Tracker" feature */
   trackerCourses?: TrackerCourse[];
 }
-
 const PASTEL_COLORS = [
   "bg-rose-200 text-rose-950 border-rose-300",
   "bg-orange-200 text-orange-950 border-orange-300",
@@ -217,6 +217,7 @@ function ImportTrackerModal({
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function DashboardScheduleMaker({ trackerCourses = [] }: DashboardScheduleMakerProps) {
+    const { showAlert } = useModal(); // ← must be here, inside the function
   const [view, setView] = useState<ViewMode>('editor');
   const [termName, setTermName] = useState("2nd Term, A.Y. 2025-2026");
   
@@ -343,7 +344,8 @@ export default function DashboardScheduleMaker({ trackerCourses = [] }: Dashboar
       link.click();
     } catch (err) {
       console.error(err);
-      alert("Failed to export. Ensure 'html-to-image' is installed.");
+      showAlert("Export Failed", "Failed to export. Ensure 'html-to-image' is installed.");
+
     } finally {
       setIsExporting(false);
     }

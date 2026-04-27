@@ -8,7 +8,7 @@ import {
 } from "react-icons/fa";
 import { collection, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, query, where, getDocs, orderBy, getDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/db"; 
-
+import { useModal } from "../../context/ModalContext";
 type Card = { id: string; front: string; back: string };
 type ViewMode = 'library' | 'editor' | 'study' | 'results';
 type StudyMode = 'flip' | 'identification';
@@ -16,7 +16,8 @@ type StudyMode = 'flip' | 'identification';
 export default function FlashcardMaker() {
   const [view, setView] = useState<ViewMode>('library');
   const [studyMode, setStudyMode] = useState<StudyMode>('flip');
-  
+  const { showAlert, showConfirm } = useModal();
+
   const [myDecks, setMyDecks] = useState<any[]>([]);
   const [isLoadingLibrary, setIsLoadingLibrary] = useState(true);
 
@@ -75,14 +76,22 @@ export default function FlashcardMaker() {
     setView('editor');
   };
 
-  const deleteDeck = async (deckId: string) => {
-    if (!confirm("Are you sure you want to delete this reviewer?")) return;
-    await deleteDoc(doc(db, "flashcard_decks", deckId));
-    setMyDecks(prev => prev.filter(d => d.id !== deckId));
-  };
+const deleteDeck = (deckId: string) => {
+  showConfirm(
+    "Delete Reviewer",
+    "Are you sure you want to delete this reviewer? This cannot be undone.",
+    async () => {
+      await deleteDoc(doc(db, "flashcard_decks", deckId));
+      setMyDecks(prev => prev.filter(d => d.id !== deckId));
+    },
+    "Delete",
+    true
+  );
+};
 
   const quickStudy = (deck: any, mode: StudyMode) => {
-    if (!deck.cards || deck.cards.length === 0) return alert("This deck has no cards.");
+    if (!deck.cards || deck.cards.length === 0) return showAlert("Empty Deck", "This deck has no cards to study.");
+
     setDeckTitle(deck.title);
     setCards(deck.cards);
     startStudy(mode);
@@ -107,7 +116,8 @@ export default function FlashcardMaker() {
   };
 
   const handleSaveDeck = async () => {
-    if (!deckTitle || !deckSubject || cards.some(c => !c.front || !c.back)) return alert("Please fill out the Title, Subject, and all card fields.");
+    if (!deckTitle || !deckSubject || cards.some(c => !c.front || !c.back)) return showAlert("Incomplete Deck", "Please fill out the Title, Subject, and all card fields.");
+
     setIsSaving(true);
     try {
       const userDoc = await getDoc(doc(db, "users", auth.currentUser!.uid));
@@ -136,13 +146,14 @@ export default function FlashcardMaker() {
   };
 
   const handleSendToFriend = async () => {
-    if (!sendToUsername.trim() || cards.length === 0 || !deckTitle) return alert("Ensure deck has a title and cards.");
+    if (!sendToUsername.trim() || cards.length === 0 || !deckTitle) return showAlert("Missing Info", "Ensure the deck has a title and cards before sending.");
+
     setIsSending(true);
     try {
       const q = query(collection(db, "users"), where("username", "==", sendToUsername.toLowerCase().trim()));
       const snap = await getDocs(q);
       if (snap.empty) {
-        alert("User not found!");
+        showAlert("User Not Found", "No user found with that username. Check the spelling.");
         setIsSending(false);
         return;
       }
@@ -162,7 +173,8 @@ export default function FlashcardMaker() {
         createdAt: serverTimestamp()
       });
       
-      alert("Reviewer sent successfully!");
+      showAlert("Sent!", "Reviewer delivered to your friend's inbox.");
+
       setSendToUsername("");
     } catch (error) {
       console.error(error);
@@ -172,7 +184,8 @@ export default function FlashcardMaker() {
   };
 
   const startStudy = (mode: StudyMode) => {
-    if (cards.some(c => !c.front || !c.back)) return alert("Fill empty cards before studying!");
+    if (cards.some(c => !c.front || !c.back)) return showAlert("Incomplete Cards", "Please fill in all card fronts and backs before studying.");
+
     setStudyMode(mode);
     setCurrentIndex(0);
     setKnownCount(0);

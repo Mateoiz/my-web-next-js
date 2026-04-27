@@ -5,19 +5,18 @@ import { motion, AnimatePresence } from "framer-motion";
 import { FaUserFriends, FaInbox, FaSearch, FaUserPlus, FaCheck, FaDownload, FaPaperPlane, FaUserCheck, FaTimes } from "react-icons/fa";
 import { collection, query, where, getDocs, doc, updateDoc, arrayUnion, onSnapshot, getDoc, addDoc, serverTimestamp, documentId } from "firebase/firestore";
 import { auth, db } from "@/lib/db";
+import { useModal } from "../../context/ModalContext";
+
 
 export default function StudyLounge() {
   const [activeTab, setActiveTab] = useState<'friends' | 'inbox'>('friends');
-  
+  const { showAlert } = useModal();
   const [myProfile, setMyProfile] = useState<any>(null);
-
   const [searchUsername, setSearchUsername] = useState("");
   const [friendsList, setFriendsList] = useState<any[]>([]);
   const [searchResult, setSearchResult] = useState<any | null>(null);
-  
   const [isAdding, setIsAdding] = useState(false);
   const [requestSent, setRequestSent] = useState(false);
-
   const [inboxItems, setInboxItems] = useState<any[]>([]);
   const [processingId, setProcessingId] = useState<string | null>(null);
 
@@ -102,7 +101,7 @@ export default function StudyLounge() {
       
     } catch (error) {
       console.error(error);
-      alert("Failed to send request.");
+      showAlert("Request Failed", "Failed to send request. Please try again.");
       setIsAdding(false);
     }
   };

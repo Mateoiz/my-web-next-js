@@ -46,7 +46,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className="antialiased bg-white dark:bg-black text-zinc-900 dark:text-white transition-colors duration-300">
+      <body suppressHydrationWarning className="antialiased bg-white dark:bg-black text-zinc-900 dark:text-white transition-colors duration-300">
+
         
         {/* Google Analytics Scripts (Safely outside the React Context tree) */}
         <Script

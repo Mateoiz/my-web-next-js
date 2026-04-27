@@ -6,6 +6,7 @@ import {
   FaCalculator, FaEraser, FaArrowRight, FaExclamationTriangle,
   FaChevronDown, FaDownload, FaCheckCircle, FaTimes
 } from "react-icons/fa";
+import { createPortal } from "react-dom";
 
 // ─── Types (must mirror UniversityTracker) ────────────────────────────────────
 
@@ -97,19 +98,19 @@ function CustomSelect<T extends string>({
 
   // FIX: Calculate fixed position based on button's bounding rect
   // so the dropdown renders above all overflow:hidden ancestors.
-  const handleOpen = () => {
-    if (buttonRef.current) {
-      const rect = buttonRef.current.getBoundingClientRect();
-      setDropdownStyle({
-        position: "fixed",
-        top: rect.bottom + 6,
-        left: rect.left,
-        zIndex: 9999,
-        minWidth: Math.max(rect.width, 180),
-      });
-    }
-    setOpen(o => !o);
-  };
+const handleOpen = () => {
+  if (buttonRef.current) {
+    const rect = buttonRef.current.getBoundingClientRect();
+    setDropdownStyle({
+      position: "fixed",
+      top: rect.bottom + 6,
+      left: rect.left,   // ← Remove window.scrollX entirely
+      minWidth: rect.width,
+      zIndex: 9999,
+    });
+  }
+  setOpen(o => !o);
+};
 
   return (
     <div ref={ref} className="relative">
@@ -122,39 +123,46 @@ function CustomSelect<T extends string>({
         {renderValue(value)}
         <FaChevronDown size={9} className={`shrink-0 opacity-50 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, y: -5, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -4, scale: 0.97 }}
-            transition={{ duration: 0.11 }}
-            // FIX: Use fixed positioning style calculated from button rect
-            style={dropdownStyle}
-            className="bg-white dark:bg-[#1c1c1f] border border-zinc-200 dark:border-zinc-700 rounded-2xl shadow-2xl overflow-hidden"
+
+{open && typeof document !== "undefined" && createPortal(
+  <AnimatePresence>
+    <motion.div
+      initial={{ opacity: 0, y: -5, scale: 0.97 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -4, scale: 0.97 }}
+      transition={{ duration: 0.11 }}
+      style={{
+        position: "fixed",
+        top: dropdownStyle.top,
+        left: dropdownStyle.left,
+        minWidth: buttonRef.current?.offsetWidth,
+        zIndex: 99999,          // above all dashboard layers
+      }}
+      className="bg-white dark:bg-[#1c1c1f] border border-zinc-200 dark:border-zinc-700 rounded-2xl shadow-2xl overflow-hidden"
+    >
+      <div className="p-1.5 space-y-0.5">
+        {options.map(opt => (
+          <button
+            key={opt} type="button"
+            onClick={() => { onChange(opt); setOpen(false); }}
+            className={`w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold transition-colors flex items-center gap-2 ${
+              opt === value
+                ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white"
+                : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/60"
+            }`}
           >
-            <div className="p-1.5 space-y-0.5">
-              {options.map(opt => (
-                <button
-                  key={opt} type="button"
-                  onClick={() => { onChange(opt); setOpen(false); }}
-                  className={`w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold transition-colors flex items-center gap-2 ${
-                    opt === value
-                      ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white"
-                      : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/60"
-                  }`}
-                >
-                  {renderOption(opt)}
-                  {opt === value && <span className="ml-auto text-[#06402B] dark:text-emerald-400 text-[10px]">✓</span>}
-                </button>
-              ))}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            {renderOption(opt)}
+            {opt === value && <span className="ml-auto text-[#06402B] dark:text-emerald-400 text-[10px]">✓</span>}
+          </button>
+        ))}
+      </div>
+    </motion.div>
+  </AnimatePresence>,
+  document.body   // ← mounts outside ALL stacking contexts
+)}
     </div>
-  );
-}
+  );}
+
 
 // ─── Grade Row ────────────────────────────────────────────────────────────────
 
