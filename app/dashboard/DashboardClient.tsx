@@ -34,6 +34,7 @@ const UniversityTracker = dynamic(() => import('../components/Tools/UniversityTr
 const AcademicCalendar = dynamic(() => import('../components/Community/AcademicCalendar').then(mod => mod.default), { ssr: false });
 // Add the import
 const CampusBulletin = dynamic(() => import('../components/Community/CampusBulletin'), { ssr: false });
+import OnboardingFlow from "../components/Onboarding/OnboardingFlow";
 
 // Replace the hardcoded bulletin block with:
 
@@ -104,6 +105,7 @@ const useCourseAverages = (courses: any[], tasks: any[]) => {
 
 // Rename the function and add useModal hook
 function DashboardInner() {
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const { showAlert, showConfirm } = useModal();  // ← ADD THIS
 
   const [activeView, setActiveView] = useState('dashboard');
@@ -150,13 +152,25 @@ function DashboardInner() {
 
 useEffect(() => {
     const fetchQuote = () => {
-      const quotes = [
-        { q: "Goodness gracious", a: "Vice Ganda" },
-        { q: "First, solve the problem. Then, write the code.", a: "John Johnson" },
-        { q: "Make it work, make it right, make it fast.", a: "Kent Beck" },
-        { q: "Strive for progress, not perfection.", a: "Unknown" },
-        { q: "It always seems impossible until it's done.", a: "Nelson Mandela" }
-      ];
+const quotes = [
+  // Motivational
+  { q: "Believe you can and you're halfway there.", a: "Theodore Roosevelt" },
+  { q: "Success is not final, failure is not fatal: it is the courage to continue that counts.", a: "Winston Churchill" },
+  { q: "Act as if what you do makes a difference. It does.", a: "William James" },
+  { q: "You are never too old to set another goal or to dream a new dream.", a: "C.S. Lewis" },
+  { q: "The only limit to our realization of tomorrow will be our doubts of today.", a: "Franklin D. Roosevelt" },
+  
+  // Humorous
+  { q: "People say nothing is impossible, but I do nothing every day.", a: "A.A. Milne" },
+  { q: "The elevator to success is out of order. You'll have to use the stairs, one step at a time.", a: "Joe Girard" },
+  { q: "I always wanted to be somebody, but now I realize I should have been more specific.", a: "Lily Tomlin" },
+  { q: "Even if you are on the right track, you will get run over if you just sit there.", a: "Will Rogers" },
+  { q: "I am so clever that sometimes I don't understand a single word of what I am saying.", a: "Oscar Wilde" },
+
+  // A little bit of both
+  { q: "Opportunity does not knock, it presents itself when you beat down the door.", a: "Kyle Chandler" },
+  { q: "If you think you are too small to make a difference, try sleeping with a mosquito.", a: "Dalai Lama" }
+];
       
       // Pick a random quote from your list
       const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
@@ -215,6 +229,10 @@ useEffect(() => {
           setEditBio(data.bio || "");
           setEditYearLevel(data.yearLevel || "1st Year");
           setEditAvatarUrl(data.avatarUrl || "");
+
+            if (!data.hasSeenOnboarding) {
+    setShowOnboarding(true);
+  }
 
           if (data.friends && data.friends.length > 0) {
             const friendsQuery = query(collection(db, "users"), where(documentId(), "in", data.friends.slice(0, 10)));
@@ -330,7 +348,15 @@ useEffect(() => {
 
   return (
     <div className="flex h-screen bg-zinc-50 dark:bg-[#09090b] font-sans text-zinc-900 dark:text-zinc-100 overflow-hidden relative transition-colors duration-300">
-      
+      <AnimatePresence>
+      {showOnboarding && authUser && (
+        <OnboardingFlow
+          userId={authUser.uid}
+          userName={userProfile?.fullName || "Scholar"}
+          onComplete={() => setShowOnboarding(false)}
+        />
+      )}
+    </AnimatePresence>
       {/* MODAL */}
 
       <div className="absolute inset-0 z-0 pointer-events-none">
