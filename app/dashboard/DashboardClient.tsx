@@ -12,7 +12,8 @@ import {
   FaCog, FaSun, FaMoon, FaDesktop, FaPalette, FaIdBadge, FaSave, FaCamera, 
   FaFolderOpen, FaCalendarDay, FaQuoteLeft, FaBook, FaBullhorn, FaFire, FaChartBar
 } from "react-icons/fa";
-import { FaBrain } from "react-icons/fa6"; 
+import { FaBrain } from "react-icons/fa6";
+import { createPortal } from "react-dom";
 
 import { onAuthStateChanged, signOut, User } from "firebase/auth";
 import { doc, getDoc, collection, query, where, orderBy, onSnapshot, addDoc, updateDoc, deleteDoc, serverTimestamp, documentId } from "firebase/firestore";
@@ -31,6 +32,11 @@ const FlashcardExchange = dynamic(() => import('../components/Community/Flashcar
 const StudyLounge = dynamic(() => import('../components/Community/StudyLounge'), { ssr: false });
 const UniversityTracker = dynamic(() => import('../components/Tools/UniversityTracker'), { ssr: false });
 const AcademicCalendar = dynamic(() => import('../components/Community/AcademicCalendar').then(mod => mod.default), { ssr: false });
+// Add the import
+const CampusBulletin = dynamic(() => import('../components/Community/CampusBulletin'), { ssr: false });
+
+// Replace the hardcoded bulletin block with:
+
 
 
 const NAV_ITEMS = [
@@ -396,136 +402,261 @@ export default function DashboardClient() {
           <AnimatePresence mode="wait">
             
             {/* === 1. SMART DASHBOARD === */}
-            {activeView === 'dashboard' && (
-              <motion.div key="dash" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-6 md:space-y-8 max-w-6xl mx-auto w-full">
-                
-                {/* Greeting & Quote */}
-                <div className="p-6 sm:p-8 md:p-10 rounded-[2rem] md:rounded-[3rem] bg-white/40 dark:bg-[#121214]/60 backdrop-blur-xl border border-zinc-200 dark:border-zinc-800/80 relative overflow-hidden shadow-xl md:text-left flex flex-col md:flex-row md:items-center justify-between gap-6">
-                  <div className="absolute top-0 left-0 w-64 h-64 bg-[#06402B]/5 dark:bg-emerald-500/5 blur-[100px] rounded-full pointer-events-none" />
-                  <div className="relative z-10 w-full flex flex-col gap-2">
-                    <div className="inline-flex self-center md:self-start items-center gap-2 px-3 py-1 mb-2 rounded-full bg-zinc-200/50 dark:bg-[#18181b]/80 text-[9px] md:text-[10px] font-mono font-bold tracking-widest text-zinc-500 dark:text-zinc-400 uppercase">
-                      <FaClock /> {formattedDate}
-                    </div>
-                    <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-center md:text-left text-zinc-900 dark:text-zinc-100 mb-2 tracking-tighter">
-                      {getGreeting()}, <span className="text-[#06402B] dark:text-emerald-400 font-light italic">{userProfile?.fullName?.split(' ')[0] || "Scholar"}</span>.
-                    </h2>
-                    <div className="flex items-start gap-3 mt-4 justify-center md:justify-start">
-                      <FaQuoteLeft className="text-[#06402B]/20 dark:text-emerald-400/20 mt-1 shrink-0" size={18} />
-                      <div className="space-y-1">
-                        <p className="font-light italic text-base md:text-lg text-zinc-500 dark:text-zinc-400 leading-relaxed text-center md:text-left">{todaysQuote.q}</p>
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-[#06402B] dark:text-emerald-500 text-center md:text-left">— {todaysQuote.a}</p>
-                      </div>
-                    </div>
+            // ============================================================
+
+// ============================================================
+// DROP-IN REPLACEMENT for {activeView === 'dashboard'} block
+// ============================================================
+
+{activeView === 'dashboard' && (
+  <motion.div
+    key="dash"
+    initial={{ opacity: 0, y: 10 }}
+    animate={{ opacity: 1, y: 0 }}
+    exit={{ opacity: 0 }}
+    className="space-y-4 max-w-6xl mx-auto w-full"
+  >
+
+    {/* ── ROW 1: Compact greeting ──────────────────────────────── */}
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-1">
+      <div>
+        <p className="text-[10px] font-mono font-bold tracking-[0.25em] text-zinc-400 uppercase mb-0.5">
+          {currentTime.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+        </p>
+        <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-zinc-900 dark:text-zinc-100 leading-none">
+          {getGreeting()},{" "}
+          <span className="text-[#06402B] dark:text-emerald-400 font-light italic">
+            {userProfile?.fullName?.split(" ")[0] || "Scholar"}
+          </span>
+        </h2>
+      </div>
+      {/* Quote pill — large screens only */}
+      <div className="hidden lg:flex items-start gap-2 max-w-xs px-4 py-3 rounded-2xl bg-white/60 dark:bg-[#121214]/80 border border-zinc-200 dark:border-zinc-800/80 backdrop-blur-xl shrink-0">
+        <FaQuoteLeft className="text-[#06402B]/25 dark:text-emerald-400/25 mt-0.5 shrink-0" size={11} />
+        <p className="text-[11px] font-medium italic text-zinc-500 dark:text-zinc-400 leading-snug line-clamp-2">
+          {todaysQuote.q}
+          <span className="not-italic font-bold text-[#06402B] dark:text-emerald-500"> — {todaysQuote.a}</span>
+        </p>
+      </div>
+    </div>
+
+    {/* ── ROW 2: Stat pills ────────────────────────────────────── */}
+    <div className="grid grid-cols-3 gap-2 sm:gap-3">
+      {[
+        { label: "Done", value: totalCompleted, color: "text-[#06402B] dark:text-emerald-400", bg: "bg-[#06402B]/5 dark:bg-emerald-500/10", border: "border-[#06402B]/10 dark:border-emerald-500/20", icon: <FaCheckCircle size={12} /> },
+        { label: "Active", value: currentWorkload, color: "text-orange-600 dark:text-orange-400", bg: "bg-orange-500/5 dark:bg-orange-500/10", border: "border-orange-500/10 dark:border-orange-500/20", icon: <FaTasks size={12} /> },
+        { label: "Network", value: friendsList.length, color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-500/5 dark:bg-blue-500/10", border: "border-blue-500/10 dark:border-blue-500/20", icon: <FaUserFriends size={12} /> },
+      ].map((s) => (
+        <div key={s.label} className={`flex items-center gap-2 sm:gap-3 p-3 sm:p-4 rounded-2xl border ${s.bg} ${s.border}`}>
+          <span className={`${s.color} shrink-0`}>{s.icon}</span>
+          <div className="min-w-0">
+            <p className={`text-xl sm:text-2xl font-black leading-none ${s.color}`}>{s.value}</p>
+            <p className="text-[9px] font-bold uppercase tracking-widest text-zinc-500 dark:text-zinc-400 mt-0.5">{s.label}</p>
+          </div>
+        </div>
+      ))}
+    </div>
+
+    {/* ── ROW 3: Main panels ───────────────────────────────────── */}
+    {/* 
+      Mobile: stacked (Up Next → Grades → Bulletin)
+      Desktop: 3-col side by side
+    */}
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5">
+
+      {/* ── Col 1: UP NEXT ── */}
+      <div className="bg-white/60 dark:bg-[#121214]/80 backdrop-blur-xl rounded-[1.5rem] border border-zinc-200 dark:border-zinc-800/80 p-4 sm:p-5 shadow-sm flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xs font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+            <FaFire className="text-orange-500" /> Up Next
+          </h3>
+          <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest bg-zinc-100 dark:bg-zinc-800 px-2 py-1 rounded-lg">
+            48 hrs
+          </span>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          {urgentTasks.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-6 text-zinc-400 opacity-50 gap-2">
+              <FaCheckCircle size={24} />
+              <p className="text-[10px] font-bold uppercase tracking-widest">All clear!</p>
+            </div>
+          ) : (
+            urgentTasks.map((task) => {
+              const ms = new Date(task.deadline).getTime() - Date.now();
+              const daysLeft = Math.ceil(ms / (1000 * 60 * 60 * 24));
+              return (
+                <div
+                  key={task.id}
+                  onClick={() => setActiveView("tracker")}
+                  className="group p-3 rounded-xl border border-red-500/20 bg-red-500/5 dark:bg-red-500/10 flex items-start justify-between gap-2 cursor-pointer hover:border-red-500/40 active:scale-[0.98] transition-all"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-zinc-900 dark:text-white leading-snug line-clamp-2">{task.title}</p>
+                    <p className="text-[10px] font-mono text-red-500 dark:text-red-400 font-bold mt-0.5">{task.deadline}</p>
+                  </div>
+                  <span className={`shrink-0 text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-full ${
+                    daysLeft <= 1 ? "bg-red-500 text-white" : "bg-orange-500/20 text-orange-600 dark:text-orange-400"
+                  }`}>
+                    {daysLeft <= 0 ? "Today" : daysLeft === 1 ? "Tmrw" : `${daysLeft}d`}
+                  </span>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        <button
+          onClick={() => setActiveView("tracker")}
+          className="mt-auto w-full py-2.5 rounded-xl border border-dashed border-zinc-300 dark:border-zinc-700 text-[10px] font-bold uppercase tracking-widest text-zinc-400 hover:text-[#06402B] dark:hover:text-emerald-400 hover:border-[#06402B]/40 dark:hover:border-emerald-500/40 transition-all flex items-center justify-center gap-1.5 active:scale-95"
+        >
+          <FaPlus size={9} /> Open Tracker
+        </button>
+      </div>
+
+      {/* ── Col 2: GRADES ── */}
+      <div className="bg-white/60 dark:bg-[#121214]/80 backdrop-blur-xl rounded-[1.5rem] border border-zinc-200 dark:border-zinc-800/80 p-4 sm:p-5 shadow-sm flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xs font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+            <FaChartBar className="text-[#06402B] dark:text-emerald-400" /> Grades
+          </h3>
+          <button
+            onClick={() => { setActiveView("academics"); setAcademicTab("grades"); }}
+            className="text-[9px] font-bold uppercase tracking-widest text-[#06402B] dark:text-emerald-400 hover:underline"
+          >
+            Full →
+          </button>
+        </div>
+
+        {/* Course grade bars */}
+        <div className="flex-1 flex flex-col gap-3 overflow-y-auto max-h-48 lg:max-h-56 pr-0.5 custom-scrollbar">
+          {computedCourseGrades.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-6 text-zinc-400 opacity-50 gap-2">
+              <FaBook size={20} />
+              <p className="text-[10px] font-bold uppercase tracking-widest text-center">Add courses in Tracker</p>
+            </div>
+          ) : (
+            computedCourseGrades.map((cg) => {
+              const avg = cg.average ? parseFloat(cg.average) : null;
+              const pct = avg ? Math.min(avg, 100) : 0;
+              const barColor =
+                avg === null ? "bg-zinc-300 dark:bg-zinc-700"
+                : avg >= 90 ? "bg-emerald-500"
+                : avg >= 75 ? "bg-blue-500"
+                : avg >= 60 ? "bg-orange-500"
+                : "bg-red-500";
+              return (
+                <div key={cg.courseId} className="space-y-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300 truncate flex-1">{cg.title}</p>
+                    <span className={`text-[11px] font-black shrink-0 ${
+                      avg === null ? "text-zinc-400" : avg >= 75 ? "text-emerald-600 dark:text-emerald-400" : "text-red-500"
+                    }`}>
+                      {avg !== null ? `${avg}%` : "—"}
+                    </span>
+                  </div>
+                  <div className="h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${pct}%` }}
+                      transition={{ duration: 0.7, ease: "easeOut" }}
+                      className={`h-full rounded-full ${barColor}`}
+                    />
                   </div>
                 </div>
+              );
+            })
+          )}
+        </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
-                  {/* UP NEXT ALGORITHM */}
-                  <div className="bg-white/60 dark:bg-[#121214]/80 backdrop-blur-xl rounded-[2rem] border border-zinc-200 dark:border-zinc-800/80 p-6 shadow-sm flex flex-col">
-                    <div className="flex items-center justify-between mb-6">
-                      <h3 className="text-sm font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                        <FaFire className="text-orange-500" /> Up Next
-                      </h3>
-                      <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Next 48 Hours</span>
-                    </div>
+        {/* ── Improved Heatmap ── */}
+        <div className="pt-3 border-t border-zinc-100 dark:border-zinc-800">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[9px] font-bold uppercase tracking-widest text-zinc-400">Activity — last 5 weeks</p>
+            <div className="flex items-center gap-1">
+              <span className="text-[8px] text-zinc-400 font-bold">Less</span>
+              {[0, 0.3, 0.6, 1.0].map((v, i) => (
+                <div
+                  key={i}
+                  className="w-2.5 h-2.5 rounded-sm"
+                  style={{ backgroundColor: v === 0 ? 'rgba(0,0,0,0.07)' : `rgba(6,64,43,${v})` }}
+                />
+              ))}
+              <span className="text-[8px] text-zinc-400 font-bold">More</span>
+            </div>
+          </div>
 
-                    <div className="flex-1 flex flex-col gap-3">
-                      {urgentTasks.length === 0 ? (
-                        <div className="flex-1 flex flex-col items-center justify-center text-zinc-400 opacity-60">
-                           <FaCheckCircle size={32} className="mb-3" />
-                           <p className="text-xs font-bold uppercase tracking-widest">You are all caught up!</p>
-                        </div>
-                      ) : (
-                        urgentTasks.map(task => (
-                          <div key={task.id} className="p-4 rounded-xl border border-red-500/20 bg-red-500/5 dark:bg-red-500/10 flex justify-between items-center group">
-                            <div>
-                              <p className="text-sm font-bold text-zinc-900 dark:text-white leading-tight">{task.title}</p>
-                              <p className="text-[10px] font-mono text-red-600 dark:text-red-400 font-bold mt-1">Due: {task.deadline}</p>
-                            </div>
-                            <button onClick={() => { setActiveView('tracker'); }} className="px-3 py-1.5 bg-red-500 text-white rounded-lg text-[10px] font-black uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">Solve</button>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-
-                  {/* CAMPUS BULLETIN */}
-                  <div className="bg-white/60 dark:bg-[#121214]/80 backdrop-blur-xl rounded-[2rem] border border-zinc-200 dark:border-zinc-800/80 p-6 shadow-sm flex flex-col">
-                    <div className="flex items-center justify-between mb-6">
-                      <h3 className="text-sm font-black uppercase tracking-widest text-[#06402B] dark:text-emerald-400 flex items-center gap-2">
-                        <FaBullhorn /> Campus Bulletin
-                      </h3>
-                    </div>
-                    
-                    <div className="flex-1 space-y-4">
-                       <div className="p-4 rounded-xl border border-[#06402B]/20 bg-[#06402B]/5 border-l-4 border-l-[#06402B] dark:border-l-emerald-500">
-                         <span className="text-[9px] font-mono font-bold text-[#06402B] dark:text-emerald-400 uppercase tracking-widest">JPCS Event</span>
-                         <p className="text-sm font-bold text-zinc-900 dark:text-white mt-1">The Cupid Algorithm (SAMPISANAN)</p>
-                         <p className="text-xs text-zinc-500 mt-1">Web-based matchmaking service now live.</p>
-                       </div>
-                       <div className="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm">
-                         <span className="text-[9px] font-mono font-bold text-zinc-400 uppercase tracking-widest">Academics</span>
-                         <p className="text-sm font-bold text-zinc-900 dark:text-white mt-1">Final Exam Product Requirements</p>
-                         <p className="text-xs text-zinc-500 mt-1">Must include regex validation and corresponding UI actions.</p>
-                       </div>
-                    </div>
-                  </div>
+          {/* Day labels */}
+          <div className="flex gap-0.5">
+            {/* Spacer for week labels col — not shown */}
+            <div className="flex flex-col gap-0.5 mr-1">
+              {['M','W','F'].map((d, i) => (
+                <div
+                  key={d}
+                  className="text-[7px] font-bold text-zinc-400 uppercase h-3 flex items-center"
+                  style={{ marginTop: i === 0 ? 0 : '4px' }}
+                >
+                  {d}
                 </div>
+              ))}
+            </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
-                  {/* LIVE GITHUB-STYLE HEATMAP */}
-                  <div className="lg:col-span-2 bg-white/60 dark:bg-[#121214]/80 backdrop-blur-xl rounded-[2rem] border border-zinc-200 dark:border-zinc-800/80 p-6 sm:p-8 shadow-sm">
-                    <h3 className="text-sm font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-100 mb-6">Productivity Heatmap</h3>
-                    <div className="flex overflow-x-auto custom-scrollbar pb-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                        <div className="flex gap-1.5">
-                          {Array.from({ length: 30 }).map((_, colIndex) => (
-                            <div key={colIndex} className="flex flex-col gap-1.5">
-                              {Array.from({ length: 5 }).map((_, rowIndex) => {
-                                const index = colIndex * 5 + rowIndex;
-                                const intensity = heatmapData[index];
-                                const colorClass = intensity > 0.8 ? 'bg-[#06402B] dark:bg-emerald-500' : 
-                                                  intensity > 0.5 ? 'bg-[#06402B]/60 dark:bg-emerald-500/60' : 
-                                                  intensity > 0.2 ? 'bg-[#06402B]/30 dark:bg-emerald-500/30' : 
-                                                  'bg-zinc-100 dark:bg-zinc-800/50';
-                                return (
-                                  <div key={rowIndex} className={`w-3 h-3 sm:w-4 sm:h-4 rounded-sm ${colorClass} hover:ring-2 ring-zinc-400 transition-all`} title="Activity Block" />
-                                );
-                              })}
-                            </div>
-                          ))}
-                        </div>
-                    </div>
-                    <div className="flex justify-between mt-4">
-                      <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Last 150 Days</p>
-                      <div className="flex items-center gap-1.5 text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
-                        Less <div className="flex gap-1"><div className="w-3 h-3 rounded-sm bg-zinc-100 dark:bg-zinc-800/50"/><div className="w-3 h-3 rounded-sm bg-[#06402B]/30 dark:bg-emerald-500/30"/><div className="w-3 h-3 rounded-sm bg-[#06402B] dark:bg-emerald-500"/></div> More
-                      </div>
-                    </div>
-                  </div>
+            {/* 5 weeks × 7 days grid */}
+            {(() => {
+              // Build a 5-week (35-day) grid ending today
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+              const weeks: number[][] = [];
+              for (let w = 4; w >= 0; w--) {
+                const week: number[] = [];
+                for (let d = 6; d >= 0; d--) {
+                  const dayIndex = w * 7 + d;
+                  week.unshift(heatmapData[heatmapData.length - 1 - dayIndex] ?? 0);
+                }
+                weeks.push(week);
+              }
 
-                  {/* STUDY STATS */}
-                  <div className="bg-white/60 dark:bg-[#121214]/80 backdrop-blur-xl rounded-[2rem] border border-zinc-200 dark:border-zinc-800/80 p-6 sm:p-8 shadow-sm flex flex-col justify-center">
-                    <h3 className="text-sm font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-100 mb-6 flex items-center gap-2"><FaChartBar className="text-[#06402B] dark:text-emerald-400" /> Study Stats</h3>
-                    <div className="grid grid-cols-2 gap-4 mb-4">
-                      <div className="p-4 bg-zinc-100 dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 text-center">
-                        <p className="text-3xl font-black text-[#06402B] dark:text-emerald-400 leading-none mb-1">{totalCompleted}</p>
-                        <p className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest">Tasks Done</p>
-                      </div>
-                      <div className="p-4 bg-zinc-100 dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 text-center">
-                        <p className="text-3xl font-black text-orange-500 leading-none mb-1">{currentWorkload}</p>
-                        <p className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest">Workload</p>
-                      </div>
-                    </div>
-                    <div className="p-4 bg-zinc-100 dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Network Size</span>
-                      <span className="text-base font-black text-zinc-900 dark:text-white">{friendsList.length}</span>
-                    </div>
-                  </div>
+              return weeks.map((week, wi) => (
+                <div key={wi} className="flex flex-col gap-0.5">
+                  {week.map((intensity, di) => {
+                    const daysAgo = (4 - wi) * 7 + (6 - di);
+                    const date = new Date(today);
+                    date.setDate(today.getDate() - daysAgo);
+                    const label = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                    const isFuture = daysAgo < 0;
+                    return (
+                      <div
+                        key={di}
+                        title={isFuture ? '' : `${label}: ${intensity > 0 ? 'active' : 'no activity'}`}
+                        className="w-3.5 h-3.5 rounded-sm transition-all hover:ring-1 hover:ring-emerald-400/50 cursor-default"
+                        style={{
+                          backgroundColor: isFuture
+                            ? 'transparent'
+                            : intensity === 0
+                            ? 'rgba(0,0,0,0.07)'
+                            : `rgba(6,64,43,${intensity})`,
+                        }}
+                      />
+                    );
+                  })}
                 </div>
+              ));
+            })()}
+          </div>
+        </div>
+      </div>
 
-              </motion.div>
-            )}
+      {/* ── Col 3: CAMPUS BULLETIN ── */}
+      <div className="bg-white/60 dark:bg-[#121214]/80 backdrop-blur-xl rounded-[1.5rem] border border-zinc-200 dark:border-zinc-800/80 p-4 sm:p-5 shadow-sm overflow-hidden flex flex-col">
+        {/* On mobile this panel grows naturally; on desktop it's capped */}
+        <div className="flex-1 overflow-y-auto lg:max-h-[480px] custom-scrollbar">
+          <CampusBulletin />
+        </div>
+      </div>
 
+    </div>
+  </motion.div>
+)}
             {/* === 2. TRACKER (Dedicated Main Tab) === */}
             {activeView === 'tracker' && (
               <motion.div key="tracker" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="w-full max-w-7xl mx-auto">
