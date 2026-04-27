@@ -88,13 +88,20 @@ function CustomSelect<T extends string>({
   const buttonRef = useRef<HTMLButtonElement>(null);
   const ref = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const h = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, []);
+useEffect(() => {
+  const h = (e: MouseEvent) => {
+    // Check both the trigger ref AND the portal dropdown
+    const target = e.target as Node;
+    if (
+      ref.current && !ref.current.contains(target) &&
+      !(e.target as Element).closest('[data-dropdown-portal]')
+    ) {
+      setOpen(false);
+    }
+  };
+  document.addEventListener("mousedown", h);
+  return () => document.removeEventListener("mousedown", h);
+}, []);
 
   // FIX: Calculate fixed position based on button's bounding rect
   // so the dropdown renders above all overflow:hidden ancestors.
@@ -126,34 +133,40 @@ const handleOpen = () => {
 
 {open && typeof document !== "undefined" && createPortal(
   <AnimatePresence>
-    <motion.div
-      initial={{ opacity: 0, y: -5, scale: 0.97 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: -4, scale: 0.97 }}
-      transition={{ duration: 0.11 }}
-      style={{
-        position: "fixed",
-        top: dropdownStyle.top,
-        left: dropdownStyle.left,
-        minWidth: buttonRef.current?.offsetWidth,
-        zIndex: 99999,          // above all dashboard layers
-      }}
-      className="bg-white dark:bg-[#1c1c1f] border border-zinc-200 dark:border-zinc-700 rounded-2xl shadow-2xl overflow-hidden"
-    >
+<motion.div
+  data-dropdown-portal  // ← ADD THIS
+  initial={{ opacity: 0, y: -5, scale: 0.97 }}
+  animate={{ opacity: 1, y: 0, scale: 1 }}
+  exit={{ opacity: 0, y: -4, scale: 0.97 }}
+  transition={{ duration: 0.11 }}
+  style={{
+    position: "fixed",
+    top: dropdownStyle.top,
+    left: dropdownStyle.left,
+    minWidth: buttonRef.current?.offsetWidth,
+    zIndex: 99999,
+  }}
+  className="bg-white dark:bg-[#1c1c1f] border border-zinc-200 dark:border-zinc-700 rounded-2xl shadow-2xl overflow-hidden"
+>
       <div className="p-1.5 space-y-0.5">
         {options.map(opt => (
-          <button
-            key={opt} type="button"
-            onClick={() => { onChange(opt); setOpen(false); }}
-            className={`w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold transition-colors flex items-center gap-2 ${
-              opt === value
-                ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white"
-                : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/60"
-            }`}
-          >
-            {renderOption(opt)}
-            {opt === value && <span className="ml-auto text-[#06402B] dark:text-emerald-400 text-[10px]">✓</span>}
-          </button>
+<button
+  key={opt}
+  type="button"
+  onMouseDown={(e) => {
+    e.preventDefault(); // ← prevents the outside-click from firing first
+    onChange(opt);
+    setOpen(false);
+  }}
+  className={`w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold transition-colors flex items-center gap-2 ${
+    opt === value
+      ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white"
+      : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/60"
+  }`}
+>
+  {renderOption(opt)}
+  {opt === value && <span className="ml-auto text-[#06402B] dark:text-emerald-400 text-[10px]">✓</span>}
+</button>
         ))}
       </div>
     </motion.div>
@@ -247,32 +260,35 @@ export default function GradeCalculator({ courses = [], tasks = [] }: GradeCalcu
 
   // ── Import from tracker ────────────────────────────────────────────────────
 
-  const handleImport = useCallback(() => {
-    if (!selectedCourseId) return;
-    const graded = tasks.filter(t => t.courseId === selectedCourseId && t.status === "Graded");
+const handleImport = useCallback(() => {
+  if (!selectedCourseId) return;
+  const graded = tasks.filter(t => t.courseId === selectedCourseId && t.status === "Graded");
 
-    if (graded.length === 0) {
-      setResult({ percentage: null, gpa: null, error: "No graded tasks found for this course." });
-      return;
-    }
+  if (graded.length === 0) {
+    setResult({ percentage: null, gpa: null, error: "No graded tasks found for this course." });
+    return;
+  }
 
-    const mid  = graded.find(t => t.type === "Midterm Exam");
-    const fin  = graded.find(t => t.type === "Final Exam");
-    const prod = graded.find(t => t.type === "Final Product");
-    const cs   = graded.find(t => t.type === "Class Standing");
+  const mid  = graded.find(t => t.type === "Midterm Exam");
+  const fin  = graded.find(t => t.type === "Final Exam");
+  const prod = graded.find(t => t.type === "Final Product");
+  const cs   = graded.find(t => t.type === "Class Standing");
 
-    const newRows = { ...rows };
-    const synced = new Set<string>();
+  const synced = new Set<string>();
 
-    if (mid)  { newRows.midterms     = { ...parseGrade(mid.grade),  weight: "30" }; synced.add("midterms"); }
-    if (fin)  { newRows.finals       = { ...parseGrade(fin.grade),  weight: "30" }; synced.add("finals"); }
-    if (prod) { newRows.finalProduct = { ...parseGrade(prod.grade), weight: "20" }; synced.add("finalProduct"); }
-    if (cs)   { newRows.classStanding= { ...parseGrade(cs.grade, true), weight: "20" }; synced.add("classStanding"); }
+  // ← Use functional update to always get fresh rows state
+  setRows(currentRows => {
+    const newRows = { ...currentRows };
+    if (mid)  { newRows.midterms      = { ...parseGrade(mid.grade),       weight: "30" }; synced.add("midterms"); }
+    if (fin)  { newRows.finals        = { ...parseGrade(fin.grade),       weight: "30" }; synced.add("finals"); }
+    if (prod) { newRows.finalProduct  = { ...parseGrade(prod.grade),      weight: "20" }; synced.add("finalProduct"); }
+    if (cs)   { newRows.classStanding = { ...parseGrade(cs.grade, true),  weight: "20" }; synced.add("classStanding"); }
+    return newRows;
+  });
 
-    setRows(newRows);
-    setImportedRows(synced);
-    setResult({ percentage: null, gpa: null, error: null });
-  }, [selectedCourseId, tasks, rows]);
+  setImportedRows(synced);
+  setResult({ percentage: null, gpa: null, error: null });
+}, [selectedCourseId, tasks]); // ← rows removed from deps, no more stale closure
 
   // ── Compute ────────────────────────────────────────────────────────────────
 

@@ -130,26 +130,35 @@ export default function StudyLounge() {
   };
 
   const handleAcceptDeck = async (item: any) => {
-    if (!auth.currentUser) return;
-    setProcessingId(item.id);
+  if (!auth.currentUser) return;
+  setProcessingId(item.id);
 
-    try {
-      await addDoc(collection(db, "flashcard_decks"), {
-        userId: auth.currentUser.uid,
-        authorUsername: item.senderName, 
-        title: item.deckTitle,
-        subject: item.deckSubject || "Collab",
-        cards: item.cards, 
-        isPublic: false, 
-        createdAt: serverTimestamp(),
-      });
-      await updateDoc(doc(db, "inbox", item.id), { status: "accepted" });
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setProcessingId(null);
+  try {
+    if (!item.cards || item.cards.length === 0) {
+      showAlert("Empty Deck", "This deck has no cards to import.");
+      return;
     }
-  };
+
+    await addDoc(collection(db, "flashcard_decks"), {
+      userId: auth.currentUser.uid,
+      authorUsername: item.senderName,
+      title: item.deckTitle,
+      subject: item.deckSubject || "Collab",
+      cards: item.cards,
+      isPublic: false,
+      upvotes: 0,
+      downloads: 0,
+      createdAt: serverTimestamp(),
+    });
+
+    await updateDoc(doc(db, "inbox", item.id), { status: "accepted" });
+  } catch (error) {
+    console.error(error);
+    showAlert("Import Failed", "Could not save the deck. Please try again.");
+  } finally {
+    setProcessingId(null);
+  }
+};
 
   const pendingInboxCount = inboxItems.filter(i => i.status !== 'accepted').length;
 

@@ -145,43 +145,48 @@ const deleteDeck = (deckId: string) => {
     finally { setIsSaving(false); }
   };
 
-  const handleSendToFriend = async () => {
-    if (!sendToUsername.trim() || cards.length === 0 || !deckTitle) return showAlert("Missing Info", "Ensure the deck has a title and cards before sending.");
-
-    setIsSending(true);
-    try {
-      const q = query(collection(db, "users"), where("username", "==", sendToUsername.toLowerCase().trim()));
-      const snap = await getDocs(q);
-      if (snap.empty) {
-        showAlert("User Not Found", "No user found with that username. Check the spelling.");
-        setIsSending(false);
-        return;
-      }
-      const friendData = snap.docs[0].data();
-
-      const userDoc = await getDoc(doc(db, "users", auth.currentUser!.uid));
-      const myName = userDoc.exists() ? userDoc.data().username : "Ice Matthew Ramirez";
-
-      await addDoc(collection(db, "inbox"), {
-        recipientId: friendData.uid,
-        senderId: auth.currentUser!.uid,
-        senderName: myName,
-        deckTitle: deckTitle,
-        deckSubject: deckSubject,
-        cards: cards,
-        status: "pending",
-        createdAt: serverTimestamp()
-      });
-      
-      showAlert("Sent!", "Reviewer delivered to your friend's inbox.");
-
-      setSendToUsername("");
-    } catch (error) {
-      console.error(error);
-    } finally {
+const handleSendToFriend = async () => {
+  if (!sendToUsername.trim() || cards.length === 0 || !deckTitle) 
+    return showAlert("Missing Info", "Ensure the deck has a title and cards before sending.");
+  
+  setIsSending(true);
+  try {
+    const q = query(collection(db, "users"), where("username", "==", sendToUsername.toLowerCase().trim()));
+    const snap = await getDocs(q);
+    
+    if (snap.empty) {
+      showAlert("User Not Found", "No user found with that username. Check the spelling.");
       setIsSending(false);
+      return;
     }
-  };
+
+    const friendDoc = snap.docs[0];
+    const recipientId = friendDoc.id; // ← use .id not .data().uid
+
+    const userDoc = await getDoc(doc(db, "users", auth.currentUser!.uid));
+    const myName = userDoc.exists() ? userDoc.data().username : "A Lasallian";
+
+    await addDoc(collection(db, "inbox"), {
+      type: "deck_share",           // ← ADD THIS, critical for StudyLounge rendering
+      recipientId: recipientId,     // ← fixed
+      senderId: auth.currentUser!.uid,
+      senderName: myName,
+      deckTitle: deckTitle,
+      deckSubject: deckSubject || "General",
+      cards: cards,                 // ← ensure cards array is fully populated
+      status: "pending",
+      createdAt: serverTimestamp()
+    });
+    
+    showAlert("Sent!", "Reviewer delivered to your friend's inbox.");
+    setSendToUsername("");
+  } catch (error) {
+    console.error(error);
+    showAlert("Send Failed", "Something went wrong. Please try again.");
+  } finally {
+    setIsSending(false);
+  }
+};
 
   const startStudy = (mode: StudyMode) => {
     if (cards.some(c => !c.front || !c.back)) return showAlert("Incomplete Cards", "Please fill in all card fronts and backs before studying.");
