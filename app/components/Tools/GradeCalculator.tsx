@@ -292,35 +292,117 @@ const handleImport = useCallback(() => {
 
   // ── Compute ────────────────────────────────────────────────────────────────
 
-  const calculateGrade = useCallback(() => {
-    const getPoints = (item: RowState, isDirect = false): number => {
-      const raw = parseFloat(item.raw);
-      if (isNaN(raw)) return 0;
-      if (isDirect) {
-        if (raw > 20) return -3;
-        if (raw < 0)  return -4;
-        return raw;
-      }
-      const total  = parseFloat(item.total);
-      const weight = parseFloat(item.weight);
-      if (isNaN(total) || total === 0) return raw > 0 ? -1 : 0;
-      if (raw > total) return -2;
-      return (raw / total) * weight;
-    };
+const calculateGrade = useCallback(() => {
+  const getPoints = (item: RowState, isDirect = false): number => {
+    const raw = parseFloat(item.raw);
+    if (isNaN(raw)) return 0;
 
-    const midPts  = getPoints(rows.midterms);
-    const finPts  = getPoints(rows.finals);
-    const prodPts = getPoints(rows.finalProduct);
-    const csPts   = getPoints(rows.classStanding, true);
+    if (isDirect) {
+      if (!Number.isFinite(raw)) return -5;     // handles Infinity
+      if (raw > 20) return -3;
+      if (raw < 0)  return -4;
+      return raw;
+    }
 
-    if ([midPts, finPts, prodPts].includes(-1)) return setResult({ percentage: null, gpa: null, error: "Please enter a Total for each exam row." });
-    if ([midPts, finPts, prodPts].includes(-2)) return setResult({ percentage: null, gpa: null, error: "Score cannot be higher than Total." });
-    if (csPts === -3) return setResult({ percentage: null, gpa: null, error: "Class Standing maximum is 20." });
-    if (csPts === -4) return setResult({ percentage: null, gpa: null, error: "Negative scores are invalid." });
+    const total  = parseFloat(item.total);
+    const weight = parseFloat(item.weight);
 
-    const totalScore = midPts + finPts + prodPts + csPts;
-    setResult({ percentage: totalScore, gpa: getGpaFromScore(totalScore, program), error: null });
-  }, [rows, program]);
+    if (!Number.isFinite(raw)) return -5;        // handles Infinity
+    if (raw < 0) return -4;                      // negative score
+    if (isNaN(total) || total === 0) return raw > 0 ? -1 : 0;
+    if (total < 0) return -6;                    // negative total
+    if (total > 1000) return -7;                 // unrealistic total
+    if (raw > total) return -2;
+    if (raw > 1000) return -8;                   // unrealistic score
+
+    return (raw / total) * weight;
+  };
+
+  // ── Run all fields ──────────────────────────────────────────────────────────
+  const midPts  = getPoints(rows.midterms);
+  const finPts  = getPoints(rows.finals);
+  const prodPts = getPoints(rows.finalProduct);
+  const csPts   = getPoints(rows.classStanding, true);
+
+  // ── All fields empty check ──────────────────────────────────────────────────
+  const allEmpty = [rows.midterms, rows.finals, rows.finalProduct, rows.classStanding]
+    .every(r => r.raw.trim() === "");
+  if (allEmpty) return setResult({ 
+    percentage: null, gpa: null, 
+    error: "Please enter at least one score to compute your grade." 
+  });
+
+  // ── Error mapping ───────────────────────────────────────────────────────────
+  const errors: Record<number, string> = {
+    [-1]: "Please enter a valid Total for each exam row.",
+    [-2]: "Score cannot be higher than the Total.",
+    [-3]: "Class Standing score cannot exceed 20.",
+    [-4]: "Negative scores are not valid.",
+    [-5]: "Please enter a valid numeric score.",
+    [-6]: "Total score cannot be negative.",
+    [-7]: "Total score seems unrealistically high. Please double check.",
+    [-8]: "Raw score seems unrealistically high. Please double check.",
+  };
+
+  for (const [pts, label] of [
+    [midPts,  "Midterm Exam"],
+    [finPts,  "Final Exam"],
+    [prodPts, "Final Product"],
+    [csPts,   "Class Standing"],
+  ] as [number, string][]) {
+    if (pts < 0 && errors[pts]) {
+      return setResult({ 
+        percentage: null, gpa: null, 
+        error: `${label}: ${errors[pts]}` 
+      });
+    }
+  }
+
+  // ── Decimal precision check ─────────────────────────────────────────────────
+  const checkDecimalPrecision = (val: string) => {
+    if (val.includes(".")) {
+      const decimals = val.split(".")[1];
+      if (decimals && decimals.length > 4) return false;
+    }
+    return true;
+  };
+
+  const allRaws = [
+    { val: rows.midterms.raw,      label: "Midterm Exam" },
+    { val: rows.finals.raw,        label: "Final Exam" },
+    { val: rows.finalProduct.raw,  label: "Final Product" },
+    { val: rows.classStanding.raw, label: "Class Standing" },
+  ];
+
+  for (const { val, label } of allRaws) {
+    if (val && !checkDecimalPrecision(val)) {
+      return setResult({ 
+        percentage: null, gpa: null, 
+        error: `${label}: Too many decimal places. Max 4 decimal digits allowed.` 
+      });
+    }
+  }
+
+  // ── Compute ─────────────────────────────────────────────────────────────────
+  const totalScore = midPts + finPts + prodPts + csPts;
+
+  // Sanity check on final score
+  if (totalScore > 100) return setResult({ 
+    percentage: null, gpa: null, 
+    error: "Computed score exceeds 100%. Please check your inputs." 
+  });
+
+  if (totalScore < 0) return setResult({ 
+    percentage: null, gpa: null, 
+    error: "Computed score is negative. Please check your inputs." 
+  });
+
+  setResult({ 
+    percentage: totalScore, 
+    gpa: getGpaFromScore(totalScore, program), 
+    error: null 
+  });
+}, [rows, program]);
 
   const reset = () => {
     setRows(EMPTY_ROWS());

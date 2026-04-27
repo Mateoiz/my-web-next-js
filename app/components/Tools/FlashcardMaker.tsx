@@ -79,10 +79,15 @@ export default function FlashcardMaker() {
 const deleteDeck = (deckId: string) => {
   showConfirm(
     "Delete Reviewer",
-    "Are you sure you want to delete this reviewer? This cannot be undone.",
+    "Are you sure you want to permanently delete this reviewer? This cannot be undone.",
     async () => {
-      await deleteDoc(doc(db, "flashcard_decks", deckId));
-      setMyDecks(prev => prev.filter(d => d.id !== deckId));
+      try {
+        await deleteDoc(doc(db, "flashcard_decks", deckId));
+        setMyDecks(prev => prev.filter(d => d.id !== deckId));
+      } catch (error) {
+        console.error(error);
+        showAlert("Delete Failed", "Could not delete this deck. Please try again.");
+      }
     },
     "Delete",
     true
@@ -99,106 +104,261 @@ const deleteDeck = (deckId: string) => {
 
   const addCard = () => setCards([...cards, { id: Date.now().toString(), front: '', back: '' }]);
   const updateCard = (id: string, field: 'front' | 'back', value: string) => setCards(cards.map(c => c.id === id ? { ...c, [field]: value } : c));
-  const removeCard = (id: string) => { if (cards.length > 1) setCards(cards.filter(c => c.id !== id)); };
+const removeCard = (id: string) => {
+  if (cards.length <= 1) 
+    return showAlert("Can't Remove", "A deck must have at least one card.");
+  showConfirm(
+    "Remove Card",
+    "Are you sure you want to remove this card?",
+    () => setCards(cards.filter(c => c.id !== id)),
+    "Remove",
+    true
+  );
+};
+const handleBulkImport = () => {
+  if (!importText.trim()) return showAlert("Empty Import", "Please paste your terms before importing.");
 
-  const handleBulkImport = () => {
-    if (!importText.trim()) return;
-    const separator = delimiter === 'tab' ? '\t' : delimiter;
-    const newCards = importText.split('\n').filter(line => line.trim() !== '').map((line, index) => {
-        const splitIndex = line.indexOf(separator);
-        if (splitIndex === -1) return { id: Date.now().toString() + index, front: line.trim(), back: '' };
-        return { id: Date.now().toString() + index, front: line.substring(0, splitIndex).trim(), back: line.substring(splitIndex + 1).trim() };
+  const separator = delimiter === 'tab' ? '\t' : delimiter;
+
+  // Split by newlines, handle both \r\n (Windows) and \n (Unix)
+  const lines = importText
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(line => line.length > 0);
+
+  if (lines.length === 0) return showAlert("Nothing Found", "No valid lines detected. Make sure your text has content.");
+  if (lines.length > 200) return showAlert("Too Many Cards", `You're trying to import ${lines.length} cards at once. Maximum is 200 per import.`);
+
+  const newCards: Card[] = [];
+  const skipped: number[] = [];
+
+  lines.forEach((line, index) => {
+    // Remove common formatting artifacts
+    const cleanLine = line
+      .replace(/\u00A0/g, ' ')   // non-breaking spaces
+      .replace(/\u200B/g, '')    // zero-width spaces
+      .replace(/\uFEFF/g, '')    // BOM characters
+      .trim();
+
+    if (!cleanLine) return;
+
+    const splitIndex = cleanLine.indexOf(separator);
+
+    if (splitIndex === -1) {
+      // Line has no delimiter — skip it and record line number
+      skipped.push(index + 1);
+      return;
+    }
+
+    const front = cleanLine.substring(0, splitIndex).trim();
+    const back = cleanLine.substring(splitIndex + separator.length).trim();
+
+    // Skip if either side is empty after trimming
+    if (!front || !back) {
+      skipped.push(index + 1);
+      return;
+    }
+
+    // Truncate extremely long values to prevent layout breakage
+    const truncatedFront = front.length > 300 
+      ? front.substring(0, 300) + "…" 
+      : front;
+    const truncatedBack = back.length > 500 
+      ? back.substring(0, 500) + "…" 
+      : back;
+
+    newCards.push({
+      id: `import-${Date.now()}-${index}`,
+      front: truncatedFront,
+      back: truncatedBack,
+    });
+  });
+
+  if (newCards.length === 0) {
+    return showAlert(
+      "No Valid Cards Found",
+      `None of the ${lines.length} lines could be parsed. Make sure you selected the correct delimiter (Tab, Dash, or Comma) and that each line has both a term and a description.`
+    );
+  }
+
+  // Keep existing non-empty cards and append new ones
+  const filteredCurrent = cards.filter(c => c.front.trim() || c.back.trim());
+  const combined = [...filteredCurrent, ...newCards];
+
+  // Cap total cards at 500
+  if (combined.length > 500) {
+    return showAlert(
+      "Deck Too Large",
+      `Adding these cards would bring your deck to ${combined.length} cards. Maximum deck size is 500. Try splitting into multiple decks.`
+    );
+  }
+
+  setCards(combined);
+  setImportText("");
+  setShowImportModal(false);
+
+  if (skipped.length > 0) {
+    showAlert(
+      "Import Complete with Warnings",
+      `${newCards.length} cards imported successfully. ${skipped.length} line(s) were skipped (lines ${skipped.slice(0, 5).join(", ")}${skipped.length > 5 ? "…" : ""}) because they were missing a term, description, or the correct delimiter.`
+    );
+  }
+};
+
+ const handleSaveDeck = async () => {
+  // Title check
+  if (!deckTitle.trim()) 
+    return showAlert("Missing Title", "Please give your reviewer a title before saving.");
+  if (deckTitle.trim().length < 3) 
+    return showAlert("Title Too Short", "Your reviewer title should be at least 3 characters.");
+  if (deckTitle.trim().length > 100) 
+    return showAlert("Title Too Long", "Reviewer title cannot exceed 100 characters.");
+
+  // Subject check
+  if (!deckSubject.trim()) 
+    return showAlert("Missing Subject", "Please enter a course code or subject name.");
+  if (deckSubject.trim().length > 50) 
+    return showAlert("Subject Too Long", "Course code cannot exceed 50 characters.");
+
+  // Cards check
+  if (cards.length === 0) 
+    return showAlert("No Cards", "Add at least one card before saving.");
+
+  const emptyCards = cards.filter(c => !c.front.trim() || !c.back.trim());
+  if (emptyCards.length > 0) 
+    return showAlert(
+      "Incomplete Cards", 
+      `${emptyCards.length} card(s) are missing a term or description. Fill them in or remove them before saving.`
+    );
+
+  const duplicateFronts = cards
+    .map(c => c.front.trim().toLowerCase())
+    .filter((val, idx, arr) => arr.indexOf(val) !== idx);
+  if (duplicateFronts.length > 0)
+    return showAlert(
+      "Duplicate Terms", 
+      `You have ${duplicateFronts.length} duplicate term(s) in your deck. Each term should be unique.`
+    );
+
+  if (!auth.currentUser) 
+    return showAlert("Not Logged In", "You must be logged in to save a deck.");
+
+  setIsSaving(true);
+  try {
+    const userDoc = await getDoc(doc(db, "users", auth.currentUser.uid));
+    const username = userDoc.exists() ? userDoc.data().username : "Lasallian";
+
+    const deckData = {
+      userId: auth.currentUser.uid,
+      authorUsername: username,
+      title: deckTitle.trim(),
+      subject: deckSubject.trim().toUpperCase(),
+      college: isPublic ? deckCollege : "Private",
+      cards: cards.map(c => ({
+        id: c.id,
+        front: c.front.trim(),
+        back: c.back.trim(),
+      })),
+      isPublic,
+    };
+
+    if (currentDeckId) {
+      await updateDoc(doc(db, "flashcard_decks", currentDeckId), deckData);
+    } else {
+      await addDoc(collection(db, "flashcard_decks"), {
+        ...deckData,
+        upvotes: 0,
+        downloads: 0,
+        createdAt: serverTimestamp(),
       });
-    const filteredCurrent = cards.filter(c => c.front.trim() || c.back.trim());
-    setCards([...filteredCurrent, ...newCards]);
-    setImportText("");
-    setShowImportModal(false);
-  };
-
-  const handleSaveDeck = async () => {
-    if (!deckTitle || !deckSubject || cards.some(c => !c.front || !c.back)) return showAlert("Incomplete Deck", "Please fill out the Title, Subject, and all card fields.");
-
-    setIsSaving(true);
-    try {
-      const userDoc = await getDoc(doc(db, "users", auth.currentUser!.uid));
-      const username = userDoc.exists() ? userDoc.data().username : "Ice Matthew Ramirez";
-
-      const deckData = {
-        userId: auth.currentUser?.uid,
-        authorUsername: username, 
-        title: deckTitle,
-        subject: deckSubject.toUpperCase(),
-        college: isPublic ? deckCollege : "Private", 
-        cards: cards,
-        isPublic: isPublic,
-      };
-
-      if (currentDeckId) {
-        await updateDoc(doc(db, "flashcard_decks", currentDeckId), deckData);
-      } else {
-        await addDoc(collection(db, "flashcard_decks"), {
-          ...deckData, upvotes: 0, downloads: 0, createdAt: serverTimestamp(),
-        });
-      }
-      setView('library'); 
-    } catch (error) { console.error(error); } 
-    finally { setIsSaving(false); }
-  };
+    }
+    setView('library');
+  } catch (error) {
+    console.error(error);
+    showAlert("Save Failed", "Something went wrong while saving. Please check your connection and try again.");
+  } finally {
+    setIsSaving(false);
+  }
+};
 
 const handleSendToFriend = async () => {
-  if (!sendToUsername.trim() || cards.length === 0 || !deckTitle) 
-    return showAlert("Missing Info", "Ensure the deck has a title and cards before sending.");
+  if (!sendToUsername.trim()) 
+    return showAlert("Missing Username", "Please enter a username to send to.");
+  if (!deckTitle.trim()) 
+    return showAlert("No Title", "Save your deck with a title before sending.");
   
+  const validCards = cards.filter(c => c.front?.trim() && c.back?.trim());
+  if (validCards.length === 0) 
+    return showAlert("No Cards", "Your deck has no complete cards to send.");
+
+  if (!auth.currentUser) 
+    return showAlert("Not Logged In", "You must be logged in to send a deck.");
+
+  if (sendToUsername.trim().toLowerCase() === 
+    (await getDoc(doc(db, "users", auth.currentUser.uid))).data()?.username?.toLowerCase()
+  ) return showAlert("Can't Send to Yourself", "You can't send a reviewer to yourself.");
+
   setIsSending(true);
   try {
-    const q = query(collection(db, "users"), where("username", "==", sendToUsername.toLowerCase().trim()));
+    const q = query(
+      collection(db, "users"), 
+      where("username", "==", sendToUsername.trim().toLowerCase())
+    );
     const snap = await getDocs(q);
-    
+
     if (snap.empty) {
-      showAlert("User Not Found", "No user found with that username. Check the spelling.");
+      showAlert("User Not Found", "No user found with that username. Check the spelling and try again.");
       setIsSending(false);
       return;
     }
 
-    const friendDoc = snap.docs[0];
-    const recipientId = friendDoc.id; // ← use .id not .data().uid
-
-    const userDoc = await getDoc(doc(db, "users", auth.currentUser!.uid));
+    const recipientId = snap.docs[0].id;
+    const userDoc = await getDoc(doc(db, "users", auth.currentUser.uid));
     const myName = userDoc.exists() ? userDoc.data().username : "A Lasallian";
 
     await addDoc(collection(db, "inbox"), {
-      type: "deck_share",           // ← ADD THIS, critical for StudyLounge rendering
-      recipientId: recipientId,     // ← fixed
-      senderId: auth.currentUser!.uid,
+      type: "deck_share",
+      recipientId,
+      senderId: auth.currentUser.uid,
       senderName: myName,
-      deckTitle: deckTitle,
-      deckSubject: deckSubject || "General",
-      cards: cards,                 // ← ensure cards array is fully populated
+      deckTitle: deckTitle.trim(),
+      deckSubject: deckSubject.trim() || "General",
+      cards: validCards,
       status: "pending",
-      createdAt: serverTimestamp()
+      createdAt: serverTimestamp(),
     });
-    
-    showAlert("Sent!", "Reviewer delivered to your friend's inbox.");
+
+    showAlert("Sent!", `Reviewer successfully sent to @${sendToUsername.trim()}.`);
     setSendToUsername("");
   } catch (error) {
     console.error(error);
-    showAlert("Send Failed", "Something went wrong. Please try again.");
+    showAlert("Send Failed", "Something went wrong. Please check your connection and try again.");
   } finally {
     setIsSending(false);
   }
 };
 
-  const startStudy = (mode: StudyMode) => {
-    if (cards.some(c => !c.front || !c.back)) return showAlert("Incomplete Cards", "Please fill in all card fronts and backs before studying.");
+const startStudy = (mode: StudyMode) => {
+  const validCards = cards.filter(c => c.front?.trim() && c.back?.trim());
+  
+  if (validCards.length === 0) 
+    return showAlert("No Valid Cards", "Please fill in all card fronts and backs before studying.");
+  
+  if (validCards.length < cards.length)
+    showAlert(
+      "Some Cards Skipped", 
+      `${cards.length - validCards.length} incomplete card(s) were skipped for this session.`
+    );
 
-    setStudyMode(mode);
-    setCurrentIndex(0);
-    setKnownCount(0);
-    setIsFlipped(false);
-    setUserInput("");
-    setShowAnswerFeedback('none');
-    setView('study');
-  };
+  setStudyMode(mode);
+  setCards(validCards);
+  setCurrentIndex(0);
+  setKnownCount(0);
+  setIsFlipped(false);
+  setUserInput("");
+  setShowAnswerFeedback('none');
+  setView('study');
+};
 
   const handleNext = (knewIt: boolean) => {
     if (knewIt) setKnownCount(prev => prev + 1);
