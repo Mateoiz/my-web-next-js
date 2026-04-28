@@ -330,132 +330,40 @@ export default function WorkspaceHub() {
             <motion.div key="hub" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-4 md:space-y-6">
 
               {/* Register / Setup banner */}
-              <div className="relative w-full rounded-[2rem] overflow-hidden shadow-2xl group transition-all duration-500">
-                <div className="absolute inset-0 bg-gradient-to-br from-zinc-900 to-black dark:from-green-950 dark:to-zinc-950 z-0 transition-transform duration-700 group-hover:scale-105" />
-                <div className="absolute inset-0 bg-[url('/scanlines.png')] opacity-10 z-0 mix-blend-overlay" />
+              {/* CTA Banner */}
+<div className="relative w-full rounded-[2rem] overflow-hidden shadow-2xl">
+  <div className="absolute inset-0 bg-gradient-to-br from-zinc-900 to-black dark:from-green-950 dark:to-zinc-950 z-0" />
+  <div className="absolute inset-0 bg-[url('/scanlines.png')] opacity-10 z-0 mix-blend-overlay" />
 
-                <div className="relative z-10 p-6 md:p-12 border border-zinc-800 dark:border-green-500/30 rounded-[2rem] min-h-[200px] flex items-center">
-                  <AnimatePresence mode="wait">
+  <div className="relative z-10 p-6 md:p-12 border border-zinc-800 dark:border-green-500/30 rounded-[2rem] flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+    <div>
+      <div className="inline-flex items-center gap-2 px-3 py-1 mb-4 rounded-full bg-white/10 border border-white/20 text-[10px] font-mono font-bold tracking-widest text-zinc-300 uppercase backdrop-blur-md">
+        <FaUserCircle /> Guest Mode
+      </div>
+      <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-white mb-2 tracking-tight">
+        Unlock Your Dashboard
+      </h2>
+      <p className="text-zinc-400 max-w-xl text-xs sm:text-sm md:text-base leading-relaxed">
+        Create an account to access the full Academic Lasallian Terminal — track grades, manage tasks, study with flashcards, and connect with classmates.
+      </p>
+    </div>
 
-                    {!needsSetup ? (
-                      <motion.div
-                        key="register-prompt"
-                        initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}
-                        className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 w-full"
-                      >
-                        <div className="text-left w-full md:w-auto">
-                          <div className="inline-flex items-center gap-2 px-3 py-1 mb-4 rounded-full bg-white/10 border border-white/20 text-[10px] font-mono font-bold tracking-widest text-zinc-300 uppercase backdrop-blur-md shadow-sm">
-                            <FaUserCircle /> Guest Mode
-                          </div>
-                          <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-white mb-2 md:mb-3 tracking-tight">Unlock Your Dashboard</h2>
-                          <p className="text-zinc-400 max-w-xl text-xs sm:text-sm md:text-base leading-relaxed">
-                            Register an account to access the Task Tracker, Cloud Notes, and sync your schedule across devices. Already have an account?
-                          </p>
-                        </div>
-
-                        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto mt-4 md:mt-0">
-                          <button
-                            onClick={handleGoogleRegister}
-                            disabled={isAuthenticating}
-                            className="w-full sm:w-auto shrink-0 relative px-6 md:px-8 py-4 bg-white text-black font-bold rounded-xl md:rounded-2xl overflow-hidden shadow-[0_0_30px_rgba(255,255,255,0.3)] hover:-translate-y-1 active:scale-95 flex items-center justify-center gap-3 transition-all disabled:opacity-70 disabled:hover:translate-y-0"
-                          >
-                            {isAuthenticating ? <span className="animate-spin rounded-full h-5 w-5 border-b-2 border-black" /> : <FaGoogle />}
-                            {isAuthenticating ? "Verifying..." : "Register with Google"}
-                          </button>
-
-                          <button
-                            onClick={() => router.push('/login')}
-                            className="w-full sm:w-auto shrink-0 px-6 md:px-8 py-4 bg-zinc-800 dark:bg-zinc-900 border border-zinc-700 hover:border-zinc-500 text-white font-bold rounded-xl md:rounded-2xl hover:-translate-y-1 active:scale-95 flex items-center justify-center transition-all"
-                          >
-                            Log In
-                          </button>
-                        </div>
-                      </motion.div>
-                    ) : (
-                      <motion.div
-                        key="password-setup"
-                        initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}
-                        className="flex flex-col md:flex-row items-start justify-between gap-8 w-full"
-                      >
-                        <div className="text-left w-full md:w-auto mt-4">
-                          <div className="inline-flex items-center gap-2 px-3 py-1 mb-4 rounded-full bg-green-500/20 border border-green-500/50 text-[10px] font-mono font-bold tracking-widest text-green-400 uppercase">
-                            <FaUserTag /> Account Setup
-                          </div>
-                          <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-white mb-2 md:mb-3 tracking-tight">Secure Your Profile</h2>
-                          <p className="text-zinc-400 max-w-xl text-xs sm:text-sm md:text-base leading-relaxed">
-                            Google verified! Set up your username and password below.
-                          </p>
-                          {/* Terms accepted badge */}
-                          <div className="inline-flex items-center gap-2 mt-3 px-3 py-1.5 rounded-full bg-green-500/10 border border-green-500/30 text-[10px] font-mono font-bold tracking-widest text-green-400 uppercase">
-                            <FaCheckCircle size={10} /> Terms Accepted
-                          </div>
-                        </div>
-
-                        <div className="w-full md:w-auto shrink-0 flex flex-col gap-3">
-                          <input
-                            type="text"
-                            value={usernameInput} onChange={e => setUsernameInput(e.target.value)}
-                            placeholder="Create @Username"
-                            className="w-full md:w-[320px] px-4 py-3 rounded-xl bg-zinc-900/50 border-2 border-zinc-700 text-white font-bold outline-none focus:border-green-500 transition-colors"
-                          />
-                          <input
-                            type="email"
-                            value={schoolEmailInput} onChange={e => setSchoolEmailInput(e.target.value)}
-                            placeholder="Enter your school email"
-                            className="w-full md:w-[320px] px-4 py-3 rounded-xl bg-zinc-900/50 border-2 border-zinc-700 text-white font-bold outline-none focus:border-green-500 transition-colors"
-                          />
-
-                          <div className="relative w-full md:w-[320px]">
-                            <input
-                              type={showPassword ? "text" : "password"}
-                              value={passwordInput} onChange={e => setPasswordInput(e.target.value)}
-                              placeholder="Create Password"
-                              className="w-full px-4 py-3 rounded-xl bg-zinc-900/50 border-2 border-zinc-700 text-white font-bold outline-none focus:border-green-500 transition-colors pr-12"
-                            />
-                            <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white transition-colors">
-                              {showPassword ? <FaEyeSlash size={18} /> : <FaEye size={18} />}
-                            </button>
-                          </div>
-
-                          <div className="relative w-full md:w-[320px]">
-                            <input
-                              type={showConfirmPassword ? "text" : "password"}
-                              value={confirmPasswordInput} onChange={e => setConfirmPasswordInput(e.target.value)}
-                              placeholder="Re-enter Password"
-                              className="w-full px-4 py-3 rounded-xl bg-zinc-900/50 border-2 border-zinc-700 text-white font-bold outline-none focus:border-green-500 transition-colors pr-12"
-                              onKeyDown={e => e.key === 'Enter' && handleFinalizeSetup()}
-                            />
-                            <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white transition-colors">
-                              {showConfirmPassword ? <FaEyeSlash size={18} /> : <FaEye size={18} />}
-                            </button>
-                          </div>
-
-                          {setupError && <p className="text-red-400 text-[10px] font-bold px-2 max-w-[320px]">{setupError}</p>}
-
-                          {/* Re-read terms link */}
-                          <button
-                            type="button"
-                            onClick={() => setShowTermsModal(true)}
-                            className="text-zinc-500 hover:text-zinc-300 text-[11px] font-mono underline underline-offset-2 text-left transition-colors px-1"
-                          >
-                            <FaFileContract className="inline mr-1" size={10} />
-                            Review Terms of Agreement
-                          </button>
-
-                          <button
-                            onClick={handleFinalizeSetup} disabled={isAuthenticating}
-                            className="w-full py-4 bg-green-500 text-white font-bold rounded-xl hover:-translate-y-1 active:scale-95 transition-all mt-2 disabled:opacity-70 disabled:hover:translate-y-0"
-                          >
-                            {isAuthenticating ? "Saving Profile..." : "Complete Setup"}
-                          </button>
-                        </div>
-                      </motion.div>
-                    )}
-
-                  </AnimatePresence>
-                </div>
-              </div>
-
+    <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto shrink-0">
+      <button
+        onClick={() => router.push('/login?tab=register')}
+        className="w-full sm:w-auto px-8 py-4 bg-white text-black font-black rounded-2xl hover:-translate-y-1 active:scale-95 transition-all shadow-[0_0_30px_rgba(255,255,255,0.2)] flex items-center justify-center gap-2 text-sm uppercase tracking-widest"
+      >
+        Create Account
+      </button>
+      <button
+        onClick={() => router.push('/login')}
+        className="w-full sm:w-auto px-8 py-4 bg-zinc-800 border border-zinc-700 hover:border-zinc-500 text-white font-bold rounded-2xl hover:-translate-y-1 active:scale-95 transition-all flex items-center justify-center text-sm uppercase tracking-widest"
+      >
+        Log In
+      </button>
+    </div>
+  </div>
+</div>
               {/* Tool grid */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
 

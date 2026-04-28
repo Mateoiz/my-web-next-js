@@ -919,121 +919,174 @@ export default function UniversityTracker() {
   const color = getCourseColor(activeCourse.color);
 
   return (
-    <motion.div initial={{opacity:0,y:12}} animate={{opacity:1,y:0}} className="w-full max-w-6xl mx-auto space-y-5 relative">
-      <ConfirmModal modal={modal} onClose={closeModal}/>
-      <ScheduleSyncModal isOpen={syncModal.isOpen} onClose={()=>setSyncModal(s=>({...s,isOpen:false}))} payload={syncModal.payload}/>
+    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-6xl mx-auto space-y-4 relative">
+      <ConfirmModal modal={modal} onClose={closeModal} />
+      <ScheduleSyncModal isOpen={syncModal.isOpen} onClose={() => setSyncModal(s => ({ ...s, isOpen: false }))} payload={syncModal.payload} />
 
       {/* Course header */}
-      <div className="bg-white/60 dark:bg-[#121214]/80 backdrop-blur-xl p-6 md:p-8 rounded-[2rem] border border-zinc-200 dark:border-zinc-800/80 shadow-sm">
-        <div className="flex items-center gap-3 mb-5 flex-wrap">
-          <button onClick={()=>setSelectedCourseId(null)}
-            className="px-4 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 shadow-sm text-[10px] font-bold text-zinc-600 dark:text-zinc-300 uppercase tracking-widest hover:text-[#06402B] dark:hover:text-emerald-400 hover:border-[#06402B]/30 rounded-xl transition-all flex items-center gap-2"
+      <div className="bg-white/60 dark:bg-[#121214]/80 backdrop-blur-xl p-5 md:p-8 rounded-[2rem] border border-zinc-200 dark:border-zinc-800/80 shadow-sm">
+        
+        {/* Top action row */}
+        <div className="flex items-center justify-between gap-2 mb-5">
+          <button
+            onClick={() => setSelectedCourseId(null)}
+            className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 shadow-sm text-[10px] font-bold text-zinc-600 dark:text-zinc-300 uppercase tracking-widest hover:text-[#06402B] dark:hover:text-emerald-400 hover:border-[#06402B]/30 rounded-xl transition-all"
           >
-            <FaArrowLeft size={10}/> Back <span className="opacity-40 font-mono ml-1">Esc</span>
+            <FaArrowLeft size={10} /> Back
+            <span className="opacity-40 font-mono hidden sm:inline">Esc</span>
           </button>
-          <button onClick={e=>handleOpenSync(activeCourse,rawCourseTasks,e)}
-            className={`px-4 py-2 ${color.bg} ${color.text} border ${color.border} shadow-sm text-[10px] font-bold uppercase tracking-widest hover:opacity-80 rounded-xl transition-all flex items-center gap-2`}
-          >
-            <FaCalendarAlt size={10}/> Sync to Schedule
-          </button>
-          {/* Keyboard hints toggle */}
-          <button onClick={()=>setShowKbdHints(v=>!v)}
-            className={`px-4 py-2 border shadow-sm text-[10px] font-bold uppercase tracking-widest rounded-xl transition-all flex items-center gap-2 ${showKbdHints?"bg-zinc-900 text-white border-zinc-700":"bg-white dark:bg-zinc-900 text-zinc-500 border-zinc-200 dark:border-zinc-700 hover:text-zinc-700 dark:hover:text-zinc-300"}`}
-          >
-            <FaKeyboard size={10}/> Shortcuts <span className="opacity-40 font-mono">?</span>
-          </button>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={e => handleOpenSync(activeCourse, rawCourseTasks, e)}
+              className={`p-2.5 ${color.bg} ${color.text} border ${color.border} rounded-xl transition-all flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest`}
+            >
+              <FaCalendarAlt size={11} />
+              <span className="hidden sm:inline">Sync</span>
+            </button>
+            <button
+              onClick={() => setShowKbdHints(v => !v)}
+              className={`p-2.5 border rounded-xl transition-all hidden md:flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest ${showKbdHints ? "bg-zinc-900 text-white border-zinc-700" : "bg-white dark:bg-zinc-900 text-zinc-500 border-zinc-200 dark:border-zinc-700"}`}
+            >
+              <FaKeyboard size={11} /> Shortcuts
+            </button>
+            <button
+              onClick={() => handleAddTask(activeCourse.id)}
+              className="flex items-center gap-1.5 px-4 py-2.5 bg-[#06402B] dark:bg-emerald-600 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-[#042d1f] dark:hover:bg-emerald-500 active:scale-95 transition-all shadow-md"
+            >
+              <FaPlus size={11} /> <span className="hidden sm:inline">New</span>
+            </button>
+          </div>
         </div>
 
         {/* Keyboard hints */}
         <AnimatePresence>
           {showKbdHints && (
-            <motion.div initial={{height:0,opacity:0}} animate={{height:"auto",opacity:1}} exit={{height:0,opacity:0}} className="overflow-hidden mb-5">
+            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden mb-5">
               <div className="p-4 bg-zinc-950 rounded-2xl flex flex-wrap gap-x-6 gap-y-3">
-                <KbdBadge keys={["N"]} label="New task"/>
-                <KbdBadge keys={["/"]} label="Search"/>
-                <KbdBadge keys={["Esc"]} label="Back to folders"/>
-                <KbdBadge keys={["?"]} label="Toggle shortcuts"/>
-                <KbdBadge keys={["S"]} label="Star task (click row star)"/>
+                <KbdBadge keys={["N"]} label="New task" />
+                <KbdBadge keys={["/"]} label="Search" />
+                <KbdBadge keys={["Esc"]} label="Back" />
+                <KbdBadge keys={["?"]} label="Toggle shortcuts" />
               </div>
             </motion.div>
           )}
         </AnimatePresence>
 
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-          <div>
-            <div className="flex items-center gap-3 mb-1">
-              <h2 className="text-3xl md:text-5xl font-black uppercase tracking-tighter text-zinc-900 dark:text-white">{activeCourse.title}</h2>
-              <div onClick={e=>e.stopPropagation()}>
-                <CourseColorPicker value={activeCourse.color} onChange={async c => { await updateDoc(doc(db,"courses",activeCourse.id),{color:c}); }}/>
-              </div>
+        {/* Title + stats */}
+        <div className="flex flex-col gap-4">
+          <div className="flex items-start gap-3">
+            <div className={`w-12 h-12 ${color.bg} ${color.text} rounded-2xl flex items-center justify-center shrink-0`}>
+              <FaBook size={18} />
             </div>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400 flex items-center gap-2">
-              <FaCheckCircle className={color.text} size={12}/>
-              Track deliverables, deadlines, and grades
-            </p>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-0.5">
+                <h2 className="text-xl md:text-3xl font-black uppercase tracking-tight text-zinc-900 dark:text-white truncate">{activeCourse.title}</h2>
+                <div onClick={e => e.stopPropagation()}>
+                  <CourseColorPicker value={activeCourse.color} onChange={async c => { await updateDoc(doc(db, "courses", activeCourse.id), { color: c }); }} />
+                </div>
+              </div>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5">
+                <FaCheckCircle className={color.text} size={10} /> Track deliverables, deadlines, and grades
+              </p>
+            </div>
           </div>
-          <StatsBar tasks={rawCourseTasks}/>
+          <StatsBar tasks={rawCourseTasks} />
         </div>
       </div>
 
-      {/* Toolbar: Search + Filter + Sort + Bulk */}
-      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center flex-wrap">
+      {/* Toolbar */}
+      <div className="flex flex-col gap-3">
         {/* Search */}
-        <div className="relative flex-1 min-w-[200px]">
-          <FaSearch size={11} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none"/>
-          <input id="task-search" type="text" value={searchQuery} onChange={e=>setSearchQuery(e.target.value)}
-            placeholder="Search tasks… (/)"
-            className="w-full pl-9 pr-4 py-2.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl text-sm font-medium text-zinc-900 dark:text-white placeholder:text-zinc-400 outline-none focus:border-[#06402B] dark:focus:border-emerald-500 transition-colors"
+        <div className="relative">
+          <FaSearch size={11} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" />
+          <input
+            id="task-search"
+            type="text"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Search tasks…"
+            className="w-full pl-9 pr-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl text-sm font-medium text-zinc-900 dark:text-white placeholder:text-zinc-400 outline-none focus:border-[#06402B] dark:focus:border-emerald-500 transition-colors"
           />
           {searchQuery && (
-            <button onClick={()=>setSearchQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 transition-colors"><FaTimes size={10}/></button>
+            <button onClick={() => setSearchQuery("")} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 transition-colors">
+              <FaTimes size={10} />
+            </button>
           )}
         </div>
 
-        {/* Filter pills */}
-        <div className="flex gap-1.5 flex-wrap">
-          {(["ALL","OPEN","Submitted","Graded","STARRED","OVERDUE"] as FilterStatus[]).map(f => {
-            const labels: Record<FilterStatus,string> = { ALL:"All", OPEN:"Open", Submitted:"Submitted", Graded:"Graded", STARRED:"⭐ Starred", OVERDUE:"⚠ Overdue" };
-            return (
-              <button key={f} onClick={()=>setFilterStatus(f)}
-                className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${filterStatus===f?`${color.bg} ${color.text} border ${color.border}`:"bg-white dark:bg-zinc-900 text-zinc-500 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-600"}`}
-              >
-                {labels[f]}
-              </button>
-            );
-          })}
+        {/* Filter + Sort row */}
+        <div className="flex gap-2 items-center overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+          <div className="flex gap-1.5 flex-nowrap">
+            {(["ALL", "OPEN", "Submitted", "Graded", "STARRED", "OVERDUE"] as FilterStatus[]).map(f => {
+              const labels: Record<FilterStatus, string> = { ALL: "All", OPEN: "Open", Submitted: "Done", Graded: "Graded", STARRED: "⭐", OVERDUE: "⚠ Late" };
+              return (
+                <button
+                  key={f}
+                  onClick={() => setFilterStatus(f)}
+                  className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all ${
+                    filterStatus === f
+                      ? `${color.bg} ${color.text} border ${color.border}`
+                      : "bg-white dark:bg-zinc-900 text-zinc-500 border border-zinc-200 dark:border-zinc-800"
+                  }`}
+                >
+                  {labels[f]}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Sort button */}
+          <button
+            onClick={() => {
+              const keys: SortKey[] = ["none", "deadline", "name", "type", "status"];
+              const idx = keys.indexOf(sortKey);
+              setSortKey(keys[(idx + 1) % keys.length]);
+            }}
+            className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${
+              sortKey !== "none"
+                ? `${color.bg} ${color.text} ${color.border}`
+                : "bg-white dark:bg-zinc-900 text-zinc-500 border-zinc-200 dark:border-zinc-800"
+            }`}
+          >
+            <FaSortAmountDown size={9} />
+            {sortKey === "none" ? "Sort" : sortKey}
+          </button>
         </div>
 
         {/* Bulk actions */}
-        {selectedTaskIds.size>0 && (
+        {selectedTaskIds.size > 0 && (
           <div ref={bulkRef} className="relative">
-            <button onClick={()=>setBulkMenuOpen(o=>!o)}
-              className="flex items-center gap-2 px-4 py-2.5 bg-zinc-900 dark:bg-white text-white dark:text-black rounded-xl font-bold text-xs uppercase tracking-widest hover:opacity-80 transition-all"
+            <button
+              onClick={() => setBulkMenuOpen(o => !o)}
+              className="flex items-center gap-2 px-4 py-2.5 bg-zinc-900 dark:bg-white text-white dark:text-black rounded-xl font-bold text-xs uppercase tracking-widest w-full justify-center hover:opacity-80 transition-all"
             >
-              <FaEllipsisH size={11}/> {selectedTaskIds.size} selected
+              <FaEllipsisH size={11} /> {selectedTaskIds.size} selected — tap to act
             </button>
             <AnimatePresence>
               {bulkMenuOpen && (
-                <motion.div initial={{opacity:0,scale:0.97,y:-4}} animate={{opacity:1,scale:1,y:0}} exit={{opacity:0,scale:0.97,y:-4}} transition={{duration:0.12}}
-                  className="absolute right-0 top-full mt-2 z-50 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl overflow-hidden min-w-[180px]"
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.97, y: -4 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.97, y: -4 }}
+                  transition={{ duration: 0.12 }}
+                  className="absolute left-0 right-0 top-full mt-2 z-50 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl overflow-hidden"
                 >
                   <div className="p-1.5 space-y-0.5">
                     <p className="px-3 py-1.5 text-[9px] font-black text-zinc-400 uppercase tracking-widest">Mark as…</p>
                     {TASK_STATUSES.map(s => (
-                      <button key={s} onClick={()=>bulkSetStatus(s)}
-                        className="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors flex items-center gap-2"
+                      <button key={s} onClick={() => bulkSetStatus(s)}
+                        className="w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors flex items-center gap-2"
                       >
-                        <span className={`w-2 h-2 rounded-full ${safeStatusMeta(s).ring.replace("ring-","bg-")}`}/>{s}
+                        <span className={`w-2 h-2 rounded-full ${safeStatusMeta(s).ring.replace("ring-", "bg-")}`} />{s}
                       </button>
                     ))}
-                    <div className="h-px bg-zinc-100 dark:bg-zinc-800 mx-2 my-1"/>
-                    <button onClick={bulkDeleteSelected}
-                      className="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors flex items-center gap-2"
-                    >
-                      <FaTrash size={10}/> Delete selected
+                    <div className="h-px bg-zinc-100 dark:bg-zinc-800 mx-2 my-1" />
+                    <button onClick={bulkDeleteSelected} className="w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors flex items-center gap-2">
+                      <FaTrash size={10} /> Delete selected
                     </button>
-                    <button onClick={()=>{setSelectedTaskIds(new Set());setBulkMenuOpen(false);}}
-                      className="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+                    <button onClick={() => { setSelectedTaskIds(new Set()); setBulkMenuOpen(false); }}
+                      className="w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
                     >
                       Deselect all
                     </button>
@@ -1045,40 +1098,178 @@ export default function UniversityTracker() {
         )}
       </div>
 
-      {/* Table */}
-      <div className="w-full overflow-x-auto pb-4">
+      {/* ── MOBILE CARD VIEW (< md) ── */}
+      <div className="md:hidden space-y-3">
+        {displayTasks.length === 0 ? (
+          <div className="py-20 text-center flex flex-col items-center gap-3">
+            <div className="w-14 h-14 bg-zinc-50 dark:bg-zinc-900 rounded-2xl flex items-center justify-center text-zinc-300 dark:text-zinc-700">
+              <FaClipboardList size={22} />
+            </div>
+            <span className="text-sm font-bold text-zinc-400 uppercase tracking-widest">
+              {searchQuery || filterStatus !== "ALL" ? "No matching tasks" : "No deliverables yet"}
+            </span>
+            <button
+              onClick={() => handleAddTask(activeCourse.id)}
+              className="px-6 py-3 bg-[#06402B] dark:bg-emerald-600 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-[#042d1f] transition-all shadow-md"
+            >
+              <FaPlus size={11} className="inline mr-2" /> Add First Task
+            </button>
+          </div>
+        ) : (
+          <AnimatePresence>
+            {displayTasks.map(task => {
+              const isSelected = selectedTaskIds.has(task.id);
+              const typeMeta = safeTypeMeta(task.type);
+              const statusMeta = safeStatusMeta(task.status);
+              return (
+                <motion.div
+                  key={task.id}
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className={`bg-white dark:bg-[#18181b] rounded-2xl border transition-all ${
+                    isSelected
+                      ? "border-[#06402B] dark:border-emerald-500 bg-[#06402B]/5 dark:bg-emerald-500/5"
+                      : task.starred
+                      ? "border-amber-200 dark:border-amber-500/30 bg-amber-50/30 dark:bg-amber-500/5"
+                      : "border-zinc-200 dark:border-zinc-800"
+                  }`}
+                >
+                  {/* Card top row */}
+                  <div className="flex items-start gap-3 p-4 pb-3">
+                    {/* Checkbox + star */}
+                    <div className="flex flex-col items-center gap-2 pt-0.5 shrink-0">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleSelectTask(task.id)}
+                        className="w-4 h-4 accent-[#06402B] cursor-pointer"
+                      />
+                      <button
+                        onClick={() => updateTask(task.id, "starred", !task.starred)}
+                        className={`transition-all ${task.starred ? "text-amber-400" : "text-zinc-300 dark:text-zinc-700"}`}
+                      >
+                        <FaStar size={13} />
+                      </button>
+                    </div>
+
+                    {/* Name + badges */}
+                    <div className="flex-1 min-w-0">
+                      <InlineEdit
+                        value={task.name}
+                        onSave={v => updateTask(task.id, "name", v)}
+                        placeholder="Untitled deliverable…"
+                      />
+                      <div className="flex items-center gap-2 mt-2 flex-wrap px-2.5">
+                        <span className={`px-2 py-0.5 rounded-lg border text-[9px] font-bold uppercase tracking-wider ${typeMeta.color}`}>
+                          {task.type}
+                        </span>
+                        <UrgencyBadge deadline={task.deadline} status={task.status} />
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        onClick={() => duplicateTask(task)}
+                        className="p-2 text-zinc-300 dark:text-zinc-700 hover:text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-all active:scale-90"
+                      >
+                        <FaCopy size={11} />
+                      </button>
+                      <button
+                        onClick={() => deleteTask(task.id)}
+                        className="p-2 text-zinc-300 dark:text-zinc-700 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-all active:scale-90"
+                      >
+                        <FaTrash size={11} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Card bottom row — status + deadline + grade */}
+                  <div className="grid grid-cols-3 gap-2 px-4 pb-4 pt-1 border-t border-zinc-50 dark:border-zinc-800">
+                    {/* Status */}
+                    <div>
+                      <p className="text-[8px] font-black text-zinc-400 uppercase tracking-widest mb-1.5 px-1">Status</p>
+                      <div className={`flex items-center px-2.5 py-2 rounded-xl border text-[9px] font-bold uppercase tracking-wider ${statusMeta.color}`}>
+                        <Dropdown<TaskStatus>
+                          value={safeStatus(task.status)}
+                          options={TASK_STATUSES}
+                          onChange={v => updateTask(task.id, "status", v)}
+                          renderValue={v => <span className="truncate text-[9px]">{v}</span>}
+                          renderOption={v => (
+                            <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border ${safeStatusMeta(v).color}`}>{v}</span>
+                          )}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Deadline */}
+                    <div>
+                      <p className="text-[8px] font-black text-zinc-400 uppercase tracking-widest mb-1.5 px-1">Due</p>
+                      <DateInput value={task.deadline} onChange={v => updateTask(task.id, "deadline", v)} />
+                    </div>
+
+                    {/* Grade */}
+                    <div>
+                      <p className="text-[8px] font-black text-zinc-400 uppercase tracking-widest mb-1.5 px-1">Grade</p>
+                      <GradeEdit value={task.grade} onSave={v => updateTask(task.id, "grade", v)} />
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
+        )}
+
+        {/* Mobile add button */}
+        {displayTasks.length > 0 && (
+          <button
+            onClick={() => handleAddTask(activeCourse.id)}
+            className="w-full py-4 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl text-zinc-400 font-bold uppercase tracking-widest text-xs hover:border-[#06402B] dark:hover:border-emerald-500 hover:text-[#06402B] dark:hover:text-emerald-400 flex items-center justify-center gap-2 transition-all active:scale-95"
+          >
+            <FaPlus size={10} /> New Deliverable
+          </button>
+        )}
+      </div>
+
+      {/* ── DESKTOP TABLE VIEW (≥ md) ── */}
+      <div className="hidden md:block w-full overflow-x-auto pb-4">
         <div className="min-w-[1020px] w-full bg-white dark:bg-[#18181b] rounded-[2rem] border border-zinc-200 dark:border-zinc-800 shadow-lg">
 
           {/* Column headers */}
           <div className="grid grid-cols-[28px_24px_2fr_1.4fr_1.2fr_1.4fr_0.7fr_0.5fr_0.4fr] gap-2 px-5 py-3.5 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/80 dark:bg-[#111113] rounded-t-[2rem] text-[10px] font-black uppercase tracking-widest text-zinc-400 select-none">
-            {/* Checkbox all */}
             <div className="flex items-center">
-              <input type="checkbox" checked={selectedTaskIds.size===displayTasks.length&&displayTasks.length>0} onChange={selectAll}
+              <input
+                type="checkbox"
+                checked={selectedTaskIds.size === displayTasks.length && displayTasks.length > 0}
+                onChange={selectAll}
                 className="w-3.5 h-3.5 accent-[#06402B] cursor-pointer"
               />
             </div>
-            <div/>
-            {/* Sortable headers */}
-            {([["name","Deliverable"],["type","Type"],["status","Status"],["deadline","Deadline"]] as [SortKey,string][]).map(([key,label]) => (
-              <button key={key} onClick={()=>toggleSort(key)} className="flex items-center gap-1 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors group text-left">
+            <div />
+            {([["name", "Deliverable"], ["type", "Type"], ["status", "Status"], ["deadline", "Deadline"]] as [SortKey, string][]).map(([key, label]) => (
+              <button key={key} onClick={() => toggleSort(key)} className="flex items-center gap-1 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors group text-left">
                 {label}
-                <span className={`transition-all ${sortKey===key?"opacity-100 text-[#06402B] dark:text-emerald-400":"opacity-0 group-hover:opacity-40"}`}>
-                  {sortKey===key&&!sortAsc ? <FaChevronUp size={7}/> : <FaChevronDown size={7}/>}
+                <span className={`transition-all ${sortKey === key ? "opacity-100 text-[#06402B] dark:text-emerald-400" : "opacity-0 group-hover:opacity-40"}`}>
+                  {sortKey === key && !sortAsc ? <FaChevronUp size={7} /> : <FaChevronDown size={7} />}
                 </span>
               </button>
             ))}
             <div className="text-center">Grade</div>
-            <div/>
-            <div/>
+            <div />
+            <div />
           </div>
 
           {/* Rows */}
           <div className="divide-y divide-zinc-50 dark:divide-zinc-800/40">
-            {displayTasks.length===0 && (
-              <motion.div initial={{opacity:0}} animate={{opacity:1}} className="p-16 text-center flex flex-col items-center">
-                <div className="w-14 h-14 bg-zinc-50 dark:bg-zinc-900 rounded-2xl flex items-center justify-center text-zinc-300 dark:text-zinc-700 mb-4"><FaClipboardList size={22}/></div>
-                <span className="text-sm font-bold text-zinc-400 uppercase tracking-widest">{searchQuery||filterStatus!=="ALL" ? "No matching tasks" : "No deliverables yet"}</span>
-                <p className="text-xs text-zinc-400 mt-1">{searchQuery||filterStatus!=="ALL" ? "Try a different search or filter" : `Press N or click "New Deliverable" below`}</p>
+            {displayTasks.length === 0 && (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-16 text-center flex flex-col items-center">
+                <div className="w-14 h-14 bg-zinc-50 dark:bg-zinc-900 rounded-2xl flex items-center justify-center text-zinc-300 dark:text-zinc-700 mb-4">
+                  <FaClipboardList size={22} />
+                </div>
+                <span className="text-sm font-bold text-zinc-400 uppercase tracking-widest">
+                  {searchQuery || filterStatus !== "ALL" ? "No matching tasks" : "No deliverables yet"}
+                </span>
               </motion.div>
             )}
 
@@ -1086,62 +1277,45 @@ export default function UniversityTracker() {
               {displayTasks.map(task => {
                 const isSelected = selectedTaskIds.has(task.id);
                 return (
-                  <motion.div key={task.id} initial={{opacity:0,y:-8}} animate={{opacity:1,y:0}} exit={{opacity:0,height:0}}
-                    className={`grid grid-cols-[28px_24px_2fr_1.4fr_1.2fr_1.4fr_0.7fr_0.5fr_0.4fr] gap-2 px-5 py-2.5 items-center transition-colors group border-l-[3px] ${isSelected?"bg-[#06402B]/5 dark:bg-emerald-500/5 border-l-[#06402B] dark:border-l-emerald-500":"hover:bg-zinc-50/60 dark:hover:bg-white/[0.03] border-l-transparent hover:border-l-[#06402B] dark:hover:border-l-emerald-500"} ${task.starred?"bg-amber-50/30 dark:bg-amber-500/5":""}`}
+                  <motion.div
+                    key={task.id}
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className={`grid grid-cols-[28px_24px_2fr_1.4fr_1.2fr_1.4fr_0.7fr_0.5fr_0.4fr] gap-2 px-5 py-2.5 items-center transition-colors group border-l-[3px] ${
+                      isSelected
+                        ? "bg-[#06402B]/5 dark:bg-emerald-500/5 border-l-[#06402B] dark:border-l-emerald-500"
+                        : "hover:bg-zinc-50/60 dark:hover:bg-white/[0.03] border-l-transparent hover:border-l-[#06402B] dark:hover:border-l-emerald-500"
+                    } ${task.starred ? "bg-amber-50/30 dark:bg-amber-500/5" : ""}`}
                   >
-                    {/* Checkbox */}
                     <div className="flex items-center">
-                      <input type="checkbox" checked={isSelected} onChange={()=>toggleSelectTask(task.id)} className="w-3.5 h-3.5 accent-[#06402B] cursor-pointer"/>
+                      <input type="checkbox" checked={isSelected} onChange={() => toggleSelectTask(task.id)} className="w-3.5 h-3.5 accent-[#06402B] cursor-pointer" />
                     </div>
-
-                    {/* Star */}
-                    <button onClick={()=>updateTask(task.id,"starred",!task.starred)}
-                      className={`flex items-center justify-center transition-all ${task.starred?"text-amber-400":"text-zinc-200 dark:text-zinc-700 hover:text-amber-400"}`}
-                      title="Star task"
-                    >
-                      <FaStar size={12}/>
+                    <button onClick={() => updateTask(task.id, "starred", !task.starred)} className={`flex items-center justify-center transition-all ${task.starred ? "text-amber-400" : "text-zinc-200 dark:text-zinc-700 hover:text-amber-400"}`}>
+                      <FaStar size={12} />
                     </button>
-
-                    {/* Name + urgency badge */}
                     <div className="flex items-center gap-2 min-w-0">
                       <div className="flex-1 min-w-0">
-                        <InlineEdit value={task.name} onSave={v=>updateTask(task.id,"name",v)} placeholder="Untitled deliverable…"/>
+                        <InlineEdit value={task.name} onSave={v => updateTask(task.id, "name", v)} placeholder="Untitled deliverable…" />
                       </div>
-                      <UrgencyBadge deadline={task.deadline} status={task.status}/>
+                      <UrgencyBadge deadline={task.deadline} status={task.status} />
                     </div>
-
-                    {/* Type */}
-                    <TypePicker value={safeType(task.type)} onChange={v=>updateTask(task.id,"type",v)}/>
-
-                    {/* Status */}
+                    <TypePicker value={safeType(task.type)} onChange={v => updateTask(task.id, "type", v)} />
                     <div className={`flex items-center px-2.5 py-1.5 rounded-xl border text-[10px] font-bold uppercase tracking-wider ${safeStatusMeta(task.status).color}`}>
                       <Dropdown<TaskStatus>
                         value={safeStatus(task.status)} options={TASK_STATUSES}
-                        onChange={v=>updateTask(task.id,"status",v)}
-                        renderValue={v=><span className="truncate">{v}</span>}
-                        renderOption={v=><span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border ${safeStatusMeta(v).color}`}>{v}</span>}
+                        onChange={v => updateTask(task.id, "status", v)}
+                        renderValue={v => <span className="truncate">{v}</span>}
+                        renderOption={v => <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border ${safeStatusMeta(v).color}`}>{v}</span>}
                       />
                     </div>
-
-                    {/* Deadline */}
-                    <DateInput value={task.deadline} onChange={v=>updateTask(task.id,"deadline",v)}/>
-
-                    {/* Grade */}
-                    <GradeEdit value={task.grade} onSave={v=>updateTask(task.id,"grade",v)}/>
-
-                    {/* Duplicate */}
-                    <button onClick={()=>duplicateTask(task)}
-                      className="flex items-center justify-center p-1.5 text-zinc-300 dark:text-zinc-700 hover:text-zinc-500 dark:hover:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 opacity-0 group-hover:opacity-100 transition-all rounded-lg active:scale-90"
-                      title="Duplicate task"
-                    >
-                      <FaCopy size={11}/>
+                    <DateInput value={task.deadline} onChange={v => updateTask(task.id, "deadline", v)} />
+                    <GradeEdit value={task.grade} onSave={v => updateTask(task.id, "grade", v)} />
+                    <button onClick={() => duplicateTask(task)} className="flex items-center justify-center p-1.5 text-zinc-300 dark:text-zinc-700 hover:text-zinc-500 dark:hover:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 opacity-0 group-hover:opacity-100 transition-all rounded-lg active:scale-90">
+                      <FaCopy size={11} />
                     </button>
-
-                    {/* Delete */}
-                    <button onClick={()=>deleteTask(task.id)}
-                      className="flex items-center justify-center p-1.5 text-zinc-300 dark:text-zinc-700 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all rounded-lg active:scale-90"
-                    >
-                      <FaTrash size={11}/>
+                    <button onClick={() => deleteTask(task.id)} className="flex items-center justify-center p-1.5 text-zinc-300 dark:text-zinc-700 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all rounded-lg active:scale-90">
+                      <FaTrash size={11} />
                     </button>
                   </motion.div>
                 );
@@ -1152,13 +1326,14 @@ export default function UniversityTracker() {
           {/* Footer */}
           <div className="px-4 py-3 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-[#111113] rounded-b-[2rem] flex items-center justify-between">
             <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest tabular-nums">
-              {displayTasks.length} of {rawCourseTasks.length} task{rawCourseTasks.length!==1?"s":""}
-              {(searchQuery||filterStatus!=="ALL") && " (filtered)"}
+              {displayTasks.length} of {rawCourseTasks.length} task{rawCourseTasks.length !== 1 ? "s" : ""}
+              {(searchQuery || filterStatus !== "ALL") && " (filtered)"}
             </p>
-            <button onClick={()=>handleAddTask(activeCourse.id)}
+            <button
+              onClick={() => handleAddTask(activeCourse.id)}
               className="flex items-center gap-2 px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-zinc-400 hover:text-[#06402B] dark:hover:text-emerald-400 hover:bg-white dark:hover:bg-zinc-900 rounded-xl transition-all border border-transparent hover:border-zinc-200 dark:hover:border-zinc-800 shadow-sm hover:shadow-md"
             >
-              <FaPlus size={11}/> New Deliverable <span className="opacity-40 font-mono ml-1">N</span>
+              <FaPlus size={11} /> New Deliverable <span className="opacity-40 font-mono ml-1">N</span>
             </button>
           </div>
         </div>
