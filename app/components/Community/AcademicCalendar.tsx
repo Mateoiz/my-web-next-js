@@ -368,11 +368,27 @@ const [selectedDay, setSelectedDay] = useState<{ dateStr: string; rect: DOMRect 
   }, []);
 
   // ── Load admin events from Firestore ───────────────────────────────────────
-  useEffect(() => {
-    const unsub = onSnapshot(doc(db, "app_config", "calendar_events"), snap => {
-      if (snap.exists()) setAdminEvents(snap.data() as Record<string, CalendarEvent[]>);
+useEffect(() => {
+    // 1. Wait for Auth to confirm the user is logged in
+    const unsubAuth = onAuthStateChanged(auth, (user) => {
+      if (!user) return; // If no user, do not ping the database!
+
+      // 2. ONLY start listening to the database after Auth is confirmed
+      const unsubSnap = onSnapshot(doc(db, "app_config", "calendar_events"), 
+        snap => {
+          if (snap.exists()) setAdminEvents(snap.data() as Record<string, CalendarEvent[]>);
+        },
+        error => {
+          console.warn("Calendar sync delayed/failed:", error.message);
+        }
+      );
+
+      // Clean up the snapshot if the auth state changes
+      return () => unsubSnap();
     });
-    return () => unsub();
+
+    // Clean up the auth listener when the component unmounts
+    return () => unsubAuth();
   }, []);
 
   // ── Expand stretch events into individual dates ────────────────────────────

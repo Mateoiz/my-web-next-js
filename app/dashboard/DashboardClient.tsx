@@ -178,6 +178,7 @@ function DashboardInner() {
   useEffect(() => { setMounted(true); if (window.innerWidth >= 768) setIsQueueOpen(true); }, []);
 
   // --- PRESENCE SYSTEM ---
+// --- PRESENCE SYSTEM ---
   useEffect(() => {
     if (!authUser) return;
 
@@ -186,23 +187,22 @@ function DashboardInner() {
     let onlineDebounce: NodeJS.Timeout;
 
     const goOnline = () => {
+      clearTimeout(offlineTimeout);
       clearTimeout(onlineDebounce);
+      
       onlineDebounce = setTimeout(async () => {
         try {
-          await updateDoc(userRef, { isOnline: true, lastSeen: serverTimestamp() });
+          await updateDoc(userRef, { isOnline: true, lastSeen: new Date().toISOString() });
         } catch (err) {
-          console.error("Presence online failed:", err);
+          console.warn("Presence online failed:", err);
         }
-      }, 500);
+      }, 2000); // 2-second buffer safely avoids hot-reload crossfire
     };
 
     const goOffline = () => {
       clearTimeout(onlineDebounce);
-      try {
-        updateDoc(userRef, { isOnline: false, lastSeen: serverTimestamp() });
-      } catch (err) {
-        console.error("Presence offline failed:", err);
-      }
+      updateDoc(userRef, { isOnline: false, lastSeen: new Date().toISOString() })
+        .catch(err => console.warn("Presence offline failed:", err));
     };
 
     const handleVisibility = () => {
@@ -222,6 +222,7 @@ function DashboardInner() {
 
     const handleFocus = () => goOnline();
     const handleBlur = () => {
+      clearTimeout(offlineTimeout);
       offlineTimeout = setTimeout(() => goOffline(), 60000);
     };
 
@@ -239,10 +240,13 @@ function DashboardInner() {
       window.removeEventListener('blur', handleBlur);
       clearTimeout(offlineTimeout);
       clearTimeout(onlineDebounce);
-      goOffline();
+      
+      // CRITICAL FIX: DO NOT call goOffline() here!
+      // React 18 Strict Mode and Next.js Hot Reloads run this cleanup constantly.
+      // Forcing a Firebase write here collides with active WebSocket teardowns and corrupts the SDK.
+      // We rely entirely on the 'pagehide' and 'visibilitychange' window events to catch real exits.
     };
   }, [authUser]);
-
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
       if (!user) return router.push("/Workspace");
