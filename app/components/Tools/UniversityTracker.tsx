@@ -1,14 +1,15 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   FaPlus, FaBook, FaTrash, FaChevronDown, FaCalendarDay,
   FaArrowLeft, FaFolderOpen, FaExclamationTriangle, FaCheckCircle,
   FaClipboardList, FaTimes, FaPencilAlt, FaCalendarAlt,
-  FaStar, FaFilter, FaSortAmountDown, FaKeyboard,
+  FaStar, FaSortAmountDown, FaKeyboard,
   FaExclamationCircle, FaSearch, FaChevronUp, FaCopy,
-  FaBell, FaRandom, FaEllipsisH
+  FaBell, FaEllipsisH, FaEllipsisV
 } from "react-icons/fa";
 import {
   collection, query, where, orderBy, onSnapshot,
@@ -24,12 +25,10 @@ type TaskType =
   | "Final Product" | "Class Standing" | "Project" | "Presentation";
 
 type TaskStatus = "OPEN" | "Submitted" | "Graded";
-
 type SortKey = "deadline" | "type" | "status" | "name" | "none";
 type FilterStatus = "ALL" | TaskStatus | "STARRED" | "OVERDUE";
 
 interface Course { id: string; title: string; color?: string; }
-
 interface CourseTask {
   id: string; courseId: string; name: string;
   type: TaskType; status: TaskStatus; deadline: string; grade: string;
@@ -53,14 +52,14 @@ const getCourseColor = (colorName?: string) =>
 // ─── Style Maps ───────────────────────────────────────────────────────────────
 
 const TYPE_META: Record<TaskType, { color: string; dot: string }> = {
-  Assignment:       { color: "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20",            dot: "bg-blue-500" },
+  Assignment:       { color: "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20",             dot: "bg-blue-500" },
   Quiz:             { color: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20", dot: "bg-emerald-500" },
-  "Midterm Exam":   { color: "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20",                dot: "bg-red-500" },
-  "Final Exam":     { color: "bg-red-600/20 text-red-800 dark:text-red-400 border-red-600/30",                dot: "bg-red-600" },
-  "Final Product":  { color: "bg-purple-600/20 text-purple-800 dark:text-purple-400 border-purple-600/30",    dot: "bg-purple-600" },
-  "Class Standing": { color: "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-black border-transparent",    dot: "bg-zinc-500" },
-  Project:          { color: "bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/20",    dot: "bg-purple-500" },
-  Presentation:     { color: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20",        dot: "bg-amber-500" },
+  "Midterm Exam":   { color: "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20",                 dot: "bg-red-500" },
+  "Final Exam":     { color: "bg-red-600/20 text-red-800 dark:text-red-400 border-red-600/30",                 dot: "bg-red-600" },
+  "Final Product":  { color: "bg-purple-600/20 text-purple-800 dark:text-purple-400 border-purple-600/30",     dot: "bg-purple-600" },
+  "Class Standing": { color: "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-black border-transparent",     dot: "bg-zinc-500" },
+  Project:          { color: "bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/20",     dot: "bg-purple-500" },
+  Presentation:     { color: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20",         dot: "bg-amber-500" },
 };
 
 const STATUS_META: Record<TaskStatus, { color: string; ring: string }> = {
@@ -69,12 +68,12 @@ const STATUS_META: Record<TaskStatus, { color: string; ring: string }> = {
   Graded:    { color: "bg-[#06402B] text-white border-[#042d1f] dark:bg-emerald-600 dark:border-emerald-700",               ring: "ring-emerald-400" },
 };
 
-const TASK_TYPES: TaskType[]   = ["Assignment","Quiz","Midterm Exam","Final Exam","Final Product","Class Standing","Project","Presentation"];
+const TASK_TYPES: TaskType[]    = ["Assignment","Quiz","Midterm Exam","Final Exam","Final Product","Class Standing","Project","Presentation"];
 const TASK_STATUSES: TaskStatus[] = ["OPEN","Submitted","Graded"];
 
-const safeTypeMeta   = (t: string) => TYPE_META[t as TaskType]     ?? { color: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700", dot: "bg-zinc-400" };
-const safeStatusMeta = (s: string) => STATUS_META[s as TaskStatus] ?? { color: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700", ring: "ring-zinc-300" };
-const safeType       = (t: string): TaskType   => TASK_TYPES.includes(t as TaskType)     ? (t as TaskType)   : "Assignment";
+const safeTypeMeta   = (t: string) => TYPE_META[t as TaskType]      ?? { color: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700", dot: "bg-zinc-400" };
+const safeStatusMeta = (s: string) => STATUS_META[s as TaskStatus]  ?? { color: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700", ring: "ring-zinc-300" };
+const safeType       = (t: string): TaskType   => TASK_TYPES.includes(t as TaskType)      ? (t as TaskType)   : "Assignment";
 const safeStatus     = (s: string): TaskStatus => TASK_STATUSES.includes(s as TaskStatus) ? (s as TaskStatus) : "OPEN";
 
 // ─── Urgency helpers ──────────────────────────────────────────────────────────
@@ -90,34 +89,25 @@ function UrgencyBadge({ deadline, status }: { deadline: string; status: TaskStat
   if (status === "Graded" || status === "Submitted" || !deadline) return null;
   const days = daysUntil(deadline);
   if (days === null) return null;
-  if (days < 0)  return <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-red-500/10 text-red-500 rounded-md text-[9px] font-black uppercase tracking-widest"><FaExclamationCircle size={7} />Overdue</span>;
+  if (days < 0)  return <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-red-500/10 text-red-500 rounded-md text-[9px] font-black uppercase tracking-widest"><FaExclamationCircle size={7}/>Overdue</span>;
   if (days === 0) return <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-red-500/10 text-red-500 rounded-md text-[9px] font-black uppercase tracking-widest animate-pulse">Today</span>;
-  if (days === 1) return <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-amber-500/10 text-amber-500 rounded-md text-[9px] font-black uppercase tracking-widest"><FaBell size={7} />Tomorrow</span>;
+  if (days === 1) return <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-amber-500/10 text-amber-500 rounded-md text-[9px] font-black uppercase tracking-widest"><FaBell size={7}/>Tomorrow</span>;
   if (days <= 3)  return <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-amber-500/10 text-amber-500 rounded-md text-[9px] font-black uppercase tracking-widest">In {days}d</span>;
   if (days <= 7)  return <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 rounded-md text-[9px] font-bold">In {days}d</span>;
   return null;
 }
 
-// ─── Grade auto-format & display ──────────────────────────────────────────────
+// ─── Grade helpers ────────────────────────────────────────────────────────────
 
 function parseGradeStr(g: string | undefined, isDirect = false): { raw: number; total: number } | null {
   if (!g?.trim()) return null;
-  if (isDirect) {
-    const raw = parseFloat(g.split("/")[0]);
-    return isNaN(raw) ? null : { raw, total: 20 };
-  }
-  if (g.includes("/")) {
-    const [r, t] = g.split("/");
-    const raw = parseFloat(r), total = parseFloat(t);
-    return isNaN(raw) || isNaN(total) || total === 0 ? null : { raw, total };
-  }
-  const raw = parseFloat(g);
-  return isNaN(raw) ? null : { raw, total: 100 };
+  if (isDirect) { const raw = parseFloat(g.split("/")[0]); return isNaN(raw) ? null : { raw, total: 20 }; }
+  if (g.includes("/")) { const [r, t] = g.split("/"); const raw = parseFloat(r), total = parseFloat(t); return isNaN(raw)||isNaN(total)||total===0 ? null : { raw, total }; }
+  const raw = parseFloat(g); return isNaN(raw) ? null : { raw, total: 100 };
 }
 
 function gradeColorClass(grade: string): string {
-  const p = parseGradeStr(grade);
-  if (!p) return "text-zinc-400";
+  const p = parseGradeStr(grade); if (!p) return "text-zinc-400";
   const pct = (p.raw / p.total) * 100;
   if (pct >= 90) return "text-[#06402B] dark:text-emerald-400 font-black";
   if (pct >= 75) return "text-blue-600 dark:text-blue-400 font-bold";
@@ -131,10 +121,10 @@ function computeCourseGpa(tasks: CourseTask[]): { gpa: number; score: number } |
   const fin  = graded.find(t => t.type === "Final Exam");
   const prod = graded.find(t => t.type === "Final Product");
   const cs   = graded.find(t => t.type === "Class Standing");
-  const midP  = mid  ? parseGradeStr(mid.grade)       : null;
-  const finP  = fin  ? parseGradeStr(fin.grade)        : null;
-  const prodP = prod ? parseGradeStr(prod.grade)       : null;
-  const csP   = cs   ? parseGradeStr(cs.grade, true)  : null;
+  const midP = mid ? parseGradeStr(mid.grade) : null;
+  const finP = fin ? parseGradeStr(fin.grade) : null;
+  const prodP = prod ? parseGradeStr(prod.grade) : null;
+  const csP  = cs  ? parseGradeStr(cs.grade, true) : null;
   if (!midP && !finP && !prodP && !csP) return null;
   const pts = (p: typeof midP, w: number) => p ? (p.raw / p.total) * w : 0;
   const score = pts(midP,30) + pts(finP,30) + pts(prodP,20) + (csP ? Math.min(csP.raw,20) : 0);
@@ -147,9 +137,7 @@ function parseDateInput(raw: string): string {
   if (!raw.trim()) return "";
   if (/^\d{4}-\d{2}-\d{2}$/.test(raw.trim())) return raw.trim();
   const d = new Date(raw);
-  if (!isNaN(d.getTime())) {
-    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
-  }
+  if (!isNaN(d.getTime())) return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
   return raw.trim();
 }
 
@@ -182,7 +170,7 @@ function KbdBadge({ keys, label }: { keys: string[]; label: string }) {
   );
 }
 
-// ─── Reusable Dropdown ────────────────────────────────────────────────────────
+// ─── Reusable Dropdown (PORTALED) ──────────────────────────────────────────────
 
 interface DropdownProps<T extends string> {
   value: T; options: T[];
@@ -195,47 +183,67 @@ interface DropdownProps<T extends string> {
 function Dropdown<T extends string>({ value, options, onChange, renderOption, renderValue, align = "left" }: DropdownProps<T>) {
   const [open, setOpen] = useState(false);
   const [style, setStyle] = useState<React.CSSProperties>({});
-  const ref = useRef<HTMLDivElement>(null);
+  const ref    = useRef<HTMLDivElement>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
 
   useEffect(() => {
-    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
-    document.addEventListener("mousedown", h);
+    const h = (e: MouseEvent) => { 
+      const target = e.target as HTMLElement;
+      if (btnRef.current?.contains(target) || target.closest('.portal-menu-container')) return;
+      setOpen(false); 
+    };
+    if (open) document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
-  }, []);
+  }, [open]);
 
-  const handleOpen = () => {
-    if (btnRef.current) {
-      const r = btnRef.current.getBoundingClientRect();
-      setStyle({ position:"fixed", top: r.bottom+6, ...(align==="right" ? { right: window.innerWidth-r.right } : { left: r.left }), zIndex:9999, minWidth: Math.max(r.width,160) });
+  useEffect(() => {
+    const updatePosition = () => {
+      if (open && btnRef.current) {
+        const r = btnRef.current.getBoundingClientRect();
+        setStyle({ position:"fixed", top:r.bottom+6, ...(align==="right" ? { right:window.innerWidth-r.right } : { left:r.left }), zIndex:99999, minWidth:Math.max(r.width,160) });
+      }
+    };
+    if (open) {
+      window.addEventListener("scroll", updatePosition, { capture: true, passive: true });
+      updatePosition();
     }
-    setOpen(o => !o);
-  };
+    return () => window.removeEventListener("scroll", updatePosition, { capture: true });
+  }, [open, align]);
+
+  const handleOpen = () => setOpen(o => !o);
+
+  const menu = mounted ? createPortal(
+    <AnimatePresence>
+      {open && (
+        <motion.div initial={{opacity:0,y:-6,scale:0.97}} animate={{opacity:1,y:0,scale:1}} exit={{opacity:0,y:-4,scale:0.97}} transition={{duration:0.12}}
+          style={style} className="portal-menu-container bg-white dark:bg-[#1c1c1f] border border-zinc-200 dark:border-zinc-700/80 rounded-2xl shadow-2xl overflow-hidden"
+        >
+          <div className="p-1.5 space-y-0.5 max-h-60 overflow-y-auto custom-scrollbar">
+            {options.map(opt => (
+              <button key={opt} type="button" onClick={()=>{onChange(opt);setOpen(false);}}
+                className={`w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold transition-colors flex items-center gap-2.5 ${opt===value?"bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white":"text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/60"}`}
+              >
+                {renderOption(opt)}
+                {opt===value && <span className="ml-auto text-[#06402B] dark:text-emerald-400">✓</span>}
+              </button>
+            ))}
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>,
+    document.body
+  ) : null;
 
   return (
     <div ref={ref} className="relative w-full">
       <button ref={btnRef} type="button" onClick={handleOpen} className="w-full flex items-center justify-between gap-1.5 cursor-pointer select-none focus:outline-none">
         {renderValue(value)}
-        <FaChevronDown size={8} className={`shrink-0 opacity-50 transition-transform duration-200 ${open?"rotate-180":""}`} />
+        <FaChevronDown size={8} className={`shrink-0 opacity-50 transition-transform duration-200 ${open?"rotate-180":""}`}/>
       </button>
-      <AnimatePresence>
-        {open && (
-          <motion.div initial={{ opacity:0, y:-6, scale:0.97 }} animate={{ opacity:1, y:0, scale:1 }} exit={{ opacity:0, y:-4, scale:0.97 }} transition={{ duration:0.12 }}
-            style={style} className="bg-white dark:bg-[#1c1c1f] border border-zinc-200 dark:border-zinc-700/80 rounded-2xl shadow-2xl shadow-black/10 dark:shadow-black/40 overflow-hidden"
-          >
-            <div className="p-1.5 space-y-0.5">
-              {options.map(opt => (
-                <button key={opt} type="button" onClick={() => { onChange(opt); setOpen(false); }}
-                  className={`w-full text-left px-3 py-2 rounded-xl text-xs font-semibold transition-colors flex items-center gap-2.5 ${opt===value?"bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white":"text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/60"}`}
-                >
-                  {renderOption(opt)}
-                  {opt===value && <span className="ml-auto text-[#06402B] dark:text-emerald-400">✓</span>}
-                </button>
-              ))}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {menu}
     </div>
   );
 }
@@ -243,62 +251,54 @@ function Dropdown<T extends string>({ value, options, onChange, renderOption, re
 // ─── Inline Editable Text ─────────────────────────────────────────────────────
 
 function InlineEdit({ value, onSave, placeholder, mono=false, center=false }: {
-  value: string; onSave: (v:string) => void; placeholder?: string; mono?: boolean; center?: boolean;
+  value: string; onSave: (v:string)=>void; placeholder?: string; mono?: boolean; center?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(value);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  const commit = useCallback(() => { setEditing(false); if (draft !== value) onSave(draft); }, [draft, value, onSave]);
+  const [draft, setDraft]     = useState(value);
+  const inputRef              = useRef<HTMLInputElement>(null);
+  const commit = useCallback(() => { setEditing(false); if (draft!==value) onSave(draft); }, [draft,value,onSave]);
   useEffect(() => { if (editing) inputRef.current?.focus(); }, [editing]);
 
-  if (editing) {
-    return (
-      <input ref={inputRef} value={draft} onChange={e => setDraft(e.target.value)}
-        onBlur={commit}
-        onKeyDown={e => { if (e.key==="Enter") commit(); if (e.key==="Escape") { setDraft(value); setEditing(false); } }}
-        className={`w-full bg-white dark:bg-zinc-900 outline-none border border-[#06402B]/30 dark:border-emerald-500/30 ring-2 ring-[#06402B]/10 rounded-lg px-2.5 py-1.5 text-sm font-semibold text-zinc-900 dark:text-white placeholder:text-zinc-300 dark:placeholder:text-zinc-600 transition-all ${mono?"font-mono":""} ${center?"text-center":""}`}
-        placeholder={placeholder}
-      />
-    );
-  }
+  if (editing) return (
+    <input ref={inputRef} value={draft} onChange={e=>setDraft(e.target.value)} onBlur={commit}
+      onKeyDown={e=>{if(e.key==="Enter")commit();if(e.key==="Escape"){setDraft(value);setEditing(false);}}}
+      className={`w-full bg-white dark:bg-zinc-900 outline-none border border-[#06402B]/30 dark:border-emerald-500/30 ring-2 ring-[#06402B]/10 rounded-lg px-2.5 py-1.5 text-sm font-semibold text-zinc-900 dark:text-white placeholder:text-zinc-300 dark:placeholder:text-zinc-600 transition-all ${mono?"font-mono":""} ${center?"text-center":""}`}
+      placeholder={placeholder}
+    />
+  );
   return (
-    <button type="button" onClick={() => { setDraft(value); setEditing(true); }}
+    <button type="button" onClick={()=>{setDraft(value);setEditing(true);}}
       className={`w-full group/edit flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors text-left ${center?"justify-center":""}`}
     >
       <span className={`text-sm font-semibold truncate ${value?"text-zinc-900 dark:text-white":"text-zinc-300 dark:text-zinc-600"} ${mono?"font-mono":""}`}>{value||placeholder}</span>
-      <FaPencilAlt size={9} className="shrink-0 text-zinc-300 dark:text-zinc-600 opacity-0 group-hover/edit:opacity-100 transition-opacity" />
+      <FaPencilAlt size={9} className="shrink-0 text-zinc-300 dark:text-zinc-600 opacity-0 group-hover/edit:opacity-100 transition-opacity"/>
     </button>
   );
 }
 
-// ─── Grade Inline Edit with color feedback ────────────────────────────────────
+// ─── Grade Edit ───────────────────────────────────────────────────────────────
 
-function GradeEdit({ value, onSave }: { value: string; onSave: (v:string) => void }) {
+function GradeEdit({ value, onSave }: { value: string; onSave: (v:string)=>void }) {
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(value);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const commit = useCallback(() => { setEditing(false); if (draft !== value) onSave(draft); }, [draft, value, onSave]);
+  const [draft, setDraft]     = useState(value);
+  const inputRef              = useRef<HTMLInputElement>(null);
+  const commit = useCallback(() => { setEditing(false); if (draft!==value) onSave(draft); }, [draft,value,onSave]);
   useEffect(() => { if (editing) inputRef.current?.focus(); }, [editing]);
-
   const colorClass = gradeColorClass(value);
 
-  if (editing) {
-    return (
-      <input ref={inputRef} value={draft} onChange={e => setDraft(e.target.value)}
-        onBlur={commit}
-        onKeyDown={e => { if (e.key==="Enter") commit(); if (e.key==="Escape") { setDraft(value); setEditing(false); } }}
-        placeholder="e.g. 88 or 44/50"
-        className="w-full bg-white dark:bg-zinc-900 outline-none border border-[#06402B]/30 dark:border-emerald-500/30 ring-2 ring-[#06402B]/10 rounded-lg px-2 py-1.5 text-sm font-mono font-bold text-center text-zinc-900 dark:text-white transition-all"
-      />
-    );
-  }
+  if (editing) return (
+    <input ref={inputRef} value={draft} onChange={e=>setDraft(e.target.value)} onBlur={commit}
+      onKeyDown={e=>{if(e.key==="Enter")commit();if(e.key==="Escape"){setDraft(value);setEditing(false);}}}
+      placeholder="88 or 44/50"
+      className="w-full bg-white dark:bg-zinc-900 outline-none border border-[#06402B]/30 dark:border-emerald-500/30 ring-2 ring-[#06402B]/10 rounded-lg px-2 py-1.5 text-sm font-mono font-bold text-center text-zinc-900 dark:text-white transition-all"
+    />
+  );
   return (
-    <button type="button" onClick={() => { setDraft(value); setEditing(true); }}
-      className={`w-full flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors group/grade`}
+    <button type="button" onClick={()=>{setDraft(value);setEditing(true);}}
+      className="w-full flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors group/grade"
     >
-      <span className={`text-sm font-mono tabular-nums ${value ? colorClass : "text-zinc-300 dark:text-zinc-600"}`}>{value || "—"}</span>
-      <FaPencilAlt size={9} className="shrink-0 text-zinc-300 dark:text-zinc-600 opacity-0 group-hover/grade:opacity-100 transition-opacity" />
+      <span className={`text-sm font-mono tabular-nums ${value?colorClass:"text-zinc-300 dark:text-zinc-600"}`}>{value||"—"}</span>
+      <FaPencilAlt size={9} className="shrink-0 text-zinc-300 dark:text-zinc-600 opacity-0 group-hover/grade:opacity-100 transition-opacity"/>
     </button>
   );
 }
@@ -307,53 +307,49 @@ function GradeEdit({ value, onSave }: { value: string; onSave: (v:string) => voi
 
 function DateInput({ value, onChange }: { value:string; onChange:(v:string)=>void }) {
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
-  const pickerRef = useRef<HTMLInputElement>(null);
-  const days = daysUntil(value);
-  const overdue = isOverdueDate(value);
+  const [draft, setDraft]     = useState("");
+  const inputRef              = useRef<HTMLInputElement>(null);
+  const pickerRef             = useRef<HTMLInputElement>(null);
+  const overdue               = isOverdueDate(value);
 
   const startEdit = () => { setDraft(formatDateDisplay(value)||value); setEditing(true); setTimeout(()=>inputRef.current?.focus(),0); };
-  const commit = () => { setEditing(false); onChange(parseDateInput(draft)); };
+  const commit    = () => { setEditing(false); onChange(parseDateInput(draft)); };
 
-  if (editing) {
-    return (
-      <div className="flex items-center gap-1 w-full">
-        <input ref={inputRef} value={draft} onChange={e=>setDraft(e.target.value)} onBlur={commit}
-          onKeyDown={e=>{ if(e.key==="Enter"){e.preventDefault();commit();} if(e.key==="Escape"){setEditing(false);setDraft("");} }}
-          placeholder="May 15 or 05/15/25"
-          className="flex-1 min-w-0 bg-white dark:bg-zinc-900 outline-none border border-[#06402B]/30 dark:border-emerald-500/30 ring-2 ring-[#06402B]/10 rounded-lg px-2.5 py-1.5 text-xs font-mono font-semibold text-zinc-900 dark:text-white placeholder:text-zinc-300 transition-all"
-        />
-        <button type="button" onMouseDown={e=>e.preventDefault()} onClick={()=>pickerRef.current?.showPicker?.()}
-          className="shrink-0 p-1.5 text-zinc-400 hover:text-[#06402B] dark:hover:text-emerald-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
-        >
-          <FaCalendarDay size={11} />
-        </button>
-        <input ref={pickerRef} type="date" value={/^\d{4}-\d{2}-\d{2}$/.test(value)?value:""} onChange={e=>{onChange(e.target.value);setEditing(false);}}
-          className="absolute opacity-0 pointer-events-none w-0 h-0" tabIndex={-1}
-        />
-      </div>
-    );
-  }
-
+  if (editing) return (
+    <div className="flex items-center gap-1 w-full">
+      <input ref={inputRef} value={draft} onChange={e=>setDraft(e.target.value)} onBlur={commit}
+        onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();commit();}if(e.key==="Escape"){setEditing(false);setDraft("");}}}
+        placeholder="May 15 or 05/15/25"
+        className="flex-1 min-w-0 bg-white dark:bg-zinc-900 outline-none border border-[#06402B]/30 dark:border-emerald-500/30 ring-2 ring-[#06402B]/10 rounded-lg px-2.5 py-1.5 text-xs font-mono font-semibold text-zinc-900 dark:text-white placeholder:text-zinc-300 transition-all"
+      />
+      <button type="button" onMouseDown={e=>e.preventDefault()} onClick={()=>pickerRef.current?.showPicker?.()}
+        className="shrink-0 p-1.5 text-zinc-400 hover:text-[#06402B] dark:hover:text-emerald-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
+      >
+        <FaCalendarDay size={11}/>
+      </button>
+      <input ref={pickerRef} type="date" value={/^\d{4}-\d{2}-\d{2}$/.test(value)?value:""} onChange={e=>{onChange(e.target.value);setEditing(false);}}
+        className="absolute opacity-0 pointer-events-none w-0 h-0" tabIndex={-1}
+      />
+    </div>
+  );
   return (
-    <button type="button" onClick={startEdit}
-      className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors text-left group/date"
+    <div role="button" tabIndex={0} onClick={startEdit}
+      className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors text-left group/date cursor-pointer"
     >
-      <FaCalendarDay size={10} className={`shrink-0 ${overdue?"text-red-400":"text-zinc-400 dark:text-zinc-500"}`} />
+      <FaCalendarDay size={10} className={`shrink-0 ${overdue?"text-red-400":"text-zinc-400 dark:text-zinc-500"}`}/>
       <span className={`text-xs font-mono font-semibold truncate ${!value?"text-zinc-300 dark:text-zinc-600":overdue?"text-red-500 dark:text-red-400":"text-zinc-600 dark:text-zinc-400"}`}>
         {formatDateDisplay(value)||"Set date"}
       </span>
       {value && (
-        <div onClick={e=>{e.stopPropagation();onChange("");}} className="ml-auto opacity-0 group-hover/date:opacity-100 text-zinc-400 hover:text-red-400 transition-all">
-          <FaTimes size={9} />
-        </div>
+        <button type="button" onClick={e=>{e.stopPropagation();onChange("");}} className="ml-auto opacity-0 group-hover/date:opacity-100 text-zinc-400 hover:text-red-400 transition-all focus:opacity-100">
+          <FaTimes size={9}/>
+        </button>
       )}
-    </button>
+    </div>
   );
 }
 
-// ─── Type Picker ──────────────────────────────────────────────────────────────
+// ─── Type Picker (PORTALED) ───────────────────────────────────────────────────
 
 type TypeCategory = "Quiz" | "Activity" | "Exams" | "Final Product";
 const CATEGORY_TYPE_MAP: Record<Exclude<TypeCategory,"Exams">, TaskType> = { Quiz:"Quiz", Activity:"Assignment", "Final Product":"Final Product" };
@@ -367,28 +363,86 @@ function typeToCategory(t: TaskType): TypeCategory {
 }
 
 function TypePicker({ value, onChange }: { value:TaskType; onChange:(v:TaskType)=>void }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen]         = useState(false);
   const [examStep, setExamStep] = useState(false);
-  const [style, setStyle] = useState<React.CSSProperties>({});
-  const ref = useRef<HTMLDivElement>(null);
+  const [style, setStyle]       = useState<React.CSSProperties>({});
+  const ref    = useRef<HTMLDivElement>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
-  const meta = safeTypeMeta(value);
+  const [mounted, setMounted] = useState(false);
+  const meta   = safeTypeMeta(value);
+
+  useEffect(() => setMounted(true), []);
 
   useEffect(() => {
-    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) { setOpen(false); setExamStep(false); } };
-    document.addEventListener("mousedown", h);
+    const h = (e: MouseEvent) => { 
+      const target = e.target as HTMLElement;
+      if (btnRef.current?.contains(target) || target.closest('.portal-menu-container')) return;
+      setOpen(false); 
+      setExamStep(false); 
+    };
+    if (open) document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
-  }, []);
+  }, [open]);
+
+  useEffect(() => {
+    const updatePosition = () => {
+      if (open && btnRef.current) {
+        const r = btnRef.current.getBoundingClientRect();
+        setStyle({ position:"fixed", top:r.bottom+6, left:r.left, zIndex:99999, minWidth:Math.max(r.width,160) });
+      }
+    };
+    if (open) {
+      window.addEventListener("scroll", updatePosition, { capture: true, passive: true });
+      updatePosition();
+    }
+    return () => window.removeEventListener("scroll", updatePosition, { capture: true });
+  }, [open]);
 
   const handleOpen = () => {
-    if (btnRef.current) {
-      const r = btnRef.current.getBoundingClientRect();
-      setStyle({ position:"fixed", top:r.bottom+6, left:r.left, zIndex:9999, minWidth:Math.max(r.width,160) });
-    }
     setOpen(o=>!o); setExamStep(false);
   };
 
-  const CATEGORIES: TypeCategory[] = ["Quiz","Activity","Exams","Final Product"];
+  const menu = mounted ? createPortal(
+    <AnimatePresence>
+      {open && (
+        <motion.div initial={{opacity:0,y:-6,scale:0.97}} animate={{opacity:1,y:0,scale:1}} exit={{opacity:0,y:-4,scale:0.97}} transition={{duration:0.12}}
+          style={style} className="portal-menu-container bg-white dark:bg-[#1c1c1f] border border-zinc-200 dark:border-zinc-700/80 rounded-2xl shadow-2xl overflow-hidden"
+        >
+          <AnimatePresence mode="wait">
+            {!examStep ? (
+              <motion.div key="cats" initial={{opacity:0,x:-8}} animate={{opacity:1,x:0}} exit={{opacity:0,x:-8}} transition={{duration:0.1}} className="p-1.5 space-y-0.5">
+                {(["Quiz","Activity","Exams","Final Product"] as TypeCategory[]).map(cat => (
+                  <button key={cat} type="button" onClick={()=>cat==="Exams"?setExamStep(true):(onChange(CATEGORY_TYPE_MAP[cat]),setOpen(false))}
+                    className={`w-full text-left px-3 py-2 rounded-xl text-xs font-semibold transition-colors flex items-center gap-2.5 ${typeToCategory(value)===cat?"bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white":"text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/60"}`}
+                  >
+                    <span className={`w-2 h-2 rounded-full shrink-0 ${CATEGORY_META[cat].dot}`}/>{cat}
+                    {cat==="Exams"&&<FaChevronDown size={8} className="-rotate-90 ml-auto opacity-40"/>}
+                    {cat!=="Exams"&&typeToCategory(value)===cat&&<span className="ml-auto text-[#06402B] dark:text-emerald-400">✓</span>}
+                  </button>
+                ))}
+              </motion.div>
+            ) : (
+              <motion.div key="exams" initial={{opacity:0,x:8}} animate={{opacity:1,x:0}} exit={{opacity:0,x:8}} transition={{duration:0.1}} className="p-1.5 space-y-0.5">
+                <button type="button" onClick={()=>setExamStep(false)} className="w-full text-left px-3 py-1.5 rounded-xl text-[10px] font-bold text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 uppercase tracking-widest flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-800/60 transition-colors">
+                  <FaChevronDown size={8} className="rotate-90"/> Back
+                </button>
+                <div className="h-px bg-zinc-100 dark:bg-zinc-800 mx-2 my-1"/>
+                {(["Midterm Exam","Final Exam"] as const).map(t => (
+                  <button key={t} type="button" onClick={()=>{onChange(t);setOpen(false);setExamStep(false);}}
+                    className={`w-full text-left px-3 py-2 rounded-xl text-xs font-semibold transition-colors flex items-center gap-2.5 ${value===t?"bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white":"text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/60"}`}
+                  >
+                    <span className={`w-2 h-2 rounded-full shrink-0 ${safeTypeMeta(t).dot}`}/>{t}
+                    {value===t&&<span className="ml-auto text-[#06402B] dark:text-emerald-400">✓</span>}
+                  </button>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.div>
+      )}
+    </AnimatePresence>,
+    document.body
+  ) : null;
 
   return (
     <div ref={ref} className="relative w-full">
@@ -396,50 +450,12 @@ function TypePicker({ value, onChange }: { value:TaskType; onChange:(v:TaskType)
         className={`w-full flex items-center justify-between gap-1.5 px-2.5 py-1.5 rounded-xl border text-[10px] font-bold uppercase tracking-wider cursor-pointer select-none focus:outline-none ${meta.color}`}
       >
         <span className="flex items-center gap-1.5 truncate">
-          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${meta.dot}`} />
+          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${meta.dot}`}/>
           {value}
         </span>
-        <FaChevronDown size={8} className={`shrink-0 opacity-50 transition-transform duration-200 ${open?"rotate-180":""}`} />
+        <FaChevronDown size={8} className={`shrink-0 opacity-50 transition-transform duration-200 ${open?"rotate-180":""}`}/>
       </button>
-      <AnimatePresence>
-        {open && (
-          <motion.div initial={{opacity:0,y:-6,scale:0.97}} animate={{opacity:1,y:0,scale:1}} exit={{opacity:0,y:-4,scale:0.97}} transition={{duration:0.12}}
-            style={style} className="bg-white dark:bg-[#1c1c1f] border border-zinc-200 dark:border-zinc-700/80 rounded-2xl shadow-2xl overflow-hidden"
-          >
-            <AnimatePresence mode="wait">
-              {!examStep ? (
-                <motion.div key="cats" initial={{opacity:0,x:-8}} animate={{opacity:1,x:0}} exit={{opacity:0,x:-8}} transition={{duration:0.1}} className="p-1.5 space-y-0.5">
-                  {CATEGORIES.map(cat => (
-                    <button key={cat} type="button" onClick={() => cat==="Exams" ? setExamStep(true) : (onChange(CATEGORY_TYPE_MAP[cat]),setOpen(false))}
-                      className={`w-full text-left px-3 py-2 rounded-xl text-xs font-semibold transition-colors flex items-center gap-2.5 ${typeToCategory(value)===cat?"bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white":"text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/60"}`}
-                    >
-                      <span className={`w-2 h-2 rounded-full shrink-0 ${CATEGORY_META[cat].dot}`} />
-                      {cat}
-                      {cat==="Exams" && <FaChevronDown size={8} className="-rotate-90 ml-auto opacity-40"/>}
-                      {cat!=="Exams" && typeToCategory(value)===cat && <span className="ml-auto text-[#06402B] dark:text-emerald-400">✓</span>}
-                    </button>
-                  ))}
-                </motion.div>
-              ) : (
-                <motion.div key="exams" initial={{opacity:0,x:8}} animate={{opacity:1,x:0}} exit={{opacity:0,x:8}} transition={{duration:0.1}} className="p-1.5 space-y-0.5">
-                  <button type="button" onClick={()=>setExamStep(false)} className="w-full text-left px-3 py-1.5 rounded-xl text-[10px] font-bold text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 uppercase tracking-widest flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-800/60 transition-colors">
-                    <FaChevronDown size={8} className="rotate-90"/> Back
-                  </button>
-                  <div className="h-px bg-zinc-100 dark:bg-zinc-800 mx-2 my-1"/>
-                  {(["Midterm Exam","Final Exam"] as const).map(t => (
-                    <button key={t} type="button" onClick={()=>{onChange(t);setOpen(false);setExamStep(false);}}
-                      className={`w-full text-left px-3 py-2 rounded-xl text-xs font-semibold transition-colors flex items-center gap-2.5 ${value===t?"bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white":"text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/60"}`}
-                    >
-                      <span className={`w-2 h-2 rounded-full shrink-0 ${safeTypeMeta(t).dot}`}/>{t}
-                      {value===t && <span className="ml-auto text-[#06402B] dark:text-emerald-400">✓</span>}
-                    </button>
-                  ))}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {menu}
     </div>
   );
 }
@@ -476,18 +492,18 @@ function ConfirmModal({ modal, onClose }: { modal:ModalState; onClose:()=>void }
 // ─── Stats Bar ────────────────────────────────────────────────────────────────
 
 function StatsBar({ tasks }: { tasks:CourseTask[] }) {
-  const open      = tasks.filter(t => t.status==="OPEN").length;
-  const submitted = tasks.filter(t => t.status==="Submitted").length;
-  const graded    = tasks.filter(t => t.status==="Graded").length;
-  const starred   = tasks.filter(t => t.starred).length;
-  const overdue   = tasks.filter(t => t.status==="OPEN" && isOverdueDate(t.deadline)).length;
+  const open      = tasks.filter(t=>t.status==="OPEN").length;
+  const submitted = tasks.filter(t=>t.status==="Submitted").length;
+  const graded    = tasks.filter(t=>t.status==="Graded").length;
+  const starred   = tasks.filter(t=>t.starred).length;
+  const overdue   = tasks.filter(t=>t.status==="OPEN"&&isOverdueDate(t.deadline)).length;
   const gpaResult = computeCourseGpa(tasks);
 
   return (
     <div className="flex items-center gap-5 flex-wrap">
       {[
         { label:"Open",      value:open,      color:"text-zinc-500 dark:text-zinc-400" },
-        { label:"Submitted", value:submitted,  color:"text-blue-600 dark:text-blue-400" },
+        { label:"Submitted", value:submitted, color:"text-blue-600 dark:text-blue-400" },
         { label:"Graded",    value:graded,     color:"text-[#06402B] dark:text-emerald-400" },
       ].map(({ label, value, color }) => (
         <div key={label} className="flex items-baseline gap-1.5">
@@ -495,18 +511,8 @@ function StatsBar({ tasks }: { tasks:CourseTask[] }) {
           <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{label}</span>
         </div>
       ))}
-      {overdue > 0 && (
-        <div className="flex items-baseline gap-1.5">
-          <span className="text-2xl font-black tabular-nums text-red-500">{overdue}</span>
-          <span className="text-[10px] font-bold text-red-400 uppercase tracking-widest">Overdue</span>
-        </div>
-      )}
-      {starred > 0 && (
-        <div className="flex items-baseline gap-1.5">
-          <span className="text-2xl font-black tabular-nums text-amber-500">{starred}</span>
-          <span className="text-[10px] font-bold text-amber-400 uppercase tracking-widest">⭐ Starred</span>
-        </div>
-      )}
+      {overdue>0 && <div className="flex items-baseline gap-1.5"><span className="text-2xl font-black tabular-nums text-red-500">{overdue}</span><span className="text-[10px] font-bold text-red-400 uppercase tracking-widest">Overdue</span></div>}
+      {starred>0 && <div className="flex items-baseline gap-1.5"><span className="text-2xl font-black tabular-nums text-amber-500">{starred}</span><span className="text-[10px] font-bold text-amber-400 uppercase tracking-widest">⭐ Starred</span></div>}
       {gpaResult && (
         <div className="flex items-center gap-3 pl-4 border-l border-zinc-200 dark:border-zinc-700">
           <div className="text-right">
@@ -531,11 +537,13 @@ function ScheduleSyncModal({ isOpen, onClose, payload }: { isOpen:boolean; onClo
   const [copied, setCopied] = useState(false);
   if (!payload) return null;
   const upcoming = payload.deadlines.filter(d=>d.date);
+  
   const handleCopy = () => {
     const text = upcoming.map(d=>`${d.type}: ${d.name} — Due ${formatDateDisplay(d.date)}`).join("\n");
     navigator.clipboard.writeText(`📚 ${payload.courseTitle} — Upcoming Deadlines\n\n${text}`);
     setCopied(true); setTimeout(()=>setCopied(false),2000);
   };
+  
   return (
     <AnimatePresence>
       {isOpen && (
@@ -555,17 +563,13 @@ function ScheduleSyncModal({ isOpen, onClose, payload }: { isOpen:boolean; onClo
               <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors p-1"><FaTimes size={14}/></button>
             </div>
             <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-              {upcoming.length===0 ? (
-                <div className="py-8 text-center text-zinc-400 text-sm font-bold">No deadlines set yet.</div>
-              ) : upcoming.map((d,i) => {
+              {upcoming.length===0 ? <div className="py-8 text-center text-zinc-400 text-sm font-bold">No deadlines set yet.</div>
+              : upcoming.map((d,i) => {
                 const overdue = isOverdueDate(d.date);
                 return (
                   <div key={i} className={`flex items-center gap-3 p-3 rounded-xl border ${overdue?"bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/20":"bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800"}`}>
                     <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${safeTypeMeta(d.type).dot}`}/>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-bold text-zinc-800 dark:text-zinc-200 truncate">{d.name||"Untitled"}</p>
-                      <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{d.type}</p>
-                    </div>
+                    <div className="flex-1 min-w-0"><p className="text-xs font-bold text-zinc-800 dark:text-zinc-200 truncate">{d.name||"Untitled"}</p><p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{d.type}</p></div>
                     <span className={`text-[10px] font-mono font-bold shrink-0 ${overdue?"text-red-500":"text-zinc-500 dark:text-zinc-400"}`}>{formatDateDisplay(d.date)}</span>
                   </div>
                 );
@@ -587,16 +591,18 @@ function ScheduleSyncModal({ isOpen, onClose, payload }: { isOpen:boolean; onClo
   );
 }
 
-// ─── Color Picker Popover ─────────────────────────────────────────────────────
+// ─── Color Picker ─────────────────────────────────────────────────────────────
 
-function CourseColorPicker({ value, onChange }: { value?: string; onChange:(c:string)=>void }) {
+function CourseColorPicker({ value, onChange }: { value?:string; onChange:(c:string)=>void }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  
   useEffect(() => {
-    const h = (e:MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    const h = (e:MouseEvent) => { if (ref.current&&!ref.current.contains(e.target as Node)) setOpen(false); };
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
   }, []);
+  
   const cur = getCourseColor(value);
   return (
     <div ref={ref} className="relative">
@@ -619,37 +625,125 @@ function CourseColorPicker({ value, onChange }: { value?: string; onChange:(c:st
   );
 }
 
-// ─── Main Component ───────────────────────────────────────────────────────────
+// ─── Course Card Context Menu ─────────────────────────────────────────────────
 
-export default function UniversityTracker() {
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [tasks, setTasks] = useState<CourseTask[]>([]);
-  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
-  const [isAddingCourse, setIsAddingCourse] = useState(false);
-  const [newCourseTitle, setNewCourseTitle] = useState("");
-  const [modal, setModal] = useState<ModalState>({ isOpen:false, title:"", message:"", confirmText:"Confirm", onConfirm:()=>{} });
-  const [syncModal, setSyncModal] = useState<{isOpen:boolean;payload:ScheduleSyncPayload|null}>({ isOpen:false, payload:null });
+function CourseCardMenu({
+  course, ct, onDelete, onSync, onColorChange,
+}: {
+  course: Course;
+  ct: CourseTask[];
+  onDelete: (e: React.MouseEvent) => void;
+  onSync: (e: React.MouseEvent) => void;
+  onColorChange: (color: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [showColors, setShowColors] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
 
-  // QoL state
-  const [searchQuery, setSearchQuery] = useState("");
-  const [filterStatus, setFilterStatus] = useState<FilterStatus>("ALL");
-  const [sortKey, setSortKey] = useState<SortKey>("none");
-  const [sortAsc, setSortAsc] = useState(true);
-  const [showKbdHints, setShowKbdHints] = useState(false);
-  const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
-  const [bulkMenuOpen, setBulkMenuOpen] = useState(false);
-  const bulkRef = useRef<HTMLDivElement>(null);
-
-  const closeModal = useCallback(() => setModal(m=>({...m,isOpen:false})), []);
-
-  // Close bulk menu on outside click
   useEffect(() => {
-    const h = (e:MouseEvent) => { if (bulkRef.current && !bulkRef.current.contains(e.target as Node)) setBulkMenuOpen(false); };
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) { setOpen(false); setShowColors(false); } };
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
   }, []);
 
-  // Keyboard shortcuts (detail view)
+  return (
+    <div ref={ref} className="relative" onClick={e => e.stopPropagation()}>
+      <button
+        onClick={() => { setOpen(o => !o); setShowColors(false); }}
+        className="w-8 h-8 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 flex items-center justify-center text-zinc-500 dark:text-zinc-400 transition-all active:scale-90 touch-manipulation"
+        title="Options"
+      >
+        <FaEllipsisV size={13} />
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.93, y: -4 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.93, y: -4 }}
+            transition={{ duration: 0.12 }}
+            className="absolute right-0 top-10 z-50 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl overflow-hidden min-w-[160px]"
+          >
+            <div className="p-1.5 space-y-0.5">
+              <button
+                onClick={(e) => { onSync(e); setOpen(false); }}
+                className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-left"
+              >
+                <FaCalendarAlt size={12} className="text-[#06402B] dark:text-emerald-400" />
+                Sync Deadlines
+              </button>
+
+              <button
+                onClick={() => setShowColors(v => !v)}
+                className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-left"
+              >
+                <span className={`w-3 h-3 rounded-full ${getCourseColor(course.color).dot}`} />
+                Change Color
+                <FaChevronDown size={8} className={`ml-auto opacity-40 transition-transform ${showColors ? "rotate-180" : ""}`} />
+              </button>
+
+              <AnimatePresence>
+                {showColors && (
+                  <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                    <div className="flex gap-2 px-3 pb-2 pt-1">
+                      {COURSE_COLORS.map(c => (
+                        <button
+                          key={c.name}
+                          onClick={() => { onColorChange(c.name); setOpen(false); setShowColors(false); }}
+                          className={`w-6 h-6 rounded-full ${c.dot} hover:scale-110 transition-transform ${course.color === c.name ? "ring-2 ring-offset-2 ring-offset-white dark:ring-offset-zinc-900 ring-zinc-400" : ""}`}
+                          title={c.name}
+                        />
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <div className="h-px bg-zinc-100 dark:bg-zinc-800 mx-2 my-1" />
+              <button
+                onClick={(e) => { onDelete(e); setOpen(false); }}
+                className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-black text-red-500 bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 transition-colors text-left border border-red-100 dark:border-red-500/20"
+              >
+                <FaTrash size={12} />
+                Delete Course
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
+
+export default function UniversityTracker({ onSyncToSchedule }: { onSyncToSchedule?: (course: any) => void }) {
+  const [courses, setCourses]               = useState<Course[]>([]);
+  const [tasks, setTasks]                   = useState<CourseTask[]>([]);
+  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
+  const [isAddingCourse, setIsAddingCourse] = useState(false);
+  const [newCourseTitle, setNewCourseTitle] = useState("");
+  const [modal, setModal]                   = useState<ModalState>({ isOpen:false, title:"", message:"", confirmText:"Confirm", onConfirm:()=>{} });
+  const [syncModal, setSyncModal]           = useState<{isOpen:boolean;payload:ScheduleSyncPayload|null}>({ isOpen:false, payload:null });
+
+  const [searchQuery, setSearchQuery]       = useState("");
+  const [filterStatus, setFilterStatus]     = useState<FilterStatus>("ALL");
+  const [sortKey, setSortKey]               = useState<SortKey>("none");
+  const [sortAsc, setSortAsc]               = useState(true);
+  const [showKbdHints, setShowKbdHints]     = useState(false);
+  const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
+  const [bulkMenuOpen, setBulkMenuOpen]     = useState(false);
+  const bulkRef = useRef<HTMLDivElement>(null);
+
+  const closeModal = useCallback(() => setModal(m=>({...m,isOpen:false})), []);
+
+  useEffect(() => {
+    const h = (e:MouseEvent) => { if (bulkRef.current&&!bulkRef.current.contains(e.target as Node)) setBulkMenuOpen(false); };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
+
   useEffect(() => {
     if (!selectedCourseId) return;
     const h = (e: KeyboardEvent) => {
@@ -684,7 +778,6 @@ export default function UniversityTracker() {
     await addDoc(collection(db,"course_tasks"),{ userId:auth.currentUser.uid, courseId, name:"", type:"Assignment", status:"OPEN", deadline:"", grade:"", starred:false, createdAt:serverTimestamp() });
   };
 
-  // Duplicate task
   const duplicateTask = async (task: CourseTask) => {
     if (!auth.currentUser) return;
     await addDoc(collection(db,"course_tasks"),{ userId:auth.currentUser.uid, courseId:task.courseId, name:`${task.name} (copy)`, type:task.type, status:"OPEN", deadline:task.deadline, grade:"", starred:false, createdAt:serverTimestamp() });
@@ -698,7 +791,6 @@ export default function UniversityTracker() {
     await deleteDoc(doc(db,"course_tasks",taskId));
   }, []);
 
-  // Bulk delete selected
   const bulkDeleteSelected = () => {
     if (selectedTaskIds.size===0) return;
     setModal({
@@ -706,18 +798,16 @@ export default function UniversityTracker() {
       message:`Permanently delete ${selectedTaskIds.size} selected task${selectedTaskIds.size>1?"s":""}?`,
       onConfirm: async () => {
         const batch = writeBatch(db);
-        selectedTaskIds.forEach(id => batch.delete(doc(db,"course_tasks",id)));
+        selectedTaskIds.forEach(id=>batch.delete(doc(db,"course_tasks",id)));
         await batch.commit();
-        setSelectedTaskIds(new Set());
-        closeModal();
+        setSelectedTaskIds(new Set()); closeModal();
       }
     });
   };
 
-  // Bulk status update
   const bulkSetStatus = async (status: TaskStatus) => {
     const batch = writeBatch(db);
-    selectedTaskIds.forEach(id => batch.update(doc(db,"course_tasks",id),{ status }));
+    selectedTaskIds.forEach(id=>batch.update(doc(db,"course_tasks",id),{status}));
     await batch.commit();
     setSelectedTaskIds(new Set()); setBulkMenuOpen(false);
   };
@@ -736,57 +826,34 @@ export default function UniversityTracker() {
 
   const handleOpenSync = useCallback((course:Course, courseTasks:CourseTask[], e:React.MouseEvent) => {
     e.stopPropagation();
-    setSyncModal({ isOpen:true, payload:{ courseTitle:course.title, deadlines: courseTasks.filter(t=>t.deadline).sort((a,b)=>a.deadline.localeCompare(b.deadline)).map(t=>({name:t.name,type:t.type,date:t.deadline})) }});
+    setSyncModal({ isOpen:true, payload:{ courseTitle:course.title, deadlines:courseTasks.filter(t=>t.deadline).sort((a,b)=>a.deadline.localeCompare(b.deadline)).map(t=>({name:t.name,type:t.type,date:t.deadline})) }});
   }, []);
 
-  // ── Detail view filtered + sorted tasks ──────────────────────────────────────
-  const activeCourse = courses.find(c => c.id===selectedCourseId);
-  const rawCourseTasks = useMemo(() => tasks.filter(t => t.courseId===selectedCourseId), [tasks, selectedCourseId]);
+  const rawCourseTasks = useMemo(()=>tasks.filter(t=>t.courseId===selectedCourseId),[tasks,selectedCourseId]);
 
-  const displayTasks = useMemo(() => {
+  const displayTasks = useMemo(()=>{
     let out = [...rawCourseTasks];
-    // Search
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      out = out.filter(t => t.name.toLowerCase().includes(q) || t.type.toLowerCase().includes(q));
-    }
-    // Filter
-    if (filterStatus==="STARRED")  out = out.filter(t => t.starred);
-    else if (filterStatus==="OVERDUE") out = out.filter(t => t.status==="OPEN" && isOverdueDate(t.deadline));
-    else if (filterStatus!=="ALL") out = out.filter(t => t.status===filterStatus);
-    // Sort
+    if (searchQuery.trim()) { const q=searchQuery.toLowerCase(); out=out.filter(t=>t.name.toLowerCase().includes(q)||t.type.toLowerCase().includes(q)); }
+    if (filterStatus==="STARRED") out=out.filter(t=>t.starred);
+    else if (filterStatus==="OVERDUE") out=out.filter(t=>t.status==="OPEN"&&isOverdueDate(t.deadline));
+    else if (filterStatus!=="ALL") out=out.filter(t=>t.status===filterStatus);
     if (sortKey!=="none") {
-      out.sort((a,b) => {
-        let av="", bv="";
+      out.sort((a,b)=>{
+        let av="",bv="";
         if (sortKey==="deadline") { av=a.deadline||"9999"; bv=b.deadline||"9999"; }
-        else if (sortKey==="type")   { av=a.type;   bv=b.type; }
+        else if (sortKey==="type")   { av=a.type; bv=b.type; }
         else if (sortKey==="status") { av=a.status; bv=b.status; }
         else if (sortKey==="name")   { av=a.name.toLowerCase(); bv=b.name.toLowerCase(); }
-        return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
+        return sortAsc?av.localeCompare(bv):bv.localeCompare(av);
       });
     }
-    // Starred float to top
-    out.sort((a,b) => (b.starred?1:0)-(a.starred?1:0));
+    out.sort((a,b)=>(b.starred?1:0)-(a.starred?1:0));
     return out;
-  }, [rawCourseTasks, searchQuery, filterStatus, sortKey, sortAsc]);
+  },[rawCourseTasks,searchQuery,filterStatus,sortKey,sortAsc]);
 
-  const toggleSort = (key: SortKey) => {
-    if (sortKey===key) setSortAsc(a=>!a);
-    else { setSortKey(key); setSortAsc(true); }
-  };
-
-  const toggleSelectTask = (id: string) => {
-    setSelectedTaskIds(prev => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-  };
-
-  const selectAll = () => {
-    if (selectedTaskIds.size===displayTasks.length) setSelectedTaskIds(new Set());
-    else setSelectedTaskIds(new Set(displayTasks.map(t=>t.id)));
-  };
+  const toggleSort = (key: SortKey) => { if (sortKey===key) setSortAsc(a=>!a); else { setSortKey(key); setSortAsc(true); } };
+  const toggleSelectTask = (id: string) => { setSelectedTaskIds(prev=>{ const next=new Set(prev); next.has(id)?next.delete(id):next.add(id); return next; }); };
+  const selectAll = () => { if (selectedTaskIds.size===displayTasks.length&&displayTasks.length>0) setSelectedTaskIds(new Set()); else setSelectedTaskIds(new Set(displayTasks.map(t=>t.id))); };
 
   // ── COURSE GRID ──────────────────────────────────────────────────────────────
   if (!selectedCourseId) {
@@ -827,7 +894,7 @@ export default function UniversityTracker() {
           )}
         </AnimatePresence>
 
-        {courses.length===0 && !isAddingCourse && (
+        {courses.length===0&&!isAddingCourse && (
           <motion.div initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} className="py-28 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-[2.5rem] text-center flex flex-col items-center justify-center gap-3 bg-zinc-50/50 dark:bg-[#121214]/50">
             <div className="w-20 h-20 bg-zinc-100 dark:bg-zinc-800/80 rounded-3xl flex items-center justify-center text-zinc-300 dark:text-zinc-600 mb-2"><FaFolderOpen size={30}/></div>
             <span className="font-black text-zinc-400 uppercase tracking-widest text-xs">Workspace is empty</span>
@@ -841,7 +908,7 @@ export default function UniversityTracker() {
             {courses.map(course => {
               const ct = tasks.filter(t=>t.courseId===course.id);
               const done = ct.filter(t=>t.status!=="OPEN").length;
-              const progress = ct.length>0 ? (done/ct.length)*100 : 0;
+              const progress = ct.length>0?(done/ct.length)*100:0;
               const upcoming = ct.filter(t=>t.deadline&&new Date(t.deadline+"T00:00:00")>=new Date()).sort((a,b)=>a.deadline.localeCompare(b.deadline))[0];
               const overdue = ct.filter(t=>t.status==="OPEN"&&isOverdueDate(t.deadline)).length;
               const starred = ct.filter(t=>t.starred).length;
@@ -849,38 +916,44 @@ export default function UniversityTracker() {
               const color = getCourseColor(course.color);
 
               return (
-                <motion.div key={course.id} initial={{opacity:0,y:15}} animate={{opacity:1,y:0}} exit={{opacity:0,scale:0.95}} whileHover={{y:-5}}
+                <motion.div key={course.id} initial={{opacity:0,y:15}} animate={{opacity:1,y:0}} exit={{opacity:0,scale:0.95}} whileHover={{y:-4}}
                   onClick={()=>setSelectedCourseId(course.id)}
-                  className="bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800/80 rounded-[2rem] p-6 cursor-pointer shadow-sm hover:shadow-xl group transition-all relative overflow-hidden"
+                  className="bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800/80 rounded-[2rem] p-6 cursor-pointer shadow-sm hover:shadow-xl group transition-all relative"
                 >
-                  <div className={`absolute -top-12 -right-12 w-36 h-36 ${color.bg} rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500`}/>
+                  <div className="absolute inset-0 rounded-[2rem] overflow-hidden pointer-events-none z-0">
+                    <div className={`absolute -top-12 -right-12 w-36 h-36 ${color.bg} rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500`}/>
+                  </div>
 
-                  <div className="flex justify-between items-start mb-5 relative z-10">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-12 h-12 ${color.bg} ${color.text} rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300`}>
+                  <div className="flex justify-between items-start mb-5 relative z-[100]">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-12 h-12 ${color.bg} ${color.text} rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shrink-0`}>
                         <FaBook size={18}/>
                       </div>
-                      {/* Color picker */}
-                      <div onClick={e=>e.stopPropagation()} className="opacity-0 group-hover:opacity-100 transition-opacity">
-                        <CourseColorPicker value={course.color} onChange={async c => { await updateDoc(doc(db,"courses",course.id),{color:c}); }}/>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
                       {gpaResult && (
                         <div className={`px-2.5 py-1 rounded-xl text-xs font-black tabular-nums border ${gpaResult.gpa>=3.0?`${color.bg} ${color.text} ${color.border}`:gpaResult.gpa>=1.0?"bg-yellow-50 text-yellow-600 dark:text-yellow-400 border-yellow-200 dark:border-yellow-500/30":"bg-red-50 text-red-600 dark:text-red-400 border-red-200 dark:border-red-500/30"}`}>
-                          {gpaResult.gpa.toFixed(1)}
+                          {gpaResult.gpa.toFixed(1)} GPA
                         </div>
                       )}
-                      <button onClick={e=>handleOpenSync(course,ct,e)} className="p-2 text-zinc-300 dark:text-zinc-700 hover:text-[#06402B] dark:hover:text-emerald-400 hover:bg-[#06402B]/10 rounded-xl opacity-0 group-hover:opacity-100 transition-all" title="Sync deadlines"><FaCalendarAlt size={13}/></button>
-                      <button onClick={e=>triggerDeleteCourse(course.id,e)} className="p-2 text-zinc-300 dark:text-zinc-700 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl opacity-0 group-hover:opacity-100 transition-all"><FaTrash size={13}/></button>
+                    </div>
+
+                    <div className="relative z-[100]">
+                      <div className="w-9 h-9 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 flex items-center justify-center text-zinc-500 dark:text-zinc-400 transition-all active:scale-90 touch-manipulation shadow-sm">
+                        <CourseCardMenu
+                          course={course}
+                          ct={ct}
+                          onDelete={e => { e.stopPropagation(); triggerDeleteCourse(course.id, e); }}
+                          onSync={e => { e.stopPropagation(); handleOpenSync(course, ct, e); }}
+                          onColorChange={async (c) => { await updateDoc(doc(db,"courses",course.id),{color:c}); }}
+                        />
+                      </div>
                     </div>
                   </div>
 
                   <div className="relative z-10 mb-4">
                     <h3 className={`text-lg font-black text-zinc-900 dark:text-white leading-tight mb-0.5 truncate group-hover:${color.text} transition-colors`}>{course.title}</h3>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 flex-wrap">
                       <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{ct.length} {ct.length===1?"deliverable":"deliverables"}</p>
-                      {overdue>0 && <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-red-500/10 text-red-500 rounded text-[9px] font-black uppercase tracking-widest"><FaExclamationCircle size={7}/>{overdue} overdue</span>}
+                      {overdue>0 && <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-red-500/10 text-red-500 rounded text-[9px] font-black uppercase tracking-widest"><FaExclamationTriangle size={8} className="-mt-0.5"/>{overdue} overdue</span>}
                       {starred>0 && <span className="inline-flex items-center gap-1 text-amber-400 text-[9px] font-black">⭐{starred}</span>}
                     </div>
                   </div>
@@ -905,6 +978,19 @@ export default function UniversityTracker() {
                       />
                     </div>
                   </div>
+
+                  <div className="relative z-10 mt-4 pt-3 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+                    <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest">
+                      {ct.length} deliverable{ct.length !== 1 ? "s" : ""}
+                    </span>
+                    <button
+                      onClick={e => { e.stopPropagation(); triggerDeleteCourse(course.id, e); }}
+                      className="md:hidden flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest text-red-400 bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-500/20 hover:bg-red-100 active:scale-95 transition-all touch-manipulation"
+                    >
+                      <FaTrash size={9} /> Delete
+                    </button>
+                  </div>
+
                 </motion.div>
               );
             })}
@@ -915,177 +1001,144 @@ export default function UniversityTracker() {
   }
 
   // ── COURSE DETAIL ────────────────────────────────────────────────────────────
+
+  const activeCourse = courses.find(c => c.id === selectedCourseId);
+
   if (!activeCourse) { setSelectedCourseId(null); return null; }
   const color = getCourseColor(activeCourse.color);
 
   return (
-    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-6xl mx-auto space-y-4 relative">
-      <ConfirmModal modal={modal} onClose={closeModal} />
-      <ScheduleSyncModal isOpen={syncModal.isOpen} onClose={() => setSyncModal(s => ({ ...s, isOpen: false }))} payload={syncModal.payload} />
+    <motion.div initial={{opacity:0,y:12}} animate={{opacity:1,y:0}} className="w-full max-w-6xl mx-auto space-y-4 relative">
+      <ConfirmModal modal={modal} onClose={closeModal}/>
+      <ScheduleSyncModal isOpen={syncModal.isOpen} onClose={()=>setSyncModal(s=>({...s,isOpen:false}))} payload={syncModal.payload}/>
 
       {/* Course header */}
       <div className="bg-white/60 dark:bg-[#121214]/80 backdrop-blur-xl p-5 md:p-8 rounded-[2rem] border border-zinc-200 dark:border-zinc-800/80 shadow-sm">
-        
+
         {/* Top action row */}
         <div className="flex items-center justify-between gap-2 mb-5">
           <button
-            onClick={() => setSelectedCourseId(null)}
-            className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 shadow-sm text-[10px] font-bold text-zinc-600 dark:text-zinc-300 uppercase tracking-widest hover:text-[#06402B] dark:hover:text-emerald-400 hover:border-[#06402B]/30 rounded-xl transition-all"
+            onClick={()=>setSelectedCourseId(null)}
+            className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 shadow-sm text-[10px] font-bold text-zinc-600 dark:text-zinc-300 uppercase tracking-widest hover:text-[#06402B] dark:hover:text-emerald-400 hover:border-[#06402B]/30 rounded-xl transition-all touch-manipulation"
           >
-            <FaArrowLeft size={10} /> Back
+            <FaArrowLeft size={10}/> Back
             <span className="opacity-40 font-mono hidden sm:inline">Esc</span>
           </button>
 
           <div className="flex items-center gap-2">
             <button
-              onClick={e => handleOpenSync(activeCourse, rawCourseTasks, e)}
-              className={`p-2.5 ${color.bg} ${color.text} border ${color.border} rounded-xl transition-all flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest`}
+              onClick={e=>handleOpenSync(activeCourse,rawCourseTasks,e)}
+              className={`p-2.5 ${color.bg} ${color.text} border ${color.border} rounded-xl transition-all flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest touch-manipulation`}
             >
-              <FaCalendarAlt size={11} />
+              <FaCalendarAlt size={11}/>
               <span className="hidden sm:inline">Sync</span>
             </button>
             <button
-              onClick={() => setShowKbdHints(v => !v)}
-              className={`p-2.5 border rounded-xl transition-all hidden md:flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest ${showKbdHints ? "bg-zinc-900 text-white border-zinc-700" : "bg-white dark:bg-zinc-900 text-zinc-500 border-zinc-200 dark:border-zinc-700"}`}
+              onClick={()=>setShowKbdHints(v=>!v)}
+              className={`p-2.5 border rounded-xl transition-all hidden md:flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest ${showKbdHints?"bg-zinc-900 text-white border-zinc-700":"bg-white dark:bg-zinc-900 text-zinc-500 border-zinc-200 dark:border-zinc-700"}`}
             >
-              <FaKeyboard size={11} /> Shortcuts
+              <FaKeyboard size={11}/> Shortcuts
             </button>
             <button
-              onClick={() => handleAddTask(activeCourse.id)}
-              className="flex items-center gap-1.5 px-4 py-2.5 bg-[#06402B] dark:bg-emerald-600 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-[#042d1f] dark:hover:bg-emerald-500 active:scale-95 transition-all shadow-md"
+              onClick={()=>handleAddTask(activeCourse.id)}
+              className="flex items-center gap-1.5 px-4 py-2.5 bg-[#06402B] dark:bg-emerald-600 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-[#042d1f] dark:hover:bg-emerald-500 active:scale-95 transition-all shadow-md touch-manipulation"
             >
-              <FaPlus size={11} /> <span className="hidden sm:inline">New</span>
+              <FaPlus size={11}/> <span className="hidden sm:inline">New</span>
             </button>
           </div>
         </div>
 
-        {/* Keyboard hints */}
         <AnimatePresence>
           {showKbdHints && (
-            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden mb-5">
+            <motion.div initial={{height:0,opacity:0}} animate={{height:"auto",opacity:1}} exit={{height:0,opacity:0}} className="overflow-hidden mb-5">
               <div className="p-4 bg-zinc-950 rounded-2xl flex flex-wrap gap-x-6 gap-y-3">
-                <KbdBadge keys={["N"]} label="New task" />
-                <KbdBadge keys={["/"]} label="Search" />
-                <KbdBadge keys={["Esc"]} label="Back" />
-                <KbdBadge keys={["?"]} label="Toggle shortcuts" />
+                <KbdBadge keys={["N"]} label="New task"/>
+                <KbdBadge keys={["/"]} label="Search"/>
+                <KbdBadge keys={["Esc"]} label="Back"/>
+                <KbdBadge keys={["?"]} label="Toggle shortcuts"/>
               </div>
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* Title + stats */}
         <div className="flex flex-col gap-4">
           <div className="flex items-start gap-3">
             <div className={`w-12 h-12 ${color.bg} ${color.text} rounded-2xl flex items-center justify-center shrink-0`}>
-              <FaBook size={18} />
+              <FaBook size={18}/>
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-0.5">
                 <h2 className="text-xl md:text-3xl font-black uppercase tracking-tight text-zinc-900 dark:text-white truncate">{activeCourse.title}</h2>
-                <div onClick={e => e.stopPropagation()}>
-                  <CourseColorPicker value={activeCourse.color} onChange={async c => { await updateDoc(doc(db, "courses", activeCourse.id), { color: c }); }} />
+                <div onClick={e=>e.stopPropagation()}>
+                  <CourseColorPicker value={activeCourse.color} onChange={async c=>{await updateDoc(doc(db,"courses",activeCourse.id),{color:c});}}/>
                 </div>
               </div>
               <p className="text-xs text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5">
-                <FaCheckCircle className={color.text} size={10} /> Track deliverables, deadlines, and grades
+                <FaCheckCircle className={color.text} size={10}/> Track deliverables, deadlines, and grades
               </p>
             </div>
           </div>
-          <StatsBar tasks={rawCourseTasks} />
+          <StatsBar tasks={rawCourseTasks}/>
         </div>
       </div>
 
       {/* Toolbar */}
       <div className="flex flex-col gap-3">
-        {/* Search */}
         <div className="relative">
-          <FaSearch size={11} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" />
-          <input
-            id="task-search"
-            type="text"
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            placeholder="Search tasks…"
+          <FaSearch size={11} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none"/>
+          <input id="task-search" type="text" value={searchQuery} onChange={e=>setSearchQuery(e.target.value)} placeholder="Search tasks…"
             className="w-full pl-9 pr-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl text-sm font-medium text-zinc-900 dark:text-white placeholder:text-zinc-400 outline-none focus:border-[#06402B] dark:focus:border-emerald-500 transition-colors"
           />
-          {searchQuery && (
-            <button onClick={() => setSearchQuery("")} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 transition-colors">
-              <FaTimes size={10} />
-            </button>
-          )}
+          {searchQuery && <button onClick={()=>setSearchQuery("")} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 transition-colors"><FaTimes size={10}/></button>}
         </div>
 
-        {/* Filter + Sort row */}
-        <div className="flex gap-2 items-center overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+        <div className="flex gap-2 items-center overflow-x-auto pb-1" style={{scrollbarWidth:"none"}}>
           <div className="flex gap-1.5 flex-nowrap">
-            {(["ALL", "OPEN", "Submitted", "Graded", "STARRED", "OVERDUE"] as FilterStatus[]).map(f => {
-              const labels: Record<FilterStatus, string> = { ALL: "All", OPEN: "Open", Submitted: "Done", Graded: "Graded", STARRED: "⭐", OVERDUE: "⚠ Late" };
+            {(["ALL","OPEN","Submitted","Graded","STARRED","OVERDUE"] as FilterStatus[]).map(f=>{
+              const labels: Record<FilterStatus,string> = { ALL:"All", OPEN:"Open", Submitted:"Done", Graded:"Graded", STARRED:"⭐", OVERDUE:"⚠ Late" };
               return (
-                <button
-                  key={f}
-                  onClick={() => setFilterStatus(f)}
-                  className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all ${
-                    filterStatus === f
-                      ? `${color.bg} ${color.text} border ${color.border}`
-                      : "bg-white dark:bg-zinc-900 text-zinc-500 border border-zinc-200 dark:border-zinc-800"
-                  }`}
+                <button key={f} onClick={()=>setFilterStatus(f)}
+                  className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all touch-manipulation ${filterStatus===f?`${color.bg} ${color.text} border ${color.border}`:"bg-white dark:bg-zinc-900 text-zinc-500 border border-zinc-200 dark:border-zinc-800"}`}
                 >
                   {labels[f]}
                 </button>
               );
             })}
           </div>
-
-          {/* Sort button */}
           <button
-            onClick={() => {
-              const keys: SortKey[] = ["none", "deadline", "name", "type", "status"];
-              const idx = keys.indexOf(sortKey);
-              setSortKey(keys[(idx + 1) % keys.length]);
-            }}
-            className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${
-              sortKey !== "none"
-                ? `${color.bg} ${color.text} ${color.border}`
-                : "bg-white dark:bg-zinc-900 text-zinc-500 border-zinc-200 dark:border-zinc-800"
-            }`}
+            onClick={()=>{ const keys:SortKey[]=["none","deadline","name","type","status"]; const idx=keys.indexOf(sortKey); setSortKey(keys[(idx+1)%keys.length]); }}
+            className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all touch-manipulation ${sortKey!=="none"?`${color.bg} ${color.text} ${color.border}`:"bg-white dark:bg-zinc-900 text-zinc-500 border-zinc-200 dark:border-zinc-800"}`}
           >
-            <FaSortAmountDown size={9} />
-            {sortKey === "none" ? "Sort" : sortKey}
+            <FaSortAmountDown size={9}/>{sortKey==="none"?"Sort":sortKey}
           </button>
         </div>
 
-        {/* Bulk actions */}
-        {selectedTaskIds.size > 0 && (
+        {selectedTaskIds.size>0 && (
           <div ref={bulkRef} className="relative">
-            <button
-              onClick={() => setBulkMenuOpen(o => !o)}
-              className="flex items-center gap-2 px-4 py-2.5 bg-zinc-900 dark:bg-white text-white dark:text-black rounded-xl font-bold text-xs uppercase tracking-widest w-full justify-center hover:opacity-80 transition-all"
+            <button onClick={()=>setBulkMenuOpen(o=>!o)}
+              className="flex items-center gap-2 px-4 py-2.5 bg-zinc-900 dark:bg-white text-white dark:text-black rounded-xl font-bold text-xs uppercase tracking-widest w-full justify-center hover:opacity-80 transition-all touch-manipulation"
             >
-              <FaEllipsisH size={11} /> {selectedTaskIds.size} selected — tap to act
+              <FaEllipsisH size={11}/> {selectedTaskIds.size} selected — tap to act
             </button>
             <AnimatePresence>
               {bulkMenuOpen && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.97, y: -4 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.97, y: -4 }}
-                  transition={{ duration: 0.12 }}
+                <motion.div initial={{opacity:0,scale:0.97,y:-4}} animate={{opacity:1,scale:1,y:0}} exit={{opacity:0,scale:0.97,y:-4}} transition={{duration:0.12}}
                   className="absolute left-0 right-0 top-full mt-2 z-50 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl overflow-hidden"
                 >
                   <div className="p-1.5 space-y-0.5">
                     <p className="px-3 py-1.5 text-[9px] font-black text-zinc-400 uppercase tracking-widest">Mark as…</p>
-                    {TASK_STATUSES.map(s => (
-                      <button key={s} onClick={() => bulkSetStatus(s)}
+                    {TASK_STATUSES.map(s=>(
+                      <button key={s} onClick={()=>bulkSetStatus(s)}
                         className="w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors flex items-center gap-2"
                       >
-                        <span className={`w-2 h-2 rounded-full ${safeStatusMeta(s).ring.replace("ring-", "bg-")}`} />{s}
+                        <span className={`w-2 h-2 rounded-full ${safeStatusMeta(s).ring.replace("ring-","bg-")}`}/>{s}
                       </button>
                     ))}
-                    <div className="h-px bg-zinc-100 dark:bg-zinc-800 mx-2 my-1" />
+                    <div className="h-px bg-zinc-100 dark:bg-zinc-800 mx-2 my-1"/>
                     <button onClick={bulkDeleteSelected} className="w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors flex items-center gap-2">
-                      <FaTrash size={10} /> Delete selected
+                      <FaTrash size={10}/> Delete selected
                     </button>
-                    <button onClick={() => { setSelectedTaskIds(new Set()); setBulkMenuOpen(false); }}
+                    <button onClick={()=>{setSelectedTaskIds(new Set());setBulkMenuOpen(false);}}
                       className="w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
                     >
                       Deselect all
@@ -1097,122 +1150,64 @@ export default function UniversityTracker() {
           </div>
         )}
       </div>
+      
 
-      {/* ── MOBILE CARD VIEW (< md) ── */}
+      {/* ── MOBILE CARD VIEW ── */}
       <div className="md:hidden space-y-3">
-        {displayTasks.length === 0 ? (
+        {displayTasks.length===0 ? (
           <div className="py-20 text-center flex flex-col items-center gap-3">
-            <div className="w-14 h-14 bg-zinc-50 dark:bg-zinc-900 rounded-2xl flex items-center justify-center text-zinc-300 dark:text-zinc-700">
-              <FaClipboardList size={22} />
-            </div>
-            <span className="text-sm font-bold text-zinc-400 uppercase tracking-widest">
-              {searchQuery || filterStatus !== "ALL" ? "No matching tasks" : "No deliverables yet"}
-            </span>
-            <button
-              onClick={() => handleAddTask(activeCourse.id)}
-              className="px-6 py-3 bg-[#06402B] dark:bg-emerald-600 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-[#042d1f] transition-all shadow-md"
-            >
-              <FaPlus size={11} className="inline mr-2" /> Add First Task
+            <div className="w-14 h-14 bg-zinc-50 dark:bg-zinc-900 rounded-2xl flex items-center justify-center text-zinc-300 dark:text-zinc-700"><FaClipboardList size={22}/></div>
+            <span className="text-sm font-bold text-zinc-400 uppercase tracking-widest">{searchQuery||filterStatus!=="ALL"?"No matching tasks":"No deliverables yet"}</span>
+            <button onClick={()=>handleAddTask(activeCourse.id)} className="px-6 py-3 bg-[#06402B] dark:bg-emerald-600 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-[#042d1f] transition-all shadow-md touch-manipulation">
+              <FaPlus size={11} className="inline mr-2"/> Add First Task
             </button>
           </div>
         ) : (
           <AnimatePresence>
-            {displayTasks.map(task => {
+            {displayTasks.map(task=>{
               const isSelected = selectedTaskIds.has(task.id);
-              const typeMeta = safeTypeMeta(task.type);
+              const typeMeta   = safeTypeMeta(task.type);
               const statusMeta = safeStatusMeta(task.status);
               return (
-                <motion.div
-                  key={task.id}
-                  initial={{ opacity: 0, y: -8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className={`bg-white dark:bg-[#18181b] rounded-2xl border transition-all ${
-                    isSelected
-                      ? "border-[#06402B] dark:border-emerald-500 bg-[#06402B]/5 dark:bg-emerald-500/5"
-                      : task.starred
-                      ? "border-amber-200 dark:border-amber-500/30 bg-amber-50/30 dark:bg-amber-500/5"
-                      : "border-zinc-200 dark:border-zinc-800"
-                  }`}
+                <motion.div key={task.id} initial={{opacity:0,y:-8}} animate={{opacity:1,y:0}} exit={{opacity:0,height:0}}
+                  className={`bg-white dark:bg-[#18181b] rounded-2xl border transition-all ${isSelected?"border-[#06402B] dark:border-emerald-500 bg-[#06402B]/5 dark:bg-emerald-500/5":task.starred?"border-amber-200 dark:border-amber-500/30 bg-amber-50/30 dark:bg-amber-500/5":"border-zinc-200 dark:border-zinc-800"}`}
                 >
-                  {/* Card top row */}
                   <div className="flex items-start gap-3 p-4 pb-3">
-                    {/* Checkbox + star */}
                     <div className="flex flex-col items-center gap-2 pt-0.5 shrink-0">
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => toggleSelectTask(task.id)}
-                        className="w-4 h-4 accent-[#06402B] cursor-pointer"
-                      />
-                      <button
-                        onClick={() => updateTask(task.id, "starred", !task.starred)}
-                        className={`transition-all ${task.starred ? "text-amber-400" : "text-zinc-300 dark:text-zinc-700"}`}
-                      >
-                        <FaStar size={13} />
+                      <input type="checkbox" checked={isSelected} onChange={()=>toggleSelectTask(task.id)} className="w-4 h-4 accent-[#06402B] cursor-pointer"/>
+                      <button onClick={()=>updateTask(task.id,"starred",!task.starred)} className={`transition-all touch-manipulation ${task.starred?"text-amber-400":"text-zinc-300 dark:text-zinc-700"}`}>
+                        <FaStar size={13}/>
                       </button>
                     </div>
-
-                    {/* Name + badges */}
                     <div className="flex-1 min-w-0">
-                      <InlineEdit
-                        value={task.name}
-                        onSave={v => updateTask(task.id, "name", v)}
-                        placeholder="Untitled deliverable…"
-                      />
+                      <InlineEdit value={task.name} onSave={v=>updateTask(task.id,"name",v)} placeholder="Untitled deliverable…"/>
                       <div className="flex items-center gap-2 mt-2 flex-wrap px-2.5">
-                        <span className={`px-2 py-0.5 rounded-lg border text-[9px] font-bold uppercase tracking-wider ${typeMeta.color}`}>
-                          {task.type}
-                        </span>
-                        <UrgencyBadge deadline={task.deadline} status={task.status} />
+                        <span className={`px-2 py-0.5 rounded-lg border text-[9px] font-bold uppercase tracking-wider ${typeMeta.color}`}>{task.type}</span>
+                        <UrgencyBadge deadline={task.deadline} status={task.status}/>
                       </div>
                     </div>
-
-                    {/* Actions */}
                     <div className="flex items-center gap-1 shrink-0">
-                      <button
-                        onClick={() => duplicateTask(task)}
-                        className="p-2 text-zinc-300 dark:text-zinc-700 hover:text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-all active:scale-90"
-                      >
-                        <FaCopy size={11} />
-                      </button>
-                      <button
-                        onClick={() => deleteTask(task.id)}
-                        className="p-2 text-zinc-300 dark:text-zinc-700 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-all active:scale-90"
-                      >
-                        <FaTrash size={11} />
-                      </button>
+                      <button onClick={()=>duplicateTask(task)} className="p-2 text-zinc-300 dark:text-zinc-700 hover:text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-all active:scale-90 touch-manipulation"><FaCopy size={11}/></button>
+                      <button onClick={()=>deleteTask(task.id)} className="p-2 text-zinc-300 dark:text-zinc-700 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-all active:scale-90 touch-manipulation"><FaTrash size={11}/></button>
                     </div>
                   </div>
-
-                  {/* Card bottom row — status + deadline + grade */}
                   <div className="grid grid-cols-3 gap-2 px-4 pb-4 pt-1 border-t border-zinc-50 dark:border-zinc-800">
-                    {/* Status */}
                     <div>
                       <p className="text-[8px] font-black text-zinc-400 uppercase tracking-widest mb-1.5 px-1">Status</p>
                       <div className={`flex items-center px-2.5 py-2 rounded-xl border text-[9px] font-bold uppercase tracking-wider ${statusMeta.color}`}>
-                        <Dropdown<TaskStatus>
-                          value={safeStatus(task.status)}
-                          options={TASK_STATUSES}
-                          onChange={v => updateTask(task.id, "status", v)}
-                          renderValue={v => <span className="truncate text-[9px]">{v}</span>}
-                          renderOption={v => (
-                            <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border ${safeStatusMeta(v).color}`}>{v}</span>
-                          )}
+                        <Dropdown<TaskStatus> value={safeStatus(task.status)} options={TASK_STATUSES} onChange={v=>updateTask(task.id,"status",v)}
+                          renderValue={v=><span className="truncate text-[9px]">{v}</span>}
+                          renderOption={v=><span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border ${safeStatusMeta(v).color}`}>{v}</span>}
                         />
                       </div>
                     </div>
-
-                    {/* Deadline */}
                     <div>
                       <p className="text-[8px] font-black text-zinc-400 uppercase tracking-widest mb-1.5 px-1">Due</p>
-                      <DateInput value={task.deadline} onChange={v => updateTask(task.id, "deadline", v)} />
+                      <DateInput value={task.deadline} onChange={v=>updateTask(task.id,"deadline",v)}/>
                     </div>
-
-                    {/* Grade */}
                     <div>
                       <p className="text-[8px] font-black text-zinc-400 uppercase tracking-widest mb-1.5 px-1">Grade</p>
-                      <GradeEdit value={task.grade} onSave={v => updateTask(task.id, "grade", v)} />
+                      <GradeEdit value={task.grade} onSave={v=>updateTask(task.id,"grade",v)}/>
                     </div>
                   </div>
                 </motion.div>
@@ -1220,120 +1215,81 @@ export default function UniversityTracker() {
             })}
           </AnimatePresence>
         )}
-
-        {/* Mobile add button */}
-        {displayTasks.length > 0 && (
-          <button
-            onClick={() => handleAddTask(activeCourse.id)}
-            className="w-full py-4 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl text-zinc-400 font-bold uppercase tracking-widest text-xs hover:border-[#06402B] dark:hover:border-emerald-500 hover:text-[#06402B] dark:hover:text-emerald-400 flex items-center justify-center gap-2 transition-all active:scale-95"
+        {displayTasks.length>0 && (
+          <button onClick={()=>handleAddTask(activeCourse.id)}
+            className="w-full py-4 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl text-zinc-400 font-bold uppercase tracking-widest text-xs hover:border-[#06402B] dark:hover:border-emerald-500 hover:text-[#06402B] dark:hover:text-emerald-400 flex items-center justify-center gap-2 transition-all active:scale-95 touch-manipulation"
           >
-            <FaPlus size={10} /> New Deliverable
+            <FaPlus size={10}/> New Deliverable
           </button>
         )}
       </div>
 
-      {/* ── DESKTOP TABLE VIEW (≥ md) ── */}
-      <div className="hidden md:block w-full overflow-x-auto pb-4">
-        <div className="min-w-[1020px] w-full bg-white dark:bg-[#18181b] rounded-[2rem] border border-zinc-200 dark:border-zinc-800 shadow-lg">
-
-          {/* Column headers */}
+      {/* ── DESKTOP TABLE VIEW ── */}
+      <div className="hidden md:block w-full overflow-visible pb-32">
+        <div className="min-w-[1020px] w-full bg-white dark:bg-[#18181b] rounded-[2rem] border border-zinc-200 dark:border-zinc-800 shadow-lg relative z-10">
           <div className="grid grid-cols-[28px_24px_2fr_1.4fr_1.2fr_1.4fr_0.7fr_0.5fr_0.4fr] gap-2 px-5 py-3.5 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/80 dark:bg-[#111113] rounded-t-[2rem] text-[10px] font-black uppercase tracking-widest text-zinc-400 select-none">
             <div className="flex items-center">
-              <input
-                type="checkbox"
-                checked={selectedTaskIds.size === displayTasks.length && displayTasks.length > 0}
-                onChange={selectAll}
-                className="w-3.5 h-3.5 accent-[#06402B] cursor-pointer"
-              />
+              <input type="checkbox" checked={selectedTaskIds.size===displayTasks.length&&displayTasks.length>0} onChange={selectAll} className="w-3.5 h-3.5 accent-[#06402B] cursor-pointer"/>
             </div>
-            <div />
-            {([["name", "Deliverable"], ["type", "Type"], ["status", "Status"], ["deadline", "Deadline"]] as [SortKey, string][]).map(([key, label]) => (
-              <button key={key} onClick={() => toggleSort(key)} className="flex items-center gap-1 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors group text-left">
+            <div/>
+            {([["name","Deliverable"],["type","Type"],["status","Status"],["deadline","Deadline"]] as [SortKey,string][]).map(([key,label])=>(
+              <button key={key} onClick={()=>toggleSort(key)} className="flex items-center gap-1 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors group text-left">
                 {label}
-                <span className={`transition-all ${sortKey === key ? "opacity-100 text-[#06402B] dark:text-emerald-400" : "opacity-0 group-hover:opacity-40"}`}>
-                  {sortKey === key && !sortAsc ? <FaChevronUp size={7} /> : <FaChevronDown size={7} />}
+                <span className={`transition-all ${sortKey===key?"opacity-100 text-[#06402B] dark:text-emerald-400":"opacity-0 group-hover:opacity-40"}`}>
+                  {sortKey===key&&!sortAsc?<FaChevronUp size={7}/>:<FaChevronDown size={7}/>}
                 </span>
               </button>
             ))}
             <div className="text-center">Grade</div>
-            <div />
-            <div />
+            <div/><div/>
           </div>
 
-          {/* Rows */}
           <div className="divide-y divide-zinc-50 dark:divide-zinc-800/40">
-            {displayTasks.length === 0 && (
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-16 text-center flex flex-col items-center">
-                <div className="w-14 h-14 bg-zinc-50 dark:bg-zinc-900 rounded-2xl flex items-center justify-center text-zinc-300 dark:text-zinc-700 mb-4">
-                  <FaClipboardList size={22} />
-                </div>
-                <span className="text-sm font-bold text-zinc-400 uppercase tracking-widest">
-                  {searchQuery || filterStatus !== "ALL" ? "No matching tasks" : "No deliverables yet"}
-                </span>
+            {displayTasks.length===0 && (
+              <motion.div initial={{opacity:0}} animate={{opacity:1}} className="p-16 text-center flex flex-col items-center">
+                <div className="w-14 h-14 bg-zinc-50 dark:bg-zinc-900 rounded-2xl flex items-center justify-center text-zinc-300 dark:text-zinc-700 mb-4"><FaClipboardList size={22}/></div>
+                <span className="text-sm font-bold text-zinc-400 uppercase tracking-widest">{searchQuery||filterStatus!=="ALL"?"No matching tasks":"No deliverables yet"}</span>
               </motion.div>
             )}
-
             <AnimatePresence>
-              {displayTasks.map(task => {
+              {displayTasks.map(task=>{
                 const isSelected = selectedTaskIds.has(task.id);
                 return (
-                  <motion.div
-                    key={task.id}
-                    initial={{ opacity: 0, y: -8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className={`grid grid-cols-[28px_24px_2fr_1.4fr_1.2fr_1.4fr_0.7fr_0.5fr_0.4fr] gap-2 px-5 py-2.5 items-center transition-colors group border-l-[3px] ${
-                      isSelected
-                        ? "bg-[#06402B]/5 dark:bg-emerald-500/5 border-l-[#06402B] dark:border-l-emerald-500"
-                        : "hover:bg-zinc-50/60 dark:hover:bg-white/[0.03] border-l-transparent hover:border-l-[#06402B] dark:hover:border-l-emerald-500"
-                    } ${task.starred ? "bg-amber-50/30 dark:bg-amber-500/5" : ""}`}
+                  <motion.div key={task.id} initial={{opacity:0,y:-8}} animate={{opacity:1,y:0}} exit={{opacity:0,height:0}}
+                    className={`grid grid-cols-[28px_24px_2fr_1.4fr_1.2fr_1.4fr_0.7fr_0.5fr_0.4fr] gap-2 px-5 py-2.5 items-center transition-colors group border-l-[3px] ${isSelected?"bg-[#06402B]/5 dark:bg-emerald-500/5 border-l-[#06402B] dark:border-l-emerald-500":"hover:bg-zinc-50/60 dark:hover:bg-white/[0.03] border-l-transparent hover:border-l-[#06402B] dark:hover:border-l-emerald-500"} ${task.starred?"bg-amber-50/30 dark:bg-amber-500/5":""}`}
                   >
-                    <div className="flex items-center">
-                      <input type="checkbox" checked={isSelected} onChange={() => toggleSelectTask(task.id)} className="w-3.5 h-3.5 accent-[#06402B] cursor-pointer" />
-                    </div>
-                    <button onClick={() => updateTask(task.id, "starred", !task.starred)} className={`flex items-center justify-center transition-all ${task.starred ? "text-amber-400" : "text-zinc-200 dark:text-zinc-700 hover:text-amber-400"}`}>
-                      <FaStar size={12} />
-                    </button>
+                    <div className="flex items-center"><input type="checkbox" checked={isSelected} onChange={()=>toggleSelectTask(task.id)} className="w-3.5 h-3.5 accent-[#06402B] cursor-pointer"/></div>
+                    <button onClick={()=>updateTask(task.id,"starred",!task.starred)} className={`flex items-center justify-center transition-all ${task.starred?"text-amber-400":"text-zinc-200 dark:text-zinc-700 hover:text-amber-400"}`}><FaStar size={12}/></button>
                     <div className="flex items-center gap-2 min-w-0">
-                      <div className="flex-1 min-w-0">
-                        <InlineEdit value={task.name} onSave={v => updateTask(task.id, "name", v)} placeholder="Untitled deliverable…" />
-                      </div>
-                      <UrgencyBadge deadline={task.deadline} status={task.status} />
+                      <div className="flex-1 min-w-0"><InlineEdit value={task.name} onSave={(v: any)=>updateTask(task.id,"name",v)} placeholder="Untitled deliverable…"/></div>
+                      <UrgencyBadge deadline={task.deadline} status={task.status}/>
                     </div>
-                    <TypePicker value={safeType(task.type)} onChange={v => updateTask(task.id, "type", v)} />
+                    <TypePicker value={safeType(task.type)} onChange={(v: any)=>updateTask(task.id,"type",v)}/>
                     <div className={`flex items-center px-2.5 py-1.5 rounded-xl border text-[10px] font-bold uppercase tracking-wider ${safeStatusMeta(task.status).color}`}>
-                      <Dropdown<TaskStatus>
-                        value={safeStatus(task.status)} options={TASK_STATUSES}
-                        onChange={v => updateTask(task.id, "status", v)}
-                        renderValue={v => <span className="truncate">{v}</span>}
-                        renderOption={v => <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border ${safeStatusMeta(v).color}`}>{v}</span>}
+                      <Dropdown<TaskStatus> value={safeStatus(task.status)} options={TASK_STATUSES} onChange={(v: any)=>updateTask(task.id,"status",v)}
+                        renderValue={v=><span className="truncate">{v}</span>}
+                        renderOption={v=><span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border ${safeStatusMeta(v).color}`}>{v}</span>}
                       />
                     </div>
-                    <DateInput value={task.deadline} onChange={v => updateTask(task.id, "deadline", v)} />
-                    <GradeEdit value={task.grade} onSave={v => updateTask(task.id, "grade", v)} />
-                    <button onClick={() => duplicateTask(task)} className="flex items-center justify-center p-1.5 text-zinc-300 dark:text-zinc-700 hover:text-zinc-500 dark:hover:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 opacity-0 group-hover:opacity-100 transition-all rounded-lg active:scale-90">
-                      <FaCopy size={11} />
-                    </button>
-                    <button onClick={() => deleteTask(task.id)} className="flex items-center justify-center p-1.5 text-zinc-300 dark:text-zinc-700 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all rounded-lg active:scale-90">
-                      <FaTrash size={11} />
-                    </button>
+                    <DateInput value={task.deadline} onChange={(v: any)=>updateTask(task.id,"deadline",v)}/>
+                    <GradeEdit value={task.grade} onSave={(v: any)=>updateTask(task.id,"grade",v)}/>
+                    <button onClick={()=>duplicateTask(task)} className="flex items-center justify-center p-1.5 text-zinc-300 dark:text-zinc-700 hover:text-zinc-500 dark:hover:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 opacity-0 group-hover:opacity-100 transition-all rounded-lg active:scale-90"><FaCopy size={11}/></button>
+                    <button onClick={()=>deleteTask(task.id)} className="flex items-center justify-center p-1.5 text-zinc-300 dark:text-zinc-700 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all rounded-lg active:scale-90"><FaTrash size={11}/></button>
                   </motion.div>
                 );
               })}
             </AnimatePresence>
           </div>
 
-          {/* Footer */}
           <div className="px-4 py-3 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-[#111113] rounded-b-[2rem] flex items-center justify-between">
             <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest tabular-nums">
-              {displayTasks.length} of {rawCourseTasks.length} task{rawCourseTasks.length !== 1 ? "s" : ""}
-              {(searchQuery || filterStatus !== "ALL") && " (filtered)"}
+              {displayTasks.length} of {rawCourseTasks.length} task{rawCourseTasks.length!==1?"s":""}
+              {(searchQuery||filterStatus!=="ALL")&&" (filtered)"}
             </p>
-            <button
-              onClick={() => handleAddTask(activeCourse.id)}
+            <button onClick={()=>handleAddTask(activeCourse.id)}
               className="flex items-center gap-2 px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-zinc-400 hover:text-[#06402B] dark:hover:text-emerald-400 hover:bg-white dark:hover:bg-zinc-900 rounded-xl transition-all border border-transparent hover:border-zinc-200 dark:hover:border-zinc-800 shadow-sm hover:shadow-md"
             >
-              <FaPlus size={11} /> New Deliverable <span className="opacity-40 font-mono ml-1">N</span>
+              <FaPlus size={11}/> New Deliverable <span className="opacity-40 font-mono ml-1">N</span>
             </button>
           </div>
         </div>
