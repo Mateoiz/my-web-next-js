@@ -22,6 +22,7 @@ import { auth, db, storage } from "@/lib/db";
 
 import FloatingCubes from "../components/FloatingCubes"; 
 import CommandCenter from "../components/Layout/CommandCenter";
+import ErrorBoundary from "../components/ErrorBoundary";
 
 // --- SAFE DYNAMIC IMPORTS ---
 const DashboardScheduleMaker = dynamic(() => import('../components/Tools/DashboardScheduleMaker'), { ssr: false });
@@ -107,6 +108,8 @@ const useCourseAverages = (courses: any[], tasks: any[]) => {
 function DashboardInner() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const { showAlert, showConfirm } = useModal();  // ← ADD THIS
+  const [isOnline, setIsOnline] = useState(true);
+
 
   const [activeView, setActiveView] = useState('dashboard');
   const [academicTab, setAcademicTab] = useState<'schedule' | 'grades'>('schedule');
@@ -137,7 +140,20 @@ function DashboardInner() {
 
   const router = useRouter();
   const confirmSignOut = () => showConfirm("Log Out", "Are you sure you want to log out?", () => signOut(auth), "Log Out", false);
-
+  useEffect(() => {
+  const handleOnline = () => setIsOnline(true);
+  const handleOffline = () => setIsOnline(false);
+  window.addEventListener('online', handleOnline);
+  window.addEventListener('offline', handleOffline);
+  return () => {
+    window.removeEventListener('online', handleOnline);
+    window.removeEventListener('offline', handleOffline);
+  };
+}, []);
+  useEffect(() => {
+  const timer = setInterval(() => setCurrentTime(new Date()), 60000);
+  return () => clearInterval(timer);
+}, []);
   const getGreeting = () => {
     const hour = currentTime.getHours();  
     if (hour < 12) return "Good morning";
@@ -184,35 +200,71 @@ const quotes = [
 
   // --- PRESENCE SYSTEM ---
   useEffect(() => {
-    if (!authUser) return;
-    const userRef = doc(db, "users", authUser.uid);
-    let offlineTimeout: NodeJS.Timeout;
+  if (!authUser) return;
 
-    const goOnline = () => {
-      clearTimeout(offlineTimeout); 
-      updateDoc(userRef, { isOnline: true }).catch(() => {});
-    };
-    const goOffline = () => updateDoc(userRef, { isOnline: false }).catch(() => {});
+  const userRef = doc(db, "users", authUser.uid);
+  let offlineTimeout: NodeJS.Timeout;
+  let onlineDebounce: NodeJS.Timeout;
 
-    goOnline();
+  const goOnline = () => {
+    clearTimeout(onlineDebounce);
+    onlineDebounce = setTimeout(async () => {
+      try {
+        await updateDoc(userRef, { isOnline: true, lastSeen: serverTimestamp() });
+      } catch (err) {
+        console.error("Presence online failed:", err);
+      }
+    }, 500); // ← debounce rapid tab switches by 500ms
+  };
 
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') goOnline();
-      else offlineTimeout = setTimeout(() => goOffline(), 60000); 
-    };
+  const goOffline = () => {
+    clearTimeout(onlineDebounce); // cancel any pending online write
+    try {
+      updateDoc(userRef, { isOnline: false, lastSeen: serverTimestamp() });
+    } catch (err) {
+      console.error("Presence offline failed:", err);
+    }
+  };
 
-    const handlePageHide = () => goOffline();
+  const handleVisibility = () => {
+    clearTimeout(offlineTimeout);
+    if (document.visibilityState === 'visible') {
+      goOnline();
+    } else {
+      // Wait 60s before marking offline — handles quick tab switches
+      offlineTimeout = setTimeout(() => goOffline(), 60000);
+    }
+  };
 
-    document.addEventListener('visibilitychange', handleVisibility);
-    window.addEventListener('pagehide', handlePageHide);
+  const handlePageHide = () => {
+    clearTimeout(onlineDebounce);
+    clearTimeout(offlineTimeout);
+    goOffline();
+  };
 
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibility);
-      window.removeEventListener('pagehide', handlePageHide);
-      clearTimeout(offlineTimeout);
-      goOffline(); 
-    };
-  }, [authUser]);
+  const handleFocus = () => goOnline();
+  const handleBlur = () => {
+    offlineTimeout = setTimeout(() => goOffline(), 60000);
+  };
+
+  // Set online immediately on mount
+  goOnline();
+
+  document.addEventListener('visibilitychange', handleVisibility);
+  window.addEventListener('pagehide', handlePageHide);
+  window.addEventListener('focus', handleFocus);
+  window.addEventListener('blur', handleBlur);
+
+  return () => {
+    document.removeEventListener('visibilitychange', handleVisibility);
+    window.removeEventListener('pagehide', handlePageHide);
+    window.removeEventListener('focus', handleFocus);
+    window.removeEventListener('blur', handleBlur);
+    clearTimeout(offlineTimeout);
+    clearTimeout(onlineDebounce);
+    goOffline();
+  };
+}, [authUser]);
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
@@ -363,25 +415,93 @@ const quotes = [
         <div className="absolute inset-0 opacity-30 sm:opacity-60"><FloatingCubes /></div>
         <div className="absolute top-[10%] left-[20%] w-[300px] md:w-[500px] h-[300px] md:h-[500px] bg-[#06402B]/10 dark:bg-emerald-500/5 rounded-full blur-[100px] md:blur-[150px]" />
       </div>
+<aside className="hidden md:flex w-[84px] bg-white/50 dark:bg-[#09090b]/80 backdrop-blur-2xl border-r border-zinc-200 dark:border-zinc-800/80 shrink-0 flex-col items-center py-6 z-20 relative">
+  
+  {/* Logo */}
+  <div
+    className="relative w-12 h-12 mb-8 cursor-pointer flex items-center justify-center group"
+    onClick={() => setActiveView('dashboard')}
+  >
+    <div className="absolute inset-0 bg-[#06402B]/20 dark:bg-emerald-500/20 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+    <div className="relative w-full h-full bg-white dark:bg-[#121214] rounded-xl border border-zinc-200 dark:border-zinc-800/80 flex items-center justify-center p-1 shadow-lg transition-all duration-200 group-hover:scale-105 active:scale-90">
+      <Image src="/affiliates/dlsau.png" alt="DLSAU" fill sizes="48px" className="object-contain p-1.5" priority />
+    </div>
+    {/* Tooltip */}
+    <div className="absolute left-full ml-3 px-3 py-1.5 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-[10px] font-black uppercase tracking-widest rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none translate-x-1 group-hover:translate-x-0 shadow-xl">
+      Home
+      <div className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-zinc-900 dark:border-r-zinc-100" />
+    </div>
+  </div>
 
-      <aside className="hidden md:flex w-[84px] bg-white/50 dark:bg-[#09090b]/80 backdrop-blur-2xl border-r border-zinc-200 dark:border-zinc-800/80 shrink-0 flex-col items-center py-6 z-20 relative">
-        <div className="relative w-12 h-12 mb-8 cursor-pointer flex items-center justify-center" onClick={() => setActiveView('dashboard')}>
-          <div className="absolute inset-0 bg-[#06402B]/20 dark:bg-emerald-500/20 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-opacity" />
-          <div className="relative w-full h-full bg-white dark:bg-[#121214] rounded-xl border border-zinc-200 dark:border-zinc-800/80 flex items-center justify-center p-1 shadow-lg transition-transform active:scale-90">
-            <Image src="/affiliates/dlsau.png" alt="DLSAU" fill sizes="48px" className="object-contain p-1.5" priority />
+  {/* Nav Items */}
+  <nav className="flex-1 w-full flex flex-col items-center gap-1">
+    {NAV_ITEMS.map((item) => {
+      const isActive = activeView === item.id;
+      return (
+        <button
+          key={item.id}
+          onClick={() => setActiveView(item.id)}
+          className={`w-full flex flex-col items-center gap-1.5 py-3 px-2 transition-all relative group rounded-xl mx-2
+            ${isActive
+              ? 'text-[#06402B] dark:text-emerald-400'
+              : 'text-zinc-400 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800/50'
+            }`}
+          style={{ width: 'calc(100% - 16px)' }}
+        >
+          {/* Active indicator */}
+          {isActive && (
+            <motion.div
+              layoutId="navInd"
+              className="absolute left-0 top-1/4 bottom-1/4 w-1 bg-[#06402B] dark:bg-emerald-500 rounded-r-full shadow-[0_0_10px_rgba(6,64,43,0.8)] dark:shadow-[0_0_10px_rgba(16,185,129,0.5)]"
+            />
+          )}
+
+          {/* Active background pill */}
+          {isActive && (
+            <motion.div
+              layoutId="navBg"
+              className="absolute inset-0 bg-[#06402B]/8 dark:bg-emerald-500/10 rounded-xl"
+              transition={{ type: "spring", stiffness: 400, damping: 35 }}
+            />
+          )}
+
+          <span className={`relative z-10 transition-all duration-200 ${isActive ? 'scale-110' : 'group-hover:scale-110'}`}>
+            {item.icon}
+          </span>
+          <span className="relative z-10 text-[9px] font-mono tracking-widest uppercase">
+            {item.label}
+          </span>
+
+          {/* Tooltip */}
+          <div className="absolute left-full ml-4 px-3 py-1.5 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-[10px] font-black uppercase tracking-widest rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none translate-x-1 group-hover:translate-x-0 shadow-xl z-50">
+            {item.label}
+            <div className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-zinc-900 dark:border-r-zinc-100" />
           </div>
-        </div>
-        <nav className="flex-1 w-full flex flex-col gap-4">
-          {NAV_ITEMS.map((item) => (
-            <button key={item.id} onClick={() => setActiveView(item.id)} className={`w-full flex flex-col items-center gap-1.5 py-3 transition-all relative group ${activeView === item.id ? 'text-[#06402B] dark:text-emerald-400' : 'text-zinc-400 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}>
-              {activeView === item.id && <motion.div layoutId="navInd" className="absolute left-0 top-1/4 bottom-1/4 w-1 bg-[#06402B] dark:bg-emerald-500 rounded-r-full shadow-[0_0_10px_rgba(6,64,43,0.8)] dark:shadow-[0_0_10px_rgba(16,185,129,0.5)]" />}
-              <span className="relative group-hover:scale-110 transition-transform">{item.icon}</span>
-              <span className="text-[9px] font-mono tracking-widest uppercase">{item.label}</span>
-            </button>
-          ))}
-        </nav>
-        <button onClick={confirmSignOut} className="w-full flex flex-col items-center gap-1.5 py-3 text-zinc-500 dark:text-zinc-600 hover:text-red-500 dark:hover:text-red-400 transition-colors group"><FaSignOutAlt size={22} className="group-hover:scale-110 transition-transform" /></button>
-      </aside>
+        </button>
+      );
+    })}
+  </nav>
+
+  {/* Divider */}
+  <div className="w-8 h-px bg-zinc-200 dark:bg-zinc-800 mb-3" />
+
+  {/* Sign Out */}
+  <div className="relative group w-full flex justify-center">
+    <button
+      onClick={confirmSignOut}
+      className="flex flex-col items-center gap-1.5 py-3 px-2 text-zinc-400 dark:text-zinc-600 hover:text-red-500 dark:hover:text-red-400 transition-all rounded-xl hover:bg-red-500/5 w-[calc(100%-16px)] group"
+    >
+      <FaSignOutAlt size={20} className="transition-transform duration-200 group-hover:scale-110" />
+      <span className="text-[9px] font-mono tracking-widest uppercase">Exit</span>
+    </button>
+    {/* Tooltip */}
+    <div className="absolute left-full ml-4 px-3 py-1.5 bg-red-600 text-white text-[10px] font-black uppercase tracking-widest rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none translate-x-1 group-hover:translate-x-0 shadow-xl z-50">
+      Sign Out
+      <div className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-red-600" />
+    </div>
+  </div>
+
+</aside>
 
       <main className="flex-1 flex flex-col overflow-hidden relative z-10 w-full">
         <header className="h-16 md:h-20 bg-white/30 dark:bg-[#09090b]/60 backdrop-blur-md border-b border-zinc-200 dark:border-zinc-800/80 flex items-center justify-between px-4 md:px-8 shrink-0 relative z-20">
@@ -413,7 +533,7 @@ const quotes = [
           </div>
         </header>
 
-        <div className="flex-1 overflow-x-hidden overflow-y-auto p-4 sm:p-6 md:p-8 pb-28 md:pb-8 custom-scrollbar relative z-10 w-full">
+        <div className="flex-1 overflow-x-clip overflow-y-auto  p-4 sm:p-6 md:p-8 pb-28 md:pb-8 custom-scrollbar relative z-10 w-full">
           <AnimatePresence mode="wait">
             
             {/* === 1. SMART DASHBOARD === */}
@@ -675,13 +795,16 @@ const quotes = [
             {/* === 2. TRACKER (Dedicated Main Tab) === */}
             {activeView === 'tracker' && (
               <motion.div key="tracker" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="w-full max-w-7xl mx-auto">
+                    <ErrorBoundary fallbackTitle="Tracker Error">
                 <UniversityTracker />
+              </ErrorBoundary>
               </motion.div>
             )}
 
             {/* === 3. ACADEMICS HUB (Schedule & Grades) === */}
             {activeView === 'academics' && (
               <motion.div key="academics" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="w-full max-w-7xl mx-auto flex flex-col min-h-full space-y-6">
+                    <ErrorBoundary fallbackTitle="Academics Error">
                 <div className="w-full border-b border-zinc-200 dark:border-zinc-800/80 mb-2 shrink-0 overflow-x-auto" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                   <div className="flex gap-6 md:gap-8 min-w-max px-1">
                     {[
@@ -693,11 +816,13 @@ const quotes = [
                         className={`pb-4 text-xs font-bold uppercase tracking-widest transition-colors relative flex items-center gap-2 ${academicTab === tab.id ? 'text-[#06402B] dark:text-emerald-400' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'}`}
                       >
                         <tab.icon size={14} /> {tab.label}
+                        
                         {academicTab === tab.id && <motion.div layoutId="acadTabIndicator" className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#06402B] dark:bg-emerald-400 rounded-t-full" />}
                       </button>
                     ))}
                   </div>
                 </div>
+                    </ErrorBoundary>
                 <AnimatePresence mode="wait">
                   {academicTab === 'schedule' && <motion.div key="s" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }}><DashboardScheduleMaker /></motion.div>}
                   
@@ -715,6 +840,7 @@ const quotes = [
             {/* === 4. STUDY HUB === */}
             {activeView === 'studyhub' && (
               <motion.div key="studyhub" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="w-full max-w-7xl mx-auto flex flex-col min-h-full space-y-6">
+                    <ErrorBoundary fallbackTitle="Study Hub Error">
                 <div className="w-full border-b border-zinc-200 dark:border-zinc-800/80 mb-2 shrink-0 overflow-x-auto" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                   <div className="flex gap-6 md:gap-8 min-w-max px-1">
                     {[
@@ -737,16 +863,25 @@ const quotes = [
                   {studyTab === 'exchange' && <motion.div key="e" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }}><FlashcardExchange /></motion.div>}
                   {studyTab === 'lounge' && <motion.div key="l" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }}><StudyLounge /></motion.div>}
                 </AnimatePresence>
+                    </ErrorBoundary>
               </motion.div>
+              
             )}
 
             {/* === 5. MASTER CALENDAR === */}
-            {activeView === 'calendar' && <motion.div key="cal" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-7xl mx-auto"><AcademicCalendar userTasks={allCalendarTasks} /></motion.div>}
-            
+            {activeView === 'calendar' && (
+              <ErrorBoundary fallbackTitle="Calendar Error">
+                <motion.div key="cal" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-7xl mx-auto">
+                  <AcademicCalendar userTasks={allCalendarTasks} />
+                </motion.div>
+              </ErrorBoundary>
+            )}
+
             {/* === 6. SETTINGS === */}
             {activeView === 'settings' && (
-              <motion.div key="settings" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="max-w-4xl mx-auto space-y-6 md:space-y-8 w-full">
-                <div className="flex flex-col md:flex-row justify-between gap-6 items-start md:items-end mb-2">
+                <motion.div key="settings" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="max-w-4xl mx-auto space-y-6 md:space-y-8 w-full">
+                             <ErrorBoundary fallbackTitle="Settings Error">
+                  <div className="flex flex-col md:flex-row justify-between gap-6 items-start md:items-end mb-2">
                   <div>
                     <h2 className="text-3xl font-black tracking-tight uppercase text-zinc-900 dark:text-zinc-100">Settings</h2>
                     <p className="text-zinc-500 dark:text-zinc-400 text-sm font-medium">Manage your profile and workspace preferences.</p>
@@ -810,6 +945,7 @@ const quotes = [
                     })}
                   </div>
                 </div>
+                    </ErrorBoundary>
               </motion.div>
             )}
           </AnimatePresence>
@@ -817,21 +953,54 @@ const quotes = [
       </main>
 
       {/* MOBILE BOTTOM NAV */}
-      <nav className="md:hidden fixed bottom-4 left-4 right-4 z-40 pb-safe">
-        <div className="bg-white/90 dark:bg-[#121214]/90 backdrop-blur-2xl border border-zinc-200 dark:border-zinc-800/80 rounded-[2rem] shadow-2xl p-2 flex items-center gap-2 overflow-x-auto snap-x snap-mandatory transition-colors duration-300" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-          {NAV_ITEMS.map((item) => {
-            const isActive = activeView === item.id;
-            return (
-              <button key={item.id} onClick={() => { setActiveView(item.id as any); document.getElementById(`nav-item-${item.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' }); }} id={`nav-item-${item.id}`} className={`snap-center shrink-0 flex items-center justify-center h-14 transition-all duration-300 ease-out rounded-2xl ${isActive ? 'bg-[#06402B] dark:bg-emerald-600 text-white px-6 shadow-md w-auto' : 'bg-zinc-100 dark:bg-[#18181b] text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 w-14'}`}>
-                <span className={`transition-transform duration-300 ${isActive ? 'scale-100' : 'scale-110'}`}>{item.icon}</span>
-                <AnimatePresence>
-                  {isActive && <motion.span initial={{ opacity: 0, width: 0, scale: 0.8 }} animate={{ opacity: 1, width: 'auto', scale: 1 }} exit={{ opacity: 0, width: 0, scale: 0.8 }} className="text-[11px] font-black uppercase tracking-widest ml-3 whitespace-nowrap overflow-hidden">{item.label}</motion.span>}
-                </AnimatePresence>
-              </button>
-            );
-          })}
-        </div>
-      </nav>
+<nav 
+  className="md:hidden fixed bottom-0 left-0 right-0 z-40"
+  style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+>
+  <div className="mx-3 mb-3 bg-white/90 dark:bg-[#121214]/90 backdrop-blur-2xl border border-zinc-200 dark:border-zinc-800/80 rounded-[2rem] shadow-2xl transition-colors duration-300">
+    <div className="flex items-center justify-between px-2 py-2">
+      {NAV_ITEMS.map((item) => {
+        const isActive = activeView === item.id;
+        return (
+          <button
+            key={item.id}
+            onClick={() => setActiveView(item.id as any)}
+            className={`relative flex flex-col items-center justify-center transition-all duration-300 ease-out rounded-2xl
+              ${isActive 
+                ? 'bg-[#06402B] dark:bg-emerald-600 text-white px-4 py-3 shadow-md' 
+                : 'text-zinc-400 dark:text-zinc-500 p-3 hover:text-zinc-700 dark:hover:text-zinc-300'
+              }`}
+          >
+            {/* Active glow */}
+            {isActive && (
+              <motion.div
+                layoutId="mobileNavGlow"
+                className="absolute inset-0 bg-[#06402B] dark:bg-emerald-600 rounded-2xl shadow-[0_0_20px_rgba(6,64,43,0.4)] dark:shadow-[0_0_20px_rgba(16,185,129,0.3)]"
+                transition={{ type: "spring", stiffness: 400, damping: 35 }}
+              />
+            )}
+            <span className={`relative z-10 transition-transform duration-200 ${isActive ? 'scale-110' : 'scale-100'}`}>
+              {item.icon}
+            </span>
+            <AnimatePresence>
+              {isActive && (
+                <motion.span
+                  initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                  animate={{ opacity: 1, height: 'auto', marginTop: 4 }}
+                  exit={{ opacity: 0, height: 0, marginTop: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="relative z-10 text-[9px] font-black uppercase tracking-widest whitespace-nowrap overflow-hidden"
+                >
+                  {item.label}
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </button>
+        );
+      })}
+    </div>
+  </div>
+</nav>
 
       {/* COMMAND CENTER */}
 <CommandCenter 
