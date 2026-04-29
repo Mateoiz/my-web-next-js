@@ -17,6 +17,7 @@ type Card = { id: string; front: string; back: string; starred?: boolean };
 type ViewMode = 'library' | 'editor' | 'study' | 'results' | 'jump';
 type StudyMode = 'flip' | 'identification';
 
+
 // ─── Study Settings ──────────────────────────────────────────────────────────
 interface StudySettings {
   reversed: boolean;      // description → term
@@ -172,9 +173,12 @@ function StudySettingsModal({
     </div>
   );
 }
+interface FlashcardMakerProps {
+  onStudyModeChange?: (studying: boolean) => void;
+}
 
+export default function FlashcardMaker({ onStudyModeChange }: FlashcardMakerProps) {
 // ─── Main Component ──────────────────────────────────────────────────────────
-export default function FlashcardMaker() {
   const [view, setView] = useState<ViewMode>('library');
   const [studyMode, setStudyMode] = useState<StudyMode>('flip');
   const { showAlert, showConfirm } = useModal();
@@ -317,25 +321,26 @@ export default function FlashcardMaker() {
   };
 
   // ── Start study with settings applied ───────────────────────────────────────
-  const startStudy = (mode: StudyMode) => {
-    setShowSettingsModal(false);
-    let pool = (pendingDeck ? (pendingDeck.cards || []).filter((c: Card) => c.front?.trim() && c.back?.trim()) : cards.filter(c => c.front?.trim() && c.back?.trim()))
-      .map((c: Card) => ({ ...c }));
+const startStudy = (mode: StudyMode) => {
+  setShowSettingsModal(false);
+  let pool = (pendingDeck ? (pendingDeck.cards || []).filter((c: Card) => c.front?.trim() && c.back?.trim()) : cards.filter(c => c.front?.trim() && c.back?.trim()))
+    .map((c: Card) => ({ ...c }));
 
-    if (studySettings.onlyStarred) {
-      const starred = pool.filter((c: Card) => c.starred);
-      if (starred.length === 0) { showAlert("No Starred Cards", "Star some cards during study first."); return; }
-      pool = starred;
-    }
-    if (studySettings.shuffled) pool = [...pool].sort(() => Math.random() - 0.5);
+  if (studySettings.onlyStarred) {
+    const starred = pool.filter((c: Card) => c.starred);
+    if (starred.length === 0) { showAlert("No Starred Cards", "Star some cards during study first."); return; }
+    pool = starred;
+  }
+  if (studySettings.shuffled) pool = [...pool].sort(() => Math.random() - 0.5);
 
-    setStudyCards(pool);
-    setStudyMode(mode);
-    setCurrentIndex(0); setKnownCount(0); setStreak(0);
-    setIsFlipped(false); setUserInput(""); setShowAnswerFeedback('none');
-    setPendingDeck(null);
-    setView('study');
-  };
+  setStudyCards(pool);
+  setStudyMode(mode);
+  onStudyModeChange?.(true); // ✅ only this
+  setCurrentIndex(0); setKnownCount(0); setStreak(0);
+  setIsFlipped(false); setUserInput(""); setShowAnswerFeedback('none');
+  setPendingDeck(null);
+  setView('study');
+};
 
   // Card front/back with reversal
   const cardFront = (c: Card) => studySettings.reversed ? c.back : c.front;
@@ -781,11 +786,11 @@ export default function FlashcardMaker() {
         {/* Study header */}
         <div className="h-16 border-b border-zinc-200 dark:border-zinc-800 px-4 md:px-6 flex items-center justify-between shrink-0 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-xl">
           <div className="flex items-center gap-3 min-w-0">
-            <button onClick={() => setView(currentDeckId ? 'library' : 'editor')}
-              className="w-8 h-8 rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-500 hover:bg-red-500/10 hover:text-red-500 transition-all shrink-0"
-            >
-              <FaTimes size={13} />
-            </button>
+            <button onClick={() => { onStudyModeChange?.(false); setView(currentDeckId ? 'library' : 'editor'); }}
+  className="w-8 h-8 rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-500 hover:bg-red-500/10 hover:text-red-500 transition-all shrink-0"
+>
+  <FaTimes size={13} />
+</button>
             <div className="min-w-0">
               <h3 className="font-black text-sm uppercase tracking-tight text-zinc-900 dark:text-white truncate">{deckTitle || "Review Session"}</h3>
               <div className="flex items-center gap-2 flex-wrap">
@@ -1023,9 +1028,9 @@ export default function FlashcardMaker() {
                 <FaStar className="inline mr-1.5" size={10} /> Study Starred Only
               </button>
             )}
-            <button onClick={() => setView('library')} className="w-full py-3.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 font-bold rounded-xl uppercase tracking-widest text-xs hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">
-              Back to Vault
-            </button>
+            <button onClick={() => { onStudyModeChange?.(false); setView('library'); }} className="w-full py-3.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 font-bold rounded-xl uppercase tracking-widest text-xs hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">
+  Back to Vault
+</button>
           </div>
         </motion.div>
       </div>

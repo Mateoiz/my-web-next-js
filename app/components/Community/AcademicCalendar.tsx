@@ -209,14 +209,12 @@ if (isDesktop && anchorRect) {
   return (
     <motion.div
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm"
-      onClick={onClose}
+className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50 backdrop-blur-sm"      onClick={onClose}
     >
       <motion.div
         initial={{ y: 80 }} animate={{ y: 0 }} exit={{ y: 80 }}
         transition={{ type: "spring", stiffness: 340, damping: 30 }}
-        className="w-full max-w-lg bg-white dark:bg-zinc-950 rounded-t-[2rem] p-6 pb-10 border-t border-zinc-200 dark:border-zinc-800 shadow-2xl"
-        onClick={e => e.stopPropagation()}
+className="w-full max-w-lg bg-white dark:bg-zinc-950 rounded-t-[2rem] p-6 pb-28 border-t border-zinc-200 dark:border-zinc-800 shadow-2xl"        onClick={e => e.stopPropagation()}
       >
         <div className="w-10 h-1 bg-zinc-300 dark:bg-zinc-700 rounded-full mx-auto mb-5" />
         <p className="text-[10px] font-mono font-bold text-zinc-400 uppercase tracking-widest mb-1">{label}</p>

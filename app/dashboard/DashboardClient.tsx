@@ -22,6 +22,7 @@ import { auth, db, storage } from "@/lib/db";
 import FloatingCubes from "../components/FloatingCubes"; 
 import CommandCenter from "../components/Layout/CommandCenter";
 import ErrorBoundary from "../components/ErrorBoundary";
+import PatchNotes from "../components/PatchNotes";
 
 // --- SAFE DYNAMIC IMPORTS ---
 const DashboardScheduleMaker = dynamic(() => import('../components/Tools/DashboardScheduleMaker'), { ssr: false });
@@ -98,6 +99,7 @@ function DashboardInner() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const { showAlert, showConfirm } = useModal();
   const [isOnline, setIsOnline] = useState(true);
+  const [isStudying, setIsStudying] = useState(false);
 
   const [activeView, setActiveView] = useState('dashboard');
   const [academicTab, setAcademicTab] = useState<'schedule' | 'grades'>('schedule');
@@ -397,6 +399,7 @@ function DashboardInner() {
         )}
       </AnimatePresence>
 
+    <PatchNotes />
       <div className="absolute inset-0 z-0 pointer-events-none">
         <div className="absolute inset-0 opacity-30 sm:opacity-60"><FloatingCubes /></div>
         <div className="absolute top-[10%] left-[20%] w-[300px] md:w-[500px] h-[300px] md:h-[500px] bg-[#06402B]/10 dark:bg-emerald-500/5 rounded-full blur-[100px] md:blur-[150px]" />
@@ -783,7 +786,7 @@ function DashboardInner() {
                     </div>
                   </div>
                   <AnimatePresence mode="wait">
-                    {studyTab === 'cards' && <motion.div key="c" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }}><FlashcardMaker /></motion.div>}
+                    {studyTab === 'cards' && <motion.div key="c" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }}><FlashcardMaker onStudyModeChange={setIsStudying} /></motion.div>}
                     {studyTab === 'exchange' && <motion.div key="e" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }}><FlashcardExchange /></motion.div>}
                     {studyTab === 'lounge' && <motion.div key="l" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }}><StudyLounge /></motion.div>}
                   </AnimatePresence>
