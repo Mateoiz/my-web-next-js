@@ -36,13 +36,30 @@ const AcademicCalendar = dynamic(() => import('../components/Community/AcademicC
 const CampusBulletin = dynamic(() => import('../components/Community/CampusBulletin'), { ssr: false });
 import OnboardingFlow from "../components/Onboarding/OnboardingFlow";
 
+const COLLEGE_LOGOS: Record<string, string> = {
+  CAST:  "/College/cast1.png",  // matches your actual filename
+  CBMA:  "/College/cbma.png",
+  CVMAS: "/College/cvmas.png",  // matches your actual filename
+  COED:  "/College/coed.png",
+};
+
+// ── College badge colors ──────────────────────────────────────────────────────
+const COLLEGE_BADGE_CLASSES: Record<string, string> = {
+  CAST:  "bg-blue-500/10 text-blue-600 border-blue-200 dark:bg-white/10 dark:text-white dark:border-white/20",
+  CBMA:  "bg-amber-500/10 text-amber-600 border-amber-200 dark:bg-white/10 dark:text-white dark:border-white/20",
+  CVMAS: "bg-purple-500/10 text-purple-600 border-purple-200 dark:bg-white/10 dark:text-white dark:border-white/20",
+  COED:  "bg-red-500/10 text-red-600 border-red-200 dark:bg-white/10 dark:text-white dark:border-white/20",
+  default: "bg-[#06402B]/10 text-[#06402B] border-[#06402B]/20 dark:bg-white/10 dark:text-white dark:border-white/20",
+};
+
 const NAV_ITEMS = [
   { id: 'dashboard', icon: <FaTachometerAlt size={20} />, label: "Home" },
   { id: 'tracker', icon: <FaFolderOpen size={20} />, label: "Tracker" },
   { id: 'academics', icon: <FaBook size={20} />, label: "Academics" },
   { id: 'studyhub', icon: <FaBrain size={20} />, label: "Study Hub" },
   { id: 'calendar', icon: <FaCalendarDay size={20} />, label: "Calendar" },
-  { id: 'settings', icon: <FaCog size={20} />, label: "Settings" }, 
+  { id: 'settings', icon: <FaCog size={20} />, label: "Settings" },
+   
 ];
 
 // ==========================================
@@ -494,19 +511,47 @@ function DashboardInner() {
             <div className="hidden md:flex items-center gap-2 px-3 py-1 bg-[#06402B]/5 dark:bg-emerald-500/10 border border-[#06402B]/10 dark:border-emerald-500/20 rounded-full text-[9px] font-mono font-bold text-[#06402B] dark:text-emerald-400 tracking-widest uppercase shrink-0">System Online</div>
           </div>
           <div className="flex items-center gap-3 md:gap-4 shrink-0">
-            <div className="text-right hidden sm:block">
-              <p className="text-sm font-bold text-zinc-800 dark:text-zinc-100 leading-none mb-1 truncate max-w-[150px]">{userProfile?.fullName || "Scholar"}</p>
-              <p className="text-[9px] font-mono text-zinc-500 dark:text-zinc-400 uppercase tracking-tighter">Verified Student Account</p>
-            </div>
-            <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-zinc-200 dark:bg-[#18181b] flex items-center justify-center text-zinc-500 dark:text-zinc-400 border border-zinc-300 dark:border-zinc-700 relative cursor-pointer shrink-0 overflow-hidden shadow-sm" onClick={() => setActiveView('settings')}>
-              {userProfile?.avatarUrl ? <Image src={userProfile.avatarUrl} alt="Avatar" fill sizes="40px" className="object-cover" /> : <span className="font-bold text-sm">{userProfile?.fullName?.charAt(0) || "U"}</span>}
-              <div className="absolute top-0 right-0 w-2 h-2 md:w-2.5 md:h-2.5 bg-green-500 rounded-full border-2 border-white dark:border-[#09090b] z-10" />
-            </div>
-            <div className="w-px h-6 md:h-8 bg-zinc-200 dark:bg-zinc-800 mx-1 md:mx-2 shrink-0" />
-            <button onClick={() => setIsQueueOpen(!isQueueOpen)} className={`w-8 h-8 md:w-10 md:h-10 rounded-xl flex items-center justify-center transition-all duration-300 shrink-0 ${isQueueOpen ? 'bg-[#06402B] dark:bg-emerald-600 text-white shadow-[0_0_15px_rgba(6,64,43,0.3)]' : 'bg-zinc-100 dark:bg-[#18181b] text-zinc-500 hover:text-[#06402B] dark:hover:text-emerald-400'}`}>
-              {isQueueOpen ? <FaChevronRight size={12} /> : <FaTasks size={14} />}
-            </button>
-          </div>
+  <div className="text-right hidden sm:block">
+    <p className="text-sm font-bold text-zinc-800 dark:text-zinc-100 leading-none mb-1 truncate max-w-[150px]">{userProfile?.fullName || "Scholar"}</p>
+    <p className="text-[9px] font-mono text-zinc-500 dark:text-zinc-400 uppercase tracking-tighter">Verified Student Account</p>
+  </div>
+
+  {/* College badge — between name and avatar */}
+
+  {/* Avatar */}
+  <div
+    className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-zinc-200 dark:bg-[#18181b] flex items-center justify-center text-zinc-500 dark:text-zinc-400 border border-zinc-300 dark:border-zinc-700 relative cursor-pointer shrink-0 overflow-hidden shadow-sm"
+    onClick={() => setActiveView('settings')}
+  >
+    {userProfile?.avatarUrl
+      ? <Image src={userProfile.avatarUrl} alt="Avatar" fill sizes="40px" className="object-cover" />
+      : <span className="font-bold text-sm">{userProfile?.fullName?.charAt(0) || "U"}</span>}
+    <div className="absolute top-0 right-0 w-2 h-2 md:w-2.5 md:h-2.5 bg-green-500 rounded-full border-2 border-white dark:border-[#09090b] z-10" />
+  </div>
+{userProfile?.college && COLLEGE_LOGOS[userProfile.college] && (
+  <motion.div
+    initial={{ opacity: 0, scale: 0.8 }}
+    animate={{ opacity: 1, scale: 1 }}
+    className="hidden sm:flex w-7 h-7 md:w-9 md:h-9 shrink-0 relative"
+    title={userProfile.college}
+  >
+    <Image
+      src={COLLEGE_LOGOS[userProfile.college]}
+      alt={userProfile.college}
+      fill
+      sizes="36px"
+      className="object-contain dark:brightness-0 dark:invert"      
+    />
+  </motion.div>
+)}
+  <div className="w-px h-6 md:h-8 bg-zinc-200 dark:bg-zinc-800 mx-1 md:mx-2 shrink-0" />
+
+  <button onClick={() => setIsQueueOpen(!isQueueOpen)} className={`w-8 h-8 md:w-10 md:h-10 rounded-xl flex items-center justify-center transition-all duration-300 shrink-0 ${isQueueOpen ? 'bg-[#06402B] dark:bg-emerald-600 text-white shadow-[0_0_15px_rgba(6,64,43,0.3)]' : 'bg-zinc-100 dark:bg-[#18181b] text-zinc-500 hover:text-[#06402B] dark:hover:text-emerald-400'}`}>
+    {isQueueOpen ? <FaChevronRight size={12} /> : <FaTasks size={14} />}
+  </button>
+</div>
+
+
         </header>
 
         <div className="flex-1 overflow-x-clip overflow-y-auto p-4 sm:p-6 md:p-8 pb-28 md:pb-8 custom-scrollbar relative z-10 w-full">

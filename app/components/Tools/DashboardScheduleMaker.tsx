@@ -525,12 +525,23 @@ export default function DashboardScheduleMaker({ trackerCourses = [] }: Dashboar
               )}
             </div>
 
-            <button onClick={() => setView('canvas')}
+            <button onClick={() => {
+              if (saveTimerRef.current) {
+                clearTimeout(saveTimerRef.current);
+                try {
+                  const state = { classes, termName, activeTheme, format, savedAt: Date.now() };
+                  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+                  setSavedAt(state.savedAt);
+                } catch { /* ignore */ }
+              }
+              setView('canvas');
+            }}
               className="w-full sm:w-auto lg:w-full px-6 sm:px-8 py-3 bg-[#06402B] text-white rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-95 transition-all shadow-[0_0_20px_rgba(6,64,43,0.3)] text-[10px] sm:text-xs">
               <FaCalendarAlt size={14} /> View Timetable
             </button>
-          </div>
-        </div>
+          </div>{/* closes action buttons div */}
+        </div>{/* closes header block */}
+
 
         {/* Class Input List */}
         <div className="space-y-4 w-full">
@@ -668,9 +679,9 @@ export default function DashboardScheduleMaker({ trackerCourses = [] }: Dashboar
         <div className="h-16 md:h-20 border-b border-zinc-200 dark:border-zinc-800 px-3 sm:px-4 md:px-8 flex items-center justify-between shrink-0 bg-white/80 dark:bg-black/80 backdrop-blur-xl z-30">
           <div className="flex items-center gap-2 sm:gap-3 md:gap-4 min-w-0">
             <button onClick={() => setView('editor')}
-              className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all text-zinc-500 shrink-0">
-              <FaTimes size={14} />
-            </button>
+  className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all text-zinc-500 shrink-0">
+  <FaTimes size={14} />
+</button>
             <div className="min-w-0">
               <h3 className="font-black text-xs sm:text-sm md:text-lg uppercase tracking-tight truncate text-zinc-900 dark:text-white">{termName || "My Schedule"}</h3>
               <p className="text-[8px] sm:text-[9px] md:text-[10px] font-mono font-bold text-[#06402B] uppercase tracking-widest truncate">Preview & Export</p>

@@ -215,6 +215,9 @@ export default function FlashcardMaker({ onStudyModeChange }: FlashcardMakerProp
   const [showKbdHints, setShowKbdHints] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const autoAdvanceTimer = useRef<NodeJS.Timeout | null>(null);
+  const [originalState, setOriginalState] = useState<{
+  title: string; subject: string; cards: Card[];
+} | null>(null);
 
   const [sendToUsername, setSendToUsername] = useState("");
   const [isSending, setIsSending] = useState(false);
@@ -283,17 +286,21 @@ export default function FlashcardMaker({ onStudyModeChange }: FlashcardMakerProp
 
   // ── Deck actions ────────────────────────────────────────────────────────────
   const createNewDeck = () => {
-    setCurrentDeckId(null); setDeckTitle(""); setDeckSubject("");
-    setIsPublic(false); setDeckCollege("General");
-    setCards([{ id: Date.now().toString(), front: '', back: '' }]);
-    setView('editor');
-  };
+  setCurrentDeckId(null); setDeckTitle(""); setDeckSubject("");
+  setIsPublic(false); setDeckCollege("General");
+  setCards([{ id: Date.now().toString(), front: '', back: '' }]);
+  setOriginalState(null); // new deck, nothing to diff against
+  setView('editor');
+};
 
-  const editExistingDeck = (deck: any) => {
-    setCurrentDeckId(deck.id); setDeckTitle(deck.title); setDeckSubject(deck.subject);
-    setIsPublic(deck.isPublic || false); setDeckCollege(deck.college || "General");
-    setCards(deck.cards || []); setView('editor');
-  };
+const editExistingDeck = (deck: any) => {
+  setCurrentDeckId(deck.id); setDeckTitle(deck.title); setDeckSubject(deck.subject);
+  setIsPublic(deck.isPublic || false); setDeckCollege(deck.college || "General");
+  setCards(deck.cards || []);
+  // Save original so we can diff later
+  setOriginalState({ title: deck.title, subject: deck.subject, cards: deck.cards || [] });
+  setView('editor');
+};
 
   const deleteDeck = (deckId: string) => {
     showConfirm("Delete Reviewer", "Permanently delete this reviewer?", async () => {
@@ -397,6 +404,8 @@ const startStudy = (mode: StudyMode) => {
     if (emptyCards.length > 0) return showAlert("Incomplete Cards", `${emptyCards.length} card(s) missing term or description.`);
     if (!auth.currentUser) return showAlert("Not Logged In", "You must be logged in to save.");
     setIsSaving(true);
+      setOriginalState(null);
+  setView('library');
     try {
       const userDoc = await getDoc(doc(db, "users", auth.currentUser.uid));
       const username = userDoc.exists() ? userDoc.data().username : "Lasallian";
@@ -619,9 +628,28 @@ const startStudy = (mode: StudyMode) => {
           )}
         </AnimatePresence>
 
-        <button onClick={() => setView('library')} className="flex items-center gap-2 text-xs font-bold text-zinc-500 hover:text-[#06402B] dark:hover:text-emerald-400 transition-colors mb-6">
-          <FaArrowLeft size={11} /> Back to Vault
-        </button>
+        <button onClick={() => {
+  const isDirty = originalState
+    ? deckTitle !== originalState.title ||
+      deckSubject !== originalState.subject ||
+      JSON.stringify(cards) !== JSON.stringify(originalState.cards)
+    : deckTitle.trim() || deckSubject.trim() || cards.some(c => c.front.trim() || c.back.trim());
+
+  if (isDirty) {
+    showConfirm(
+      "Discard Changes",
+      "You have unsaved changes. Are you sure you want to go back without saving?",
+      () => { setOriginalState(null); setView('library'); },
+      "Discard",
+      true
+    );
+  } else {
+    setOriginalState(null);
+    setView('library');
+  }
+}} className="flex items-center gap-2 text-xs font-bold text-zinc-500 hover:text-[#06402B] dark:hover:text-emerald-400 transition-colors mb-6">
+  <FaArrowLeft size={11} /> Back to Vault
+</button>
 
         <div className="space-y-4">
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-[2rem] p-6 md:p-7">
