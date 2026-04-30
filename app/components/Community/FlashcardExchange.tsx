@@ -236,28 +236,29 @@ export default function FlashcardExchange() {
   };
 
   // ── Admin Delete with Notification ─────────────────────────────────────────
-  const handleAdminDeleteConfirm = async (deck: any, reason: string) => {
-    try {
-      // 1. Delete the deck
-      await deleteDoc(doc(db, "flashcard_decks", deck.id));
+const handleAdminDeleteConfirm = async (deck: any, reason: string) => {
+  try {
+    await deleteDoc(doc(db, "flashcard_decks", deck.id));
 
-      // 2. Write an inbox notification to the author
-      await addDoc(collection(db, "notifications"), {
-        toUserId: deck.userId,
-        type: "deck_removed",
-        deckTitle: deck.title,
-        reason,
-        removedAt: serverTimestamp(),
-        read: false,
-      });
+    // ✅ Write to "inbox" not "notifications" so it shows up in StudyLounge
+    await addDoc(collection(db, "inbox"), {
+      type: "deck_removed",
+      recipientId: deck.userId,         // who receives it
+      deckTitle: deck.title,
+      deckSubject: deck.subject,
+      reason,
+      removedAt: serverTimestamp(),
+      createdAt: serverTimestamp(),
+      status: "unread",
+    });
 
-      setDecks((prev) => prev.filter((d) => d.id !== deck.id));
-      setDeletingDeck(null);
-    } catch (error) {
-      showAlert("Delete Failed", "Ensure your Firebase Rules are updated for Admins.");
-      console.error(error);
-    }
-  };
+    setDecks((prev) => prev.filter((d) => d.id !== deck.id));
+    setDeletingDeck(null);
+  } catch (error) {
+    showAlert("Delete Failed", "Ensure your Firebase Rules are updated for Admins.");
+    console.error(error);
+  }
+};
 
   // ── Filter ──────────────────────────────────────────────────────────────────
   const filteredDecks = decks.filter((deck) => {

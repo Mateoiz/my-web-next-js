@@ -40,8 +40,13 @@ function daysUntil(deadline: string): number | null {
   return Math.floor((due.getTime() - today.getTime()) / 86400000);
 }
 
+// ── Checks if a task is "done" (no urgency should apply) ──────────────────────
+function isTaskDone(status: string): boolean {
+  return status === "Graded" || status === "Submitted" || status === "completed";
+}
+
 function UrgencyChip({ deadline, status }: { deadline: string; status: string }) {
-  if (!deadline || status === "Graded" || status === "completed") return null;
+  if (!deadline || isTaskDone(status)) return null;
   const days = daysUntil(deadline);
   if (days === null) return null;
   if (days < 0)  return <span className="text-[9px] font-black text-red-500 bg-red-500/10 px-1.5 py-0.5 rounded-md uppercase tracking-widest">Overdue</span>;
@@ -167,11 +172,20 @@ function MiniCalendar({ activeTasks }: { activeTasks: any[] }) {
               ) : (
                 tasksOnSelected.map(task => (
                   <div key={task.id} className="flex items-center gap-2 py-1">
-                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${task.status === "Submitted" ? "bg-blue-400" : "bg-amber-400"}`} />
+                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                      task.status === "Graded" ? "bg-emerald-500"
+                      : task.status === "Submitted" ? "bg-blue-400"
+                      : "bg-amber-400"
+                    }`} />
                     <p className="text-xs font-medium text-zinc-700 dark:text-zinc-300 truncate flex-1">{task.title}</p>
-                    {task.type && (
-                      <span className="text-[9px] font-bold text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded shrink-0">{task.type}</span>
-                    )}
+                    <div className="flex items-center gap-1 shrink-0">
+                      {task.status === "Graded" && (
+                        <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded uppercase tracking-widest">Graded</span>
+                      )}
+                      {task.type && (
+                        <span className="text-[9px] font-bold text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded">{task.type}</span>
+                      )}
+                    </div>
                   </div>
                 ))
               )}
@@ -197,16 +211,20 @@ function MiniCalendar({ activeTasks }: { activeTasks: any[] }) {
 function TaskItem({ task, onToggle, onDelete, today }: {
   task: any; onToggle: () => void; onDelete: () => void; today: string;
 }) {
-  const isOverdue = task.deadline && task.deadline < today;
   const isSubmitted = task.status === "Submitted";
+  const isGraded = task.status === "Graded";
+  const isDone = isSubmitted || isGraded;
+
+  // Only flag overdue if the task hasn't been submitted or graded
+  const isOverdue = !isDone && task.deadline && task.deadline < today;
   const days = daysUntil(task.deadline);
-  const isUrgent = !isSubmitted && days !== null && days <= 1 && days >= 0;
+  const isUrgent = !isDone && days !== null && days <= 1 && days >= 0;
 
   return (
     <motion.div
       initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, height: 0 }}
       className={`group flex items-start gap-3 p-3 rounded-xl border transition-all
-        ${isSubmitted
+        ${isDone
           ? "bg-zinc-50 dark:bg-zinc-900/50 border-zinc-100 dark:border-zinc-800/50 opacity-70"
           : isOverdue
           ? "bg-red-50/50 dark:bg-red-500/5 border-red-200/60 dark:border-red-500/20"
@@ -215,21 +233,30 @@ function TaskItem({ task, onToggle, onDelete, today }: {
           : "bg-white dark:bg-[#18181b] border-zinc-200 dark:border-zinc-800 hover:border-[#06402B]/30"
         }`}
     >
-      <button onClick={onToggle} className={`mt-0.5 shrink-0 transition-colors ${isSubmitted ? "text-blue-500" : "text-zinc-300 dark:text-zinc-600 hover:text-emerald-500"}`}>
-        {isSubmitted ? <FaCheckCircle size={15} /> : <FaRegCircle size={15} />}
+      <button onClick={onToggle} className={`mt-0.5 shrink-0 transition-colors ${
+        isGraded ? "text-emerald-500"
+        : isSubmitted ? "text-blue-500"
+        : "text-zinc-300 dark:text-zinc-600 hover:text-emerald-500"
+      }`}>
+        {isDone ? <FaCheckCircle size={15} /> : <FaRegCircle size={15} />}
       </button>
 
       <div className="flex-1 min-w-0">
-        <p className={`text-xs font-semibold leading-snug truncate ${isSubmitted ? "line-through text-zinc-400" : "text-zinc-800 dark:text-zinc-200"}`}>
+        <p className={`text-xs font-semibold leading-snug truncate ${isDone ? "line-through text-zinc-400" : "text-zinc-800 dark:text-zinc-200"}`}>
           {task.title}
         </p>
         <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+          {/* Status badge for graded tasks */}
+          {isGraded && (
+            <span className="text-[9px] font-black text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-md uppercase tracking-widest">Graded</span>
+          )}
           {task.isCourseTask && task.type && (
             <span className="text-[9px] font-bold text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded uppercase tracking-widest">
               {task.type}
             </span>
           )}
-          <UrgencyChip deadline={task.deadline} status={task.status} />
+          {/* Only show urgency chip for non-done tasks */}
+          {!isDone && <UrgencyChip deadline={task.deadline} status={task.status} />}
         </div>
       </div>
 
@@ -262,14 +289,14 @@ export default function CommandCenter({
     setNewTaskTitle(""); setNewTaskDeadline(""); setIsAddingTask(false);
   };
 
-  // ── Smart task sorting by urgency ─────────────────────────────────────────
+  // ── Smart task sorting — exclude Graded from pending ──────────────────────
   const sortedTasks = useMemo(() => {
-    const pending = activeTasks.filter(t => t.status === "OPEN" || t.status === "pending");
+    const pending   = activeTasks.filter(t => t.status === "OPEN" || t.status === "pending");
     const submitted = activeTasks.filter(t => t.status === "Submitted");
+    const graded    = activeTasks.filter(t => t.status === "Graded");
 
     if (sortByUrgency) {
       const sorted = [...pending].sort((a, b) => {
-        // Overdue first, then by days ascending, then no deadline last
         const da = daysUntil(a.deadline);
         const db = daysUntil(b.deadline);
         if (da === null && db === null) return 0;
@@ -277,11 +304,12 @@ export default function CommandCenter({
         if (db === null) return -1;
         return da - db;
       });
-      return { pending: sorted, submitted };
+      return { pending: sorted, submitted, graded };
     }
-    return { pending, submitted };
+    return { pending, submitted, graded };
   }, [activeTasks, sortByUrgency]);
 
+  // Only count overdue/urgent for truly open (non-done) tasks
   const overdueCount = activeTasks.filter(t =>
     (t.status === "OPEN" || t.status === "pending") && t.deadline && t.deadline < today
   ).length;
@@ -333,7 +361,7 @@ export default function CommandCenter({
             </button>
           </div>
 
-          {/* Urgency summary strip */}
+          {/* Urgency summary strip — only shown when there are truly open overdue/urgent tasks */}
           {(overdueCount > 0 || urgentCount > 0) && (
             <div className="flex gap-2 mb-3">
               {overdueCount > 0 && (
@@ -388,6 +416,7 @@ export default function CommandCenter({
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
                     {sortedTasks.pending.length} pending · {sortedTasks.submitted.length} submitted
+                    {sortedTasks.graded.length > 0 && ` · ${sortedTasks.graded.length} graded`}
                   </span>
                   <div className="flex items-center gap-2">
                     <button onClick={() => setSortByUrgency(v => !v)} title="Sort by urgency"
@@ -446,8 +475,8 @@ export default function CommandCenter({
                   )}
                 </AnimatePresence>
 
-                {/* Pending tasks */}
-                {sortedTasks.pending.length === 0 && sortedTasks.submitted.length === 0 ? (
+                {/* Task lists */}
+                {sortedTasks.pending.length === 0 && sortedTasks.submitted.length === 0 && sortedTasks.graded.length === 0 ? (
                   <div className="py-12 flex flex-col items-center gap-3 text-zinc-400">
                     <FaCheckCircle size={24} className="opacity-20" />
                     <p className="text-xs font-bold uppercase tracking-widest">All clear!</p>
@@ -488,6 +517,24 @@ export default function CommandCenter({
                         </AnimatePresence>
                       </div>
                     )}
+
+                    {/* Graded tasks — shown separately, never flagged as overdue */}
+                    {sortedTasks.graded.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">
+                          Graded — {sortedTasks.graded.length}
+                        </p>
+                        <AnimatePresence>
+                          {sortedTasks.graded.map(task => (
+                            <TaskItem
+                              key={task.id} task={task} today={today}
+                              onToggle={() => onToggleTask(task)}
+                              onDelete={() => onDeleteTask(task)}
+                            />
+                          ))}
+                        </AnimatePresence>
+                      </div>
+                    )}
                   </>
                 )}
 
@@ -508,10 +555,13 @@ export default function CommandCenter({
               >
                 <MiniCalendar activeTasks={activeTasks} />
 
-                {/* Upcoming this week */}
+                {/* Upcoming this week — exclude done tasks */}
                 {(() => {
                   const upcoming = activeTasks
-                    .filter(t => { const d = daysUntil(t.deadline); return d !== null && d >= 0 && d <= 7; })
+                    .filter(t => {
+                      const d = daysUntil(t.deadline);
+                      return !isTaskDone(t.status) && d !== null && d >= 0 && d <= 7;
+                    })
                     .sort((a, b) => (daysUntil(a.deadline) ?? 99) - (daysUntil(b.deadline) ?? 99));
                   if (upcoming.length === 0) return null;
                   return (

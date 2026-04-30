@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { FaUserFriends, FaInbox, FaSearch, FaUserPlus, FaCheck, FaDownload, FaPaperPlane, FaUserCheck } from "react-icons/fa";
+import { FaUserFriends, FaInbox, FaSearch, FaUserPlus, FaCheck, FaDownload, FaPaperPlane, FaUserCheck, FaTrashAlt } from "react-icons/fa";
 import { collection, query, where, getDocs, doc, updateDoc, arrayUnion, onSnapshot, addDoc, serverTimestamp, documentId } from "firebase/firestore";
 import { auth, db } from "@/lib/db";
 import { useModal } from "../../context/ModalContext";
@@ -278,9 +278,8 @@ export default function StudyLounge() {
                 inboxItems.map(item => {
                   if (item.type === 'friend_request') {
                     return (
-                      <div key={item.id} className={`p-5 md:p-6 rounded-[1.5rem] border transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 w-full ${item.status === 'accepted' ? 'bg-zinc-50 dark:bg-zinc-900/30 border-zinc-200 dark:border-zinc-800 opacity-60' : 'bg-white/60 dark:bg-zinc-900/60 backdrop-blur-md border-[#06402B]/30 shadow-md'}`}>
+                      <div key={item.id} className={`p-5 md:p-6 rounded-3xl border transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 w-full ${item.status === 'accepted' ? 'bg-zinc-50 dark:bg-zinc-900/30 border-zinc-200 dark:border-zinc-800 opacity-60' : 'bg-white/60 dark:bg-zinc-900/60 backdrop-blur-md border-[#06402B]/30 shadow-md'}`}>
                         <div className="flex items-center gap-4 min-w-0">
-                          {/* ✅ Clickable sender avatar in inbox */}
                           <div
                             className="w-12 h-12 rounded-full overflow-hidden border-2 border-white dark:border-zinc-800 shrink-0 bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center text-zinc-500 font-bold shadow-sm cursor-pointer hover:ring-2 hover:ring-[#06402B] transition-all"
                             onClick={() => setViewingUserId(item.senderId)}
@@ -293,13 +292,15 @@ export default function StudyLounge() {
                             <p className="text-xs font-medium text-zinc-500 mt-0.5">@{item.senderUsername} wants to connect</p>
                           </div>
                         </div>
+
                         {item.status === 'accepted' ? (
                           <div className="w-full sm:w-auto px-4 py-3 sm:py-2 bg-zinc-200 dark:bg-zinc-800 rounded-xl text-[10px] font-bold uppercase tracking-widest text-zinc-500 flex items-center justify-center gap-2 shrink-0">
                             <FaUserCheck /> Request Accepted
                           </div>
                         ) : (
                           <button
-                            onClick={() => handleAcceptFriend(item)} disabled={processingId === item.id}
+                            onClick={() => handleAcceptFriend(item)}
+                            disabled={processingId === item.id}
                             className="w-full sm:w-auto px-6 py-3 md:py-4 bg-[#06402B] text-white rounded-xl text-xs font-black uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-50 shrink-0"
                           >
                             {processingId === item.id ? "..." : <><FaUserPlus /> Accept</>}
@@ -309,8 +310,42 @@ export default function StudyLounge() {
                     );
                   }
 
+                  if (item.type === 'deck_removed') {
+                    return (
+                      <div key={item.id} className={`p-5 md:p-6 rounded-3xl border transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 w-full ${item.status === 'unread' ? 'bg-red-50/60 dark:bg-red-500/5 backdrop-blur-md border-red-300/40 dark:border-red-500/20 shadow-md' : 'bg-zinc-50 dark:bg-zinc-900/30 border-zinc-200 dark:border-zinc-800 opacity-60'}`}>
+                        <div className="flex items-start gap-4 min-w-0">
+                          <div className="w-12 h-12 bg-red-500/10 text-red-500 rounded-xl flex items-center justify-center shrink-0 mt-0.5">
+                            <FaTrashAlt size={18} />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-[10px] font-mono font-bold text-red-500 uppercase tracking-widest mb-1">Reviewer Removed</p>
+                            <h4 className="font-black text-base text-zinc-900 dark:text-white truncate">{item.deckTitle}</h4>
+                            {item.deckSubject && (
+                              <p className="text-[10px] font-mono text-zinc-400 uppercase mt-0.5">{item.deckSubject}</p>
+                            )}
+                            <div className="mt-2 px-3 py-2 bg-red-500/10 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-xl">
+                              <p className="text-xs font-bold text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                                <span className="text-red-500 font-black">Reason: </span>
+                                {item.reason}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {item.status === 'unread' && (
+                          <button
+                            onClick={() => updateDoc(doc(db, "inbox", item.id), { status: "read" })}
+                            className="w-full sm:w-auto px-5 py-2.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all shrink-0 flex items-center justify-center gap-2"
+                          >
+                            <FaCheck size={10} /> Got it
+                          </button>
+                        )}
+                      </div>
+                    );
+                  }
+
                   return (
-                    <div key={item.id} className={`p-5 md:p-6 rounded-[1.5rem] border transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 w-full ${item.status === 'accepted' ? 'bg-zinc-50 dark:bg-zinc-900/30 border-zinc-200 dark:border-zinc-800 opacity-60' : 'bg-white/60 dark:bg-zinc-900/60 backdrop-blur-md border-[#06402B]/30 shadow-md'}`}>
+                    <div key={item.id} className={`p-5 md:p-6 rounded-3xl border transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 w-full ${item.status === 'accepted' ? 'bg-zinc-50 dark:bg-zinc-900/30 border-zinc-200 dark:border-zinc-800 opacity-60' : 'bg-white/60 dark:bg-zinc-900/60 backdrop-blur-md border-[#06402B]/30 shadow-md'}`}>
                       <div className="flex items-center gap-4 min-w-0">
                         <div className="w-12 h-12 bg-blue-500/10 text-blue-500 rounded-xl flex items-center justify-center shrink-0">
                           <FaPaperPlane size={20} />
@@ -327,7 +362,8 @@ export default function StudyLounge() {
                         </div>
                       ) : (
                         <button
-                          onClick={() => handleAcceptDeck(item)} disabled={processingId === item.id}
+                          onClick={() => handleAcceptDeck(item)}
+                          disabled={processingId === item.id}
                           className="w-full sm:w-auto px-6 py-3 md:py-4 bg-[#06402B] text-white rounded-xl text-xs font-black uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-50 shrink-0"
                         >
                           {processingId === item.id ? "Syncing..." : <><FaDownload /> Save to Vault</>}

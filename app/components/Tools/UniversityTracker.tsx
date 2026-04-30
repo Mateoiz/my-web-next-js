@@ -9,14 +9,14 @@ import {
   FaClipboardList, FaTimes, FaPencilAlt, FaCalendarAlt,
   FaStar, FaSortAmountDown, FaKeyboard,
   FaExclamationCircle, FaSearch, FaChevronUp, FaCopy,
-  FaBell, FaEllipsisH, FaEllipsisV
+  FaBell, FaEllipsisH, FaEllipsisV, FaStickyNote
 } from "react-icons/fa";
 import {
   collection, query, where, orderBy, onSnapshot,
   addDoc, updateDoc, deleteDoc, doc, serverTimestamp, writeBatch
 } from "firebase/firestore";
 import { auth, db } from "@/lib/db";
-import { getGpaFromScore, gpaLabel } from "../../components/Tools/GradeCalculator";
+import { getGpaFromScore } from "../../components/Tools/GradeCalculator";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -68,11 +68,11 @@ const STATUS_META: Record<TaskStatus, { color: string; ring: string }> = {
   Graded:    { color: "bg-[#06402B] text-white border-[#042d1f] dark:bg-emerald-600 dark:border-emerald-700",               ring: "ring-emerald-400" },
 };
 
-const TASK_TYPES: TaskType[]    = ["Assignment","Quiz","Midterm Exam","Final Exam","Final Product","Class Standing","Project","Presentation"];
+const TASK_TYPES: TaskType[]      = ["Assignment","Quiz","Midterm Exam","Final Exam","Final Product","Class Standing","Project","Presentation"];
 const TASK_STATUSES: TaskStatus[] = ["OPEN","Submitted","Graded"];
 
-const safeTypeMeta   = (t: string) => TYPE_META[t as TaskType]      ?? { color: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700", dot: "bg-zinc-400" };
-const safeStatusMeta = (s: string) => STATUS_META[s as TaskStatus]  ?? { color: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700", ring: "ring-zinc-300" };
+const safeTypeMeta   = (t: string) => TYPE_META[t as TaskType]     ?? { color: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700", dot: "bg-zinc-400" };
+const safeStatusMeta = (s: string) => STATUS_META[s as TaskStatus] ?? { color: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700", ring: "ring-zinc-300" };
 const safeType       = (t: string): TaskType   => TASK_TYPES.includes(t as TaskType)      ? (t as TaskType)   : "Assignment";
 const safeStatus     = (s: string): TaskStatus => TASK_STATUSES.includes(s as TaskStatus) ? (s as TaskStatus) : "OPEN";
 
@@ -117,14 +117,14 @@ function gradeColorClass(grade: string): string {
 
 function computeCourseGpa(tasks: CourseTask[]): { gpa: number; score: number } | null {
   const graded = tasks.filter(t => t.status === "Graded");
-  const mid  = graded.find(t => t.type === "Midterm Exam");
-  const fin  = graded.find(t => t.type === "Final Exam");
-  const prod = graded.find(t => t.type === "Final Product");
-  const cs   = graded.find(t => t.type === "Class Standing");
-  const midP = mid ? parseGradeStr(mid.grade) : null;
-  const finP = fin ? parseGradeStr(fin.grade) : null;
-  const prodP = prod ? parseGradeStr(prod.grade) : null;
-  const csP  = cs  ? parseGradeStr(cs.grade, true) : null;
+  const mid    = graded.find(t => t.type === "Midterm Exam");
+  const fin    = graded.find(t => t.type === "Final Exam");
+  const prod   = graded.find(t => t.type === "Final Product");
+  const cs     = graded.find(t => t.type === "Class Standing");
+  const midP   = mid  ? parseGradeStr(mid.grade)       : null;
+  const finP   = fin  ? parseGradeStr(fin.grade)       : null;
+  const prodP  = prod ? parseGradeStr(prod.grade)      : null;
+  const csP    = cs   ? parseGradeStr(cs.grade, true)  : null;
   if (!midP && !finP && !prodP && !csP) return null;
   const pts = (p: typeof midP, w: number) => p ? (p.raw / p.total) * w : 0;
   const score = pts(midP,30) + pts(finP,30) + pts(prodP,20) + (csP ? Math.min(csP.raw,20) : 0);
@@ -170,7 +170,7 @@ function KbdBadge({ keys, label }: { keys: string[]; label: string }) {
   );
 }
 
-// ─── Reusable Dropdown (PORTALED) ──────────────────────────────────────────────
+// ─── Reusable Dropdown (PORTALED) ─────────────────────────────────────────────
 
 interface DropdownProps<T extends string> {
   value: T; options: T[];
@@ -181,19 +181,19 @@ interface DropdownProps<T extends string> {
 }
 
 function Dropdown<T extends string>({ value, options, onChange, renderOption, renderValue, align = "left" }: DropdownProps<T>) {
-  const [open, setOpen] = useState(false);
-  const [style, setStyle] = useState<React.CSSProperties>({});
+  const [open, setOpen]     = useState(false);
+  const [style, setStyle]   = useState<React.CSSProperties>({});
+  const [mounted, setMounted] = useState(false);
   const ref    = useRef<HTMLDivElement>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
-  const [mounted, setMounted] = useState(false);
 
   useEffect(() => setMounted(true), []);
 
   useEffect(() => {
-    const h = (e: MouseEvent) => { 
+    const h = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
       if (btnRef.current?.contains(target) || target.closest('.portal-menu-container')) return;
-      setOpen(false); 
+      setOpen(false);
     };
     if (open) document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
@@ -213,15 +213,13 @@ function Dropdown<T extends string>({ value, options, onChange, renderOption, re
     return () => window.removeEventListener("scroll", updatePosition, { capture: true });
   }, [open, align]);
 
-  const handleOpen = () => setOpen(o => !o);
-
   const menu = mounted ? createPortal(
     <AnimatePresence>
       {open && (
         <motion.div initial={{opacity:0,y:-6,scale:0.97}} animate={{opacity:1,y:0,scale:1}} exit={{opacity:0,y:-4,scale:0.97}} transition={{duration:0.12}}
           style={style} className="portal-menu-container bg-white dark:bg-[#1c1c1f] border border-zinc-200 dark:border-zinc-700/80 rounded-2xl shadow-2xl overflow-hidden"
         >
-          <div className="p-1.5 space-y-0.5 max-h-60 overflow-y-auto custom-scrollbar">
+          <div className="p-1.5 space-y-0.5 max-h-60 overflow-y-auto">
             {options.map(opt => (
               <button key={opt} type="button" onClick={()=>{onChange(opt);setOpen(false);}}
                 className={`w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold transition-colors flex items-center gap-2.5 ${opt===value?"bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white":"text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/60"}`}
@@ -239,7 +237,7 @@ function Dropdown<T extends string>({ value, options, onChange, renderOption, re
 
   return (
     <div ref={ref} className="relative w-full">
-      <button ref={btnRef} type="button" onClick={handleOpen} className="w-full flex items-center justify-between gap-1.5 cursor-pointer select-none focus:outline-none">
+      <button ref={btnRef} type="button" onClick={() => setOpen(o => !o)} className="w-full flex items-center justify-between gap-1.5 cursor-pointer select-none focus:outline-none">
         {renderValue(value)}
         <FaChevronDown size={8} className={`shrink-0 opacity-50 transition-transform duration-200 ${open?"rotate-180":""}`}/>
       </button>
@@ -341,7 +339,7 @@ function DateInput({ value, onChange }: { value:string; onChange:(v:string)=>voi
         {formatDateDisplay(value)||"Set date"}
       </span>
       {value && (
-        <button type="button" onClick={e=>{e.stopPropagation();onChange("");}} className="ml-auto opacity-0 group-hover/date:opacity-100 text-zinc-400 hover:text-red-400 transition-all focus:opacity-100">
+        <button type="button" onClick={e=>{e.stopPropagation();onChange("");}} className="ml-auto opacity-0 group-hover/date:opacity-100 text-zinc-400 hover:text-red-400 transition-all">
           <FaTimes size={9}/>
         </button>
       )}
@@ -366,19 +364,18 @@ function TypePicker({ value, onChange }: { value:TaskType; onChange:(v:TaskType)
   const [open, setOpen]         = useState(false);
   const [examStep, setExamStep] = useState(false);
   const [style, setStyle]       = useState<React.CSSProperties>({});
+  const [mounted, setMounted]   = useState(false);
   const ref    = useRef<HTMLDivElement>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
-  const [mounted, setMounted] = useState(false);
   const meta   = safeTypeMeta(value);
 
   useEffect(() => setMounted(true), []);
 
   useEffect(() => {
-    const h = (e: MouseEvent) => { 
+    const h = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
       if (btnRef.current?.contains(target) || target.closest('.portal-menu-container')) return;
-      setOpen(false); 
-      setExamStep(false); 
+      setOpen(false); setExamStep(false);
     };
     if (open) document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
@@ -397,10 +394,6 @@ function TypePicker({ value, onChange }: { value:TaskType; onChange:(v:TaskType)
     }
     return () => window.removeEventListener("scroll", updatePosition, { capture: true });
   }, [open]);
-
-  const handleOpen = () => {
-    setOpen(o=>!o); setExamStep(false);
-  };
 
   const menu = mounted ? createPortal(
     <AnimatePresence>
@@ -446,7 +439,7 @@ function TypePicker({ value, onChange }: { value:TaskType; onChange:(v:TaskType)
 
   return (
     <div ref={ref} className="relative w-full">
-      <button ref={btnRef} type="button" onClick={handleOpen}
+      <button ref={btnRef} type="button" onClick={()=>{setOpen(o=>!o);setExamStep(false);}}
         className={`w-full flex items-center justify-between gap-1.5 px-2.5 py-1.5 rounded-xl border text-[10px] font-bold uppercase tracking-wider cursor-pointer select-none focus:outline-none ${meta.color}`}
       >
         <span className="flex items-center gap-1.5 truncate">
@@ -504,7 +497,7 @@ function StatsBar({ tasks }: { tasks:CourseTask[] }) {
       {[
         { label:"Open",      value:open,      color:"text-zinc-500 dark:text-zinc-400" },
         { label:"Submitted", value:submitted, color:"text-blue-600 dark:text-blue-400" },
-        { label:"Graded",    value:graded,     color:"text-[#06402B] dark:text-emerald-400" },
+        { label:"Graded",    value:graded,    color:"text-[#06402B] dark:text-emerald-400" },
       ].map(({ label, value, color }) => (
         <div key={label} className="flex items-baseline gap-1.5">
           <span className={`text-2xl font-black tabular-nums ${color}`}>{value}</span>
@@ -537,13 +530,11 @@ function ScheduleSyncModal({ isOpen, onClose, payload }: { isOpen:boolean; onClo
   const [copied, setCopied] = useState(false);
   if (!payload) return null;
   const upcoming = payload.deadlines.filter(d=>d.date);
-  
   const handleCopy = () => {
     const text = upcoming.map(d=>`${d.type}: ${d.name} — Due ${formatDateDisplay(d.date)}`).join("\n");
     navigator.clipboard.writeText(`📚 ${payload.courseTitle} — Upcoming Deadlines\n\n${text}`);
     setCopied(true); setTimeout(()=>setCopied(false),2000);
   };
-  
   return (
     <AnimatePresence>
       {isOpen && (
@@ -563,17 +554,19 @@ function ScheduleSyncModal({ isOpen, onClose, payload }: { isOpen:boolean; onClo
               <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors p-1"><FaTimes size={14}/></button>
             </div>
             <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-              {upcoming.length===0 ? <div className="py-8 text-center text-zinc-400 text-sm font-bold">No deadlines set yet.</div>
-              : upcoming.map((d,i) => {
-                const overdue = isOverdueDate(d.date);
-                return (
-                  <div key={i} className={`flex items-center gap-3 p-3 rounded-xl border ${overdue?"bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/20":"bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800"}`}>
-                    <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${safeTypeMeta(d.type).dot}`}/>
-                    <div className="flex-1 min-w-0"><p className="text-xs font-bold text-zinc-800 dark:text-zinc-200 truncate">{d.name||"Untitled"}</p><p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{d.type}</p></div>
-                    <span className={`text-[10px] font-mono font-bold shrink-0 ${overdue?"text-red-500":"text-zinc-500 dark:text-zinc-400"}`}>{formatDateDisplay(d.date)}</span>
-                  </div>
-                );
-              })}
+              {upcoming.length===0
+                ? <div className="py-8 text-center text-zinc-400 text-sm font-bold">No deadlines set yet.</div>
+                : upcoming.map((d,i) => {
+                  const overdue = isOverdueDate(d.date);
+                  return (
+                    <div key={i} className={`flex items-center gap-3 p-3 rounded-xl border ${overdue?"bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/20":"bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800"}`}>
+                      <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${safeTypeMeta(d.type).dot}`}/>
+                      <div className="flex-1 min-w-0"><p className="text-xs font-bold text-zinc-800 dark:text-zinc-200 truncate">{d.name||"Untitled"}</p><p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{d.type}</p></div>
+                      <span className={`text-[10px] font-mono font-bold shrink-0 ${overdue?"text-red-500":"text-zinc-500 dark:text-zinc-400"}`}>{formatDateDisplay(d.date)}</span>
+                    </div>
+                  );
+                })
+              }
             </div>
             <div className="bg-[#06402B]/5 dark:bg-emerald-500/10 border border-[#06402B]/20 dark:border-emerald-500/20 rounded-xl p-3.5">
               <p className="text-[11px] text-[#06402B] dark:text-emerald-400 font-semibold leading-relaxed"><span className="font-black">Tip:</span> Open the Schedule Maker, then paste these deadlines into your notes or use the course code to add a class block.</p>
@@ -596,13 +589,11 @@ function ScheduleSyncModal({ isOpen, onClose, payload }: { isOpen:boolean; onClo
 function CourseColorPicker({ value, onChange }: { value?:string; onChange:(c:string)=>void }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  
   useEffect(() => {
     const h = (e:MouseEvent) => { if (ref.current&&!ref.current.contains(e.target as Node)) setOpen(false); };
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
   }, []);
-  
   const cur = getCourseColor(value);
   return (
     <div ref={ref} className="relative">
@@ -630,13 +621,12 @@ function CourseColorPicker({ value, onChange }: { value?:string; onChange:(c:str
 function CourseCardMenu({
   course, ct, onDelete, onSync, onColorChange,
 }: {
-  course: Course;
-  ct: CourseTask[];
+  course: Course; ct: CourseTask[];
   onDelete: (e: React.MouseEvent) => void;
   onSync: (e: React.MouseEvent) => void;
   onColorChange: (color: string) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen]         = useState(false);
   const [showColors, setShowColors] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -648,50 +638,37 @@ function CourseCardMenu({
 
   return (
     <div ref={ref} className="relative" onClick={e => e.stopPropagation()}>
-      <button
-        onClick={() => { setOpen(o => !o); setShowColors(false); }}
+      <button onClick={() => { setOpen(o => !o); setShowColors(false); }}
         className="w-8 h-8 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 flex items-center justify-center text-zinc-500 dark:text-zinc-400 transition-all active:scale-90 touch-manipulation"
         title="Options"
       >
         <FaEllipsisV size={13} />
       </button>
-
       <AnimatePresence>
         {open && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.93, y: -4 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.93, y: -4 }}
-            transition={{ duration: 0.12 }}
+          <motion.div initial={{ opacity: 0, scale: 0.93, y: -4 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.93, y: -4 }} transition={{ duration: 0.12 }}
             className="absolute right-0 top-10 z-50 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl overflow-hidden min-w-[160px]"
           >
             <div className="p-1.5 space-y-0.5">
-              <button
-                onClick={(e) => { onSync(e); setOpen(false); }}
+              <button onClick={(e) => { onSync(e); setOpen(false); }}
                 className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-left"
               >
-                <FaCalendarAlt size={12} className="text-[#06402B] dark:text-emerald-400" />
-                Sync Deadlines
+                <FaCalendarAlt size={12} className="text-[#06402B] dark:text-emerald-400" /> Sync Deadlines
               </button>
-
-              <button
-                onClick={() => setShowColors(v => !v)}
+              <button onClick={() => setShowColors(v => !v)}
                 className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-left"
               >
                 <span className={`w-3 h-3 rounded-full ${getCourseColor(course.color).dot}`} />
                 Change Color
-                <FaChevronDown size={8} className={`ml-auto opacity-40 transition-transform ${showColors ? "rotate-180" : ""}`} />
+                <FaChevronDown size={8} className={`ml-auto opacity-40 transition-transform ${showColors?"rotate-180":""}`} />
               </button>
-
               <AnimatePresence>
                 {showColors && (
                   <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
                     <div className="flex gap-2 px-3 pb-2 pt-1">
                       {COURSE_COLORS.map(c => (
-                        <button
-                          key={c.name}
-                          onClick={() => { onColorChange(c.name); setOpen(false); setShowColors(false); }}
-                          className={`w-6 h-6 rounded-full ${c.dot} hover:scale-110 transition-transform ${course.color === c.name ? "ring-2 ring-offset-2 ring-offset-white dark:ring-offset-zinc-900 ring-zinc-400" : ""}`}
+                        <button key={c.name} onClick={() => { onColorChange(c.name); setOpen(false); setShowColors(false); }}
+                          className={`w-6 h-6 rounded-full ${c.dot} hover:scale-110 transition-transform ${course.color===c.name?"ring-2 ring-offset-2 ring-offset-white dark:ring-offset-zinc-900 ring-zinc-400":""}`}
                           title={c.name}
                         />
                       ))}
@@ -699,14 +676,11 @@ function CourseCardMenu({
                   </motion.div>
                 )}
               </AnimatePresence>
-
               <div className="h-px bg-zinc-100 dark:bg-zinc-800 mx-2 my-1" />
-              <button
-                onClick={(e) => { onDelete(e); setOpen(false); }}
+              <button onClick={(e) => { onDelete(e); setOpen(false); }}
                 className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-black text-red-500 bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 transition-colors text-left border border-red-100 dark:border-red-500/20"
               >
-                <FaTrash size={12} />
-                Delete Course
+                <FaTrash size={12} /> Delete Course
               </button>
             </div>
           </motion.div>
@@ -718,26 +692,27 @@ function CourseCardMenu({
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function UniversityTracker({ onSyncToSchedule }: { onSyncToSchedule?: (course: any) => void }) {
-  const [courses, setCourses]               = useState<Course[]>([]);
-  const [tasks, setTasks]                   = useState<CourseTask[]>([]);
+export default function UniversityTracker() {
+  const [courses, setCourses]                   = useState<Course[]>([]);
+  const [tasks, setTasks]                       = useState<CourseTask[]>([]);
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
-  const [isAddingCourse, setIsAddingCourse] = useState(false);
-  const [newCourseTitle, setNewCourseTitle] = useState("");
-  const [modal, setModal]                   = useState<ModalState>({ isOpen:false, title:"", message:"", confirmText:"Confirm", onConfirm:()=>{} });
-  const [syncModal, setSyncModal]           = useState<{isOpen:boolean;payload:ScheduleSyncPayload|null}>({ isOpen:false, payload:null });
-
-  const [searchQuery, setSearchQuery]       = useState("");
-  const [filterStatus, setFilterStatus]     = useState<FilterStatus>("ALL");
-  const [sortKey, setSortKey]               = useState<SortKey>("none");
-  const [sortAsc, setSortAsc]               = useState(true);
-  const [showKbdHints, setShowKbdHints]     = useState(false);
-  const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
-  const [bulkMenuOpen, setBulkMenuOpen]     = useState(false);
+  const [isAddingCourse, setIsAddingCourse]     = useState(false);
+  const [newCourseTitle, setNewCourseTitle]     = useState("");
+  const [modal, setModal]                       = useState<ModalState>({ isOpen:false, title:"", message:"", confirmText:"Confirm", onConfirm:()=>{} });
+  const [syncModal, setSyncModal]               = useState<{isOpen:boolean;payload:ScheduleSyncPayload|null}>({ isOpen:false, payload:null });
+  const [searchQuery, setSearchQuery]           = useState("");
+  const [filterStatus, setFilterStatus]         = useState<FilterStatus>("ALL");
+  const [sortKey, setSortKey]                   = useState<SortKey>("none");
+  const [sortAsc, setSortAsc]                   = useState(true);
+  const [showKbdHints, setShowKbdHints]         = useState(false);
+  const [expandedNoteId, setExpandedNoteId]     = useState<string | null>(null);
+  const [selectedTaskIds, setSelectedTaskIds]   = useState<Set<string>>(new Set());
+  const [bulkMenuOpen, setBulkMenuOpen]         = useState(false);
   const bulkRef = useRef<HTMLDivElement>(null);
 
   const closeModal = useCallback(() => setModal(m=>({...m,isOpen:false})), []);
 
+  // ✅ FIX: All useEffects at top level — no hooks after conditional returns
   useEffect(() => {
     const h = (e:MouseEvent) => { if (bulkRef.current&&!bulkRef.current.contains(e.target as Node)) setBulkMenuOpen(false); };
     document.addEventListener("mousedown", h);
@@ -766,6 +741,39 @@ export default function UniversityTracker({ onSyncToSchedule }: { onSyncToSchedu
     return () => { unsubCourses(); unsubTasks(); };
   }, []);
 
+  // ✅ FIX: Guard effect at top level — resets selectedCourseId if course is deleted
+  useEffect(() => {
+    if (selectedCourseId && courses.length > 0 && !courses.find(c => c.id === selectedCourseId)) {
+      setSelectedCourseId(null);
+    }
+  }, [selectedCourseId, courses]);
+
+  // ── Derived state (always computed, never conditional) ────────────────────
+  const activeCourse    = courses.find(c => c.id === selectedCourseId) ?? null;
+  const color           = getCourseColor(activeCourse?.color);
+  const rawCourseTasks  = useMemo(() => tasks.filter(t => t.courseId === selectedCourseId), [tasks, selectedCourseId]);
+
+  const displayTasks = useMemo(()=>{
+    let out = [...rawCourseTasks];
+    if (searchQuery.trim()) { const q=searchQuery.toLowerCase(); out=out.filter(t=>t.name.toLowerCase().includes(q)||t.type.toLowerCase().includes(q)); }
+    if (filterStatus==="STARRED") out=out.filter(t=>t.starred);
+    else if (filterStatus==="OVERDUE") out=out.filter(t=>t.status==="OPEN"&&isOverdueDate(t.deadline));
+    else if (filterStatus!=="ALL") out=out.filter(t=>t.status===filterStatus);
+    if (sortKey!=="none") {
+      out.sort((a,b)=>{
+        let av="",bv="";
+        if (sortKey==="deadline") { av=a.deadline||"9999"; bv=b.deadline||"9999"; }
+        else if (sortKey==="type")   { av=a.type; bv=b.type; }
+        else if (sortKey==="status") { av=a.status; bv=b.status; }
+        else if (sortKey==="name")   { av=a.name.toLowerCase(); bv=b.name.toLowerCase(); }
+        return sortAsc?av.localeCompare(bv):bv.localeCompare(av);
+      });
+    }
+    out.sort((a,b)=>(b.starred?1:0)-(a.starred?1:0));
+    return out;
+  },[rawCourseTasks,searchQuery,filterStatus,sortKey,sortAsc]);
+
+  // ── Actions ───────────────────────────────────────────────────────────────
   const handleAddCourse = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCourseTitle.trim()||!auth.currentUser) return;
@@ -775,12 +783,12 @@ export default function UniversityTracker({ onSyncToSchedule }: { onSyncToSchedu
 
   const handleAddTask = async (courseId: string) => {
     if (!auth.currentUser) return;
-    await addDoc(collection(db,"course_tasks"),{ userId:auth.currentUser.uid, courseId, name:"", type:"Assignment", status:"OPEN", deadline:"", grade:"", starred:false, createdAt:serverTimestamp() });
+    await addDoc(collection(db,"course_tasks"),{ userId:auth.currentUser.uid, courseId, name:"", type:"Assignment", status:"OPEN", deadline:"", grade:"", starred:false, notes:"", createdAt:serverTimestamp() });
   };
 
   const duplicateTask = async (task: CourseTask) => {
     if (!auth.currentUser) return;
-    await addDoc(collection(db,"course_tasks"),{ userId:auth.currentUser.uid, courseId:task.courseId, name:`${task.name} (copy)`, type:task.type, status:"OPEN", deadline:task.deadline, grade:"", starred:false, createdAt:serverTimestamp() });
+    await addDoc(collection(db,"course_tasks"),{ userId:auth.currentUser.uid, courseId:task.courseId, name:`${task.name} (copy)`, type:task.type, status:"OPEN", deadline:task.deadline, grade:"", starred:false, notes:"", createdAt:serverTimestamp() });
   };
 
   const updateTask = useCallback(async (taskId:string, field:keyof CourseTask, value:string|boolean) => {
@@ -829,40 +837,17 @@ export default function UniversityTracker({ onSyncToSchedule }: { onSyncToSchedu
     setSyncModal({ isOpen:true, payload:{ courseTitle:course.title, deadlines:courseTasks.filter(t=>t.deadline).sort((a,b)=>a.deadline.localeCompare(b.deadline)).map(t=>({name:t.name,type:t.type,date:t.deadline})) }});
   }, []);
 
-  const rawCourseTasks = useMemo(()=>tasks.filter(t=>t.courseId===selectedCourseId),[tasks,selectedCourseId]);
+  const toggleSort       = (key: SortKey) => { if (sortKey===key) setSortAsc(a=>!a); else { setSortKey(key); setSortAsc(true); } };
+  const toggleSelectTask = (id: string)   => { setSelectedTaskIds(prev=>{ const next=new Set(prev); next.has(id)?next.delete(id):next.add(id); return next; }); };
+  const selectAll        = () => { if (selectedTaskIds.size===displayTasks.length&&displayTasks.length>0) setSelectedTaskIds(new Set()); else setSelectedTaskIds(new Set(displayTasks.map(t=>t.id))); };
 
-  const displayTasks = useMemo(()=>{
-    let out = [...rawCourseTasks];
-    if (searchQuery.trim()) { const q=searchQuery.toLowerCase(); out=out.filter(t=>t.name.toLowerCase().includes(q)||t.type.toLowerCase().includes(q)); }
-    if (filterStatus==="STARRED") out=out.filter(t=>t.starred);
-    else if (filterStatus==="OVERDUE") out=out.filter(t=>t.status==="OPEN"&&isOverdueDate(t.deadline));
-    else if (filterStatus!=="ALL") out=out.filter(t=>t.status===filterStatus);
-    if (sortKey!=="none") {
-      out.sort((a,b)=>{
-        let av="",bv="";
-        if (sortKey==="deadline") { av=a.deadline||"9999"; bv=b.deadline||"9999"; }
-        else if (sortKey==="type")   { av=a.type; bv=b.type; }
-        else if (sortKey==="status") { av=a.status; bv=b.status; }
-        else if (sortKey==="name")   { av=a.name.toLowerCase(); bv=b.name.toLowerCase(); }
-        return sortAsc?av.localeCompare(bv):bv.localeCompare(av);
-      });
-    }
-    out.sort((a,b)=>(b.starred?1:0)-(a.starred?1:0));
-    return out;
-  },[rawCourseTasks,searchQuery,filterStatus,sortKey,sortAsc]);
-
-  const toggleSort = (key: SortKey) => { if (sortKey===key) setSortAsc(a=>!a); else { setSortKey(key); setSortAsc(true); } };
-  const toggleSelectTask = (id: string) => { setSelectedTaskIds(prev=>{ const next=new Set(prev); next.has(id)?next.delete(id):next.add(id); return next; }); };
-  const selectAll = () => { if (selectedTaskIds.size===displayTasks.length&&displayTasks.length>0) setSelectedTaskIds(new Set()); else setSelectedTaskIds(new Set(displayTasks.map(t=>t.id))); };
-
-  // ── COURSE GRID ──────────────────────────────────────────────────────────────
+  // ── COURSE GRID ───────────────────────────────────────────────────────────
   if (!selectedCourseId) {
     return (
       <div className="w-full max-w-6xl mx-auto space-y-8 relative">
         <ConfirmModal modal={modal} onClose={closeModal}/>
         <ScheduleSyncModal isOpen={syncModal.isOpen} onClose={()=>setSyncModal(s=>({...s,isOpen:false}))} payload={syncModal.payload}/>
 
-        {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 bg-white/50 dark:bg-[#121214]/50 p-6 md:p-8 rounded-[2rem] border border-zinc-200 dark:border-zinc-800/80 backdrop-blur-xl shadow-sm">
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#06402B]/10 dark:bg-emerald-500/10 text-[#06402B] dark:text-emerald-400 rounded-full text-[10px] font-black uppercase tracking-widest mb-3">
@@ -878,7 +863,6 @@ export default function UniversityTracker({ onSyncToSchedule }: { onSyncToSchedu
           </button>
         </div>
 
-        {/* Add form */}
         <AnimatePresence>
           {isAddingCourse && (
             <motion.form initial={{opacity:0,height:0}} animate={{opacity:1,height:"auto"}} exit={{opacity:0,height:0}} onSubmit={handleAddCourse} className="overflow-hidden max-w-2xl">
@@ -902,18 +886,17 @@ export default function UniversityTracker({ onSyncToSchedule }: { onSyncToSchedu
           </motion.div>
         )}
 
-        {/* Course cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 items-start">
           <AnimatePresence>
             {courses.map(course => {
-              const ct = tasks.filter(t=>t.courseId===course.id);
-              const done = ct.filter(t=>t.status!=="OPEN").length;
+              const ct       = tasks.filter(t=>t.courseId===course.id);
+              const done     = ct.filter(t=>t.status!=="OPEN").length;
               const progress = ct.length>0?(done/ct.length)*100:0;
               const upcoming = ct.filter(t=>t.deadline&&new Date(t.deadline+"T00:00:00")>=new Date()).sort((a,b)=>a.deadline.localeCompare(b.deadline))[0];
-              const overdue = ct.filter(t=>t.status==="OPEN"&&isOverdueDate(t.deadline)).length;
-              const starred = ct.filter(t=>t.starred).length;
+              const overdue  = ct.filter(t=>t.status==="OPEN"&&isOverdueDate(t.deadline)).length;
+              const starred  = ct.filter(t=>t.starred).length;
               const gpaResult = computeCourseGpa(ct);
-              const color = getCourseColor(course.color);
+              const c        = getCourseColor(course.color);
 
               return (
                 <motion.div key={course.id} initial={{opacity:0,y:15}} animate={{opacity:1,y:0}} exit={{opacity:0,scale:0.95}} whileHover={{y:-4}}
@@ -921,36 +904,32 @@ export default function UniversityTracker({ onSyncToSchedule }: { onSyncToSchedu
                   className="bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800/80 rounded-[2rem] p-6 cursor-pointer shadow-sm hover:shadow-xl group transition-all relative"
                 >
                   <div className="absolute inset-0 rounded-[2rem] overflow-hidden pointer-events-none z-0">
-                    <div className={`absolute -top-12 -right-12 w-36 h-36 ${color.bg} rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500`}/>
+                    <div className={`absolute -top-12 -right-12 w-36 h-36 ${c.bg} rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500`}/>
                   </div>
 
                   <div className="flex justify-between items-start mb-5 relative z-[100]">
                     <div className="flex items-center gap-3">
-                      <div className={`w-12 h-12 ${color.bg} ${color.text} rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shrink-0`}>
+                      <div className={`w-12 h-12 ${c.bg} ${c.text} rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shrink-0`}>
                         <FaBook size={18}/>
                       </div>
                       {gpaResult && (
-                        <div className={`px-2.5 py-1 rounded-xl text-xs font-black tabular-nums border ${gpaResult.gpa>=3.0?`${color.bg} ${color.text} ${color.border}`:gpaResult.gpa>=1.0?"bg-yellow-50 text-yellow-600 dark:text-yellow-400 border-yellow-200 dark:border-yellow-500/30":"bg-red-50 text-red-600 dark:text-red-400 border-red-200 dark:border-red-500/30"}`}>
+                        <div className={`px-2.5 py-1 rounded-xl text-xs font-black tabular-nums border ${gpaResult.gpa>=3.0?`${c.bg} ${c.text} ${c.border}`:gpaResult.gpa>=1.0?"bg-yellow-50 text-yellow-600 dark:text-yellow-400 border-yellow-200 dark:border-yellow-500/30":"bg-red-50 text-red-600 dark:text-red-400 border-red-200 dark:border-red-500/30"}`}>
                           {gpaResult.gpa.toFixed(1)} GPA
                         </div>
                       )}
                     </div>
-
                     <div className="relative z-[100]">
-                      <div className="w-9 h-9 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 flex items-center justify-center text-zinc-500 dark:text-zinc-400 transition-all active:scale-90 touch-manipulation shadow-sm">
-                        <CourseCardMenu
-                          course={course}
-                          ct={ct}
-                          onDelete={e => { e.stopPropagation(); triggerDeleteCourse(course.id, e); }}
-                          onSync={e => { e.stopPropagation(); handleOpenSync(course, ct, e); }}
-                          onColorChange={async (c) => { await updateDoc(doc(db,"courses",course.id),{color:c}); }}
-                        />
-                      </div>
+                      <CourseCardMenu
+                        course={course} ct={ct}
+                        onDelete={e => { e.stopPropagation(); triggerDeleteCourse(course.id, e); }}
+                        onSync={e => { e.stopPropagation(); handleOpenSync(course, ct, e); }}
+                        onColorChange={async (col) => { await updateDoc(doc(db,"courses",course.id),{color:col}); }}
+                      />
                     </div>
                   </div>
 
                   <div className="relative z-10 mb-4">
-                    <h3 className={`text-lg font-black text-zinc-900 dark:text-white leading-tight mb-0.5 truncate group-hover:${color.text} transition-colors`}>{course.title}</h3>
+                    <h3 className={`text-lg font-black text-zinc-900 dark:text-white leading-tight mb-0.5 truncate group-hover:${c.text} transition-colors`}>{course.title}</h3>
                     <div className="flex items-center gap-3 flex-wrap">
                       <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{ct.length} {ct.length===1?"deliverable":"deliverables"}</p>
                       {overdue>0 && <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-red-500/10 text-red-500 rounded text-[9px] font-black uppercase tracking-widest"><FaExclamationTriangle size={8} className="-mt-0.5"/>{overdue} overdue</span>}
@@ -970,18 +949,18 @@ export default function UniversityTracker({ onSyncToSchedule }: { onSyncToSchedu
                   <div className="relative z-10 space-y-2">
                     <div className="flex justify-between items-center">
                       <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Completion</span>
-                      <span className={`text-[10px] font-black ${color.text} tabular-nums`}>{Math.round(progress)}%</span>
+                      <span className={`text-[10px] font-black ${c.text} tabular-nums`}>{Math.round(progress)}%</span>
                     </div>
                     <div className="h-1.5 w-full bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
                       <motion.div initial={{width:0}} animate={{width:`${progress}%`}} transition={{duration:0.9,ease:"easeOut",delay:0.1}}
-                        className={`h-full ${color.dot} rounded-full opacity-80`}
+                        className={`h-full ${c.dot} rounded-full opacity-80`}
                       />
                     </div>
                   </div>
 
                   <div className="relative z-10 mt-4 pt-3 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
                     <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest">
-                      {ct.length} deliverable{ct.length !== 1 ? "s" : ""}
+                      {ct.length} deliverable{ct.length!==1?"s":""}
                     </span>
                     <button
                       onClick={e => { e.stopPropagation(); triggerDeleteCourse(course.id, e); }}
@@ -990,7 +969,6 @@ export default function UniversityTracker({ onSyncToSchedule }: { onSyncToSchedu
                       <FaTrash size={9} /> Delete
                     </button>
                   </div>
-
                 </motion.div>
               );
             })}
@@ -1000,12 +978,8 @@ export default function UniversityTracker({ onSyncToSchedule }: { onSyncToSchedu
     );
   }
 
-  // ── COURSE DETAIL ────────────────────────────────────────────────────────────
-
-  const activeCourse = courses.find(c => c.id === selectedCourseId);
-
-  if (!activeCourse) { setSelectedCourseId(null); return null; }
-  const color = getCourseColor(activeCourse.color);
+  // ✅ FIX: Safe null check after conditional return — no hooks below this line
+  if (!activeCourse) return null;
 
   return (
     <motion.div initial={{opacity:0,y:12}} animate={{opacity:1,y:0}} className="w-full max-w-6xl mx-auto space-y-4 relative">
@@ -1014,33 +988,24 @@ export default function UniversityTracker({ onSyncToSchedule }: { onSyncToSchedu
 
       {/* Course header */}
       <div className="bg-white/60 dark:bg-[#121214]/80 backdrop-blur-xl p-5 md:p-8 rounded-[2rem] border border-zinc-200 dark:border-zinc-800/80 shadow-sm">
-
-        {/* Top action row */}
         <div className="flex items-center justify-between gap-2 mb-5">
-          <button
-            onClick={()=>setSelectedCourseId(null)}
+          <button onClick={()=>setSelectedCourseId(null)}
             className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 shadow-sm text-[10px] font-bold text-zinc-600 dark:text-zinc-300 uppercase tracking-widest hover:text-[#06402B] dark:hover:text-emerald-400 hover:border-[#06402B]/30 rounded-xl transition-all touch-manipulation"
           >
-            <FaArrowLeft size={10}/> Back
-            <span className="opacity-40 font-mono hidden sm:inline">Esc</span>
+            <FaArrowLeft size={10}/> Back <span className="opacity-40 font-mono hidden sm:inline">Esc</span>
           </button>
-
           <div className="flex items-center gap-2">
-            <button
-              onClick={e=>handleOpenSync(activeCourse,rawCourseTasks,e)}
+            <button onClick={e=>handleOpenSync(activeCourse,rawCourseTasks,e)}
               className={`p-2.5 ${color.bg} ${color.text} border ${color.border} rounded-xl transition-all flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest touch-manipulation`}
             >
-              <FaCalendarAlt size={11}/>
-              <span className="hidden sm:inline">Sync</span>
+              <FaCalendarAlt size={11}/> <span className="hidden sm:inline">Sync</span>
             </button>
-            <button
-              onClick={()=>setShowKbdHints(v=>!v)}
+            <button onClick={()=>setShowKbdHints(v=>!v)}
               className={`p-2.5 border rounded-xl transition-all hidden md:flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest ${showKbdHints?"bg-zinc-900 text-white border-zinc-700":"bg-white dark:bg-zinc-900 text-zinc-500 border-zinc-200 dark:border-zinc-700"}`}
             >
               <FaKeyboard size={11}/> Shortcuts
             </button>
-            <button
-              onClick={()=>handleAddTask(activeCourse.id)}
+            <button onClick={()=>handleAddTask(activeCourse.id)}
               className="flex items-center gap-1.5 px-4 py-2.5 bg-[#06402B] dark:bg-emerald-600 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-[#042d1f] dark:hover:bg-emerald-500 active:scale-95 transition-all shadow-md touch-manipulation"
             >
               <FaPlus size={11}/> <span className="hidden sm:inline">New</span>
@@ -1150,7 +1115,6 @@ export default function UniversityTracker({ onSyncToSchedule }: { onSyncToSchedu
           </div>
         )}
       </div>
-      
 
       {/* ── MOBILE CARD VIEW ── */}
       <div className="md:hidden space-y-3">
@@ -1191,7 +1155,7 @@ export default function UniversityTracker({ onSyncToSchedule }: { onSyncToSchedu
                       <button onClick={()=>deleteTask(task.id)} className="p-2 text-zinc-300 dark:text-zinc-700 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-all active:scale-90 touch-manipulation"><FaTrash size={11}/></button>
                     </div>
                   </div>
-                  <div className="grid grid-cols-3 gap-2 px-4 pb-4 pt-1 border-t border-zinc-50 dark:border-zinc-800">
+                  <div className="grid grid-cols-3 gap-2 px-4 pb-3 pt-1 border-t border-zinc-50 dark:border-zinc-800">
                     <div>
                       <p className="text-[8px] font-black text-zinc-400 uppercase tracking-widest mb-1.5 px-1">Status</p>
                       <div className={`flex items-center px-2.5 py-2 rounded-xl border text-[9px] font-bold uppercase tracking-wider ${statusMeta.color}`}>
@@ -1210,6 +1174,32 @@ export default function UniversityTracker({ onSyncToSchedule }: { onSyncToSchedu
                       <GradeEdit value={task.grade} onSave={v=>updateTask(task.id,"grade",v)}/>
                     </div>
                   </div>
+                  <div className="px-4 pb-4 border-t border-zinc-50 dark:border-zinc-800 pt-2">
+                    <button
+                      onClick={()=>setExpandedNoteId(prev => prev===task.id ? null : task.id)}
+                      className={`flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest transition-colors ${task.notes?.trim()?"text-amber-500":"text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"}`}
+                    >
+                      <FaStickyNote size={9}/>
+                      {task.notes?.trim() ? "Note attached" : "Add note"}
+                    </button>
+                    <AnimatePresence>
+                      {expandedNoteId===task.id && (
+                        <motion.div initial={{height:0,opacity:0}} animate={{height:"auto",opacity:1}} exit={{height:0,opacity:0}} className="overflow-hidden mt-2">
+                          <textarea
+                            value={task.notes||""}
+                            onChange={e=>updateTask(task.id,"notes",e.target.value)}
+                            placeholder="Add a note... e.g. 'Prof said this counts 15% not 20%'"
+                            rows={2} maxLength={300}
+                            className="w-full bg-amber-50/50 dark:bg-amber-500/5 border border-amber-200/60 dark:border-amber-500/20 rounded-xl px-3 py-2 outline-none text-xs font-medium text-zinc-700 dark:text-zinc-300 placeholder:text-zinc-400 resize-none"
+                          />
+                          <div className="flex items-center justify-between mt-1">
+                            <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest">{(task.notes||"").length}/300</span>
+                            <button onClick={()=>setExpandedNoteId(null)} className="text-[9px] font-bold text-zinc-400 hover:text-zinc-600 uppercase tracking-widest transition-colors">Done</button>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
                 </motion.div>
               );
             })}
@@ -1227,7 +1217,7 @@ export default function UniversityTracker({ onSyncToSchedule }: { onSyncToSchedu
       {/* ── DESKTOP TABLE VIEW ── */}
       <div className="hidden md:block w-full overflow-visible pb-32">
         <div className="min-w-[1020px] w-full bg-white dark:bg-[#18181b] rounded-[2rem] border border-zinc-200 dark:border-zinc-800 shadow-lg relative z-10">
-          <div className="grid grid-cols-[28px_24px_2fr_1.4fr_1.2fr_1.4fr_0.7fr_0.5fr_0.4fr] gap-2 px-5 py-3.5 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/80 dark:bg-[#111113] rounded-t-[2rem] text-[10px] font-black uppercase tracking-widest text-zinc-400 select-none">
+          <div className="grid grid-cols-[28px_24px_2fr_1.4fr_1.2fr_1.4fr_0.7fr_0.5fr_0.4fr_0.3fr] gap-2 px-5 py-3.5 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/80 dark:bg-[#111113] rounded-t-[2rem] text-[10px] font-black uppercase tracking-widest text-zinc-400 select-none">
             <div className="flex items-center">
               <input type="checkbox" checked={selectedTaskIds.size===displayTasks.length&&displayTasks.length>0} onChange={selectAll} className="w-3.5 h-3.5 accent-[#06402B] cursor-pointer"/>
             </div>
@@ -1242,6 +1232,7 @@ export default function UniversityTracker({ onSyncToSchedule }: { onSyncToSchedu
             ))}
             <div className="text-center">Grade</div>
             <div/><div/>
+            <div title="Notes" className="flex items-center justify-center text-zinc-400"><FaStickyNote size={9}/></div>
           </div>
 
           <div className="divide-y divide-zinc-50 dark:divide-zinc-800/40">
@@ -1255,26 +1246,59 @@ export default function UniversityTracker({ onSyncToSchedule }: { onSyncToSchedu
               {displayTasks.map(task=>{
                 const isSelected = selectedTaskIds.has(task.id);
                 return (
-                  <motion.div key={task.id} initial={{opacity:0,y:-8}} animate={{opacity:1,y:0}} exit={{opacity:0,height:0}}
-                    className={`grid grid-cols-[28px_24px_2fr_1.4fr_1.2fr_1.4fr_0.7fr_0.5fr_0.4fr] gap-2 px-5 py-2.5 items-center transition-colors group border-l-[3px] ${isSelected?"bg-[#06402B]/5 dark:bg-emerald-500/5 border-l-[#06402B] dark:border-l-emerald-500":"hover:bg-zinc-50/60 dark:hover:bg-white/[0.03] border-l-transparent hover:border-l-[#06402B] dark:hover:border-l-emerald-500"} ${task.starred?"bg-amber-50/30 dark:bg-amber-500/5":""}`}
-                  >
-                    <div className="flex items-center"><input type="checkbox" checked={isSelected} onChange={()=>toggleSelectTask(task.id)} className="w-3.5 h-3.5 accent-[#06402B] cursor-pointer"/></div>
-                    <button onClick={()=>updateTask(task.id,"starred",!task.starred)} className={`flex items-center justify-center transition-all ${task.starred?"text-amber-400":"text-zinc-200 dark:text-zinc-700 hover:text-amber-400"}`}><FaStar size={12}/></button>
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className="flex-1 min-w-0"><InlineEdit value={task.name} onSave={(v: any)=>updateTask(task.id,"name",v)} placeholder="Untitled deliverable…"/></div>
-                      <UrgencyBadge deadline={task.deadline} status={task.status}/>
+                  <motion.div key={task.id} initial={{opacity:0,y:-8}} animate={{opacity:1,y:0}} exit={{opacity:0,height:0}} className="group">
+                    <div className={`grid grid-cols-[28px_24px_2fr_1.4fr_1.2fr_1.4fr_0.7fr_0.5fr_0.4fr_0.3fr] gap-2 px-5 py-2.5 items-center transition-colors border-l-[3px] ${
+                      isSelected ? "bg-[#06402B]/5 dark:bg-emerald-500/5 border-l-[#06402B] dark:border-l-emerald-500"
+                      : "hover:bg-zinc-50/60 dark:hover:bg-white/[0.03] border-l-transparent hover:border-l-[#06402B] dark:hover:border-l-emerald-500"
+                    } ${task.starred?"bg-amber-50/30 dark:bg-amber-500/5":""}`}>
+                      <div className="flex items-center"><input type="checkbox" checked={isSelected} onChange={()=>toggleSelectTask(task.id)} className="w-3.5 h-3.5 accent-[#06402B] cursor-pointer"/></div>
+                      <button onClick={()=>updateTask(task.id,"starred",!task.starred)} className={`flex items-center justify-center transition-all ${task.starred?"text-amber-400":"text-zinc-200 dark:text-zinc-700 hover:text-amber-400"}`}><FaStar size={12}/></button>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="flex-1 min-w-0"><InlineEdit value={task.name} onSave={v=>updateTask(task.id,"name",v)} placeholder="Untitled deliverable…"/></div>
+                        <UrgencyBadge deadline={task.deadline} status={task.status}/>
+                      </div>
+                      <TypePicker value={safeType(task.type)} onChange={v=>updateTask(task.id,"type",v)}/>
+                      <div className={`flex items-center px-2.5 py-1.5 rounded-xl border text-[10px] font-bold uppercase tracking-wider ${safeStatusMeta(task.status).color}`}>
+                        <Dropdown<TaskStatus> value={safeStatus(task.status)} options={TASK_STATUSES} onChange={v=>updateTask(task.id,"status",v)}
+                          renderValue={v=><span className="truncate">{v}</span>}
+                          renderOption={v=><span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border ${safeStatusMeta(v).color}`}>{v}</span>}
+                        />
+                      </div>
+                      <DateInput value={task.deadline} onChange={v=>updateTask(task.id,"deadline",v)}/>
+                      <GradeEdit value={task.grade} onSave={v=>updateTask(task.id,"grade",v)}/>
+                      <button onClick={()=>duplicateTask(task)} className="flex items-center justify-center p-1.5 text-zinc-300 dark:text-zinc-700 hover:text-zinc-500 dark:hover:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 opacity-0 group-hover:opacity-100 transition-all rounded-lg active:scale-90"><FaCopy size={11}/></button>
+                      <button onClick={()=>deleteTask(task.id)} className="flex items-center justify-center p-1.5 text-zinc-300 dark:text-zinc-700 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all rounded-lg active:scale-90"><FaTrash size={11}/></button>
+                      <button
+                        onClick={()=>setExpandedNoteId(prev => prev===task.id ? null : task.id)}
+                        title="Notes"
+                        className={`flex items-center justify-center p-1.5 rounded-lg transition-all ${
+                          expandedNoteId===task.id ? "text-[#06402B] dark:text-emerald-400 bg-[#06402B]/10"
+                          : task.notes?.trim() ? "text-amber-500 bg-amber-500/10"
+                          : "text-zinc-300 dark:text-zinc-700 hover:text-zinc-500 opacity-0 group-hover:opacity-100"
+                        }`}
+                      >
+                        <FaStickyNote size={11}/>
+                      </button>
                     </div>
-                    <TypePicker value={safeType(task.type)} onChange={(v: any)=>updateTask(task.id,"type",v)}/>
-                    <div className={`flex items-center px-2.5 py-1.5 rounded-xl border text-[10px] font-bold uppercase tracking-wider ${safeStatusMeta(task.status).color}`}>
-                      <Dropdown<TaskStatus> value={safeStatus(task.status)} options={TASK_STATUSES} onChange={(v: any)=>updateTask(task.id,"status",v)}
-                        renderValue={v=><span className="truncate">{v}</span>}
-                        renderOption={v=><span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border ${safeStatusMeta(v).color}`}>{v}</span>}
-                      />
-                    </div>
-                    <DateInput value={task.deadline} onChange={(v: any)=>updateTask(task.id,"deadline",v)}/>
-                    <GradeEdit value={task.grade} onSave={(v: any)=>updateTask(task.id,"grade",v)}/>
-                    <button onClick={()=>duplicateTask(task)} className="flex items-center justify-center p-1.5 text-zinc-300 dark:text-zinc-700 hover:text-zinc-500 dark:hover:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 opacity-0 group-hover:opacity-100 transition-all rounded-lg active:scale-90"><FaCopy size={11}/></button>
-                    <button onClick={()=>deleteTask(task.id)} className="flex items-center justify-center p-1.5 text-zinc-300 dark:text-zinc-700 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all rounded-lg active:scale-90"><FaTrash size={11}/></button>
+                    <AnimatePresence>
+                      {expandedNoteId===task.id && (
+                        <motion.div initial={{height:0,opacity:0}} animate={{height:"auto",opacity:1}} exit={{height:0,opacity:0}} transition={{duration:0.18}} className="overflow-hidden">
+                          <div className="px-5 pb-3 pt-2 bg-amber-50/40 dark:bg-amber-500/5 border-l-[3px] border-l-amber-400/50">
+                            <textarea
+                              value={task.notes||""}
+                              onChange={e=>updateTask(task.id,"notes",e.target.value)}
+                              placeholder="Add a note... e.g. 'Prof said this counts 15% not 20%'"
+                              rows={2} maxLength={300}
+                              className="w-full bg-transparent outline-none text-xs font-medium text-zinc-700 dark:text-zinc-300 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 resize-none leading-relaxed"
+                            />
+                            <div className="flex items-center justify-between mt-1">
+                              <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest">{(task.notes||"").length}/300</span>
+                              <button onClick={()=>setExpandedNoteId(null)} className="text-[9px] font-bold text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 uppercase tracking-widest transition-colors">Done</button>
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </motion.div>
                 );
               })}
