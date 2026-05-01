@@ -15,6 +15,16 @@ import {
   collection, query, where, orderBy, onSnapshot,
   addDoc, updateDoc, deleteDoc, doc, serverTimestamp, writeBatch
 } from "firebase/firestore";
+import {
+  DndContext, closestCenter, KeyboardSensor, PointerSensor,
+  useSensor, useSensors, DragEndEvent, DragOverlay, DragStartEvent
+} from '@dnd-kit/core';
+import {
+  arrayMove, SortableContext, sortableKeyboardCoordinates,
+  useSortable, verticalListSortingStrategy
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { FaGripVertical } from 'react-icons/fa';
 import { auth, db } from "@/lib/db";
 import { getGpaFromScore } from "../../components/Tools/GradeCalculator";
 
@@ -690,6 +700,27 @@ function CourseCardMenu({
   );
 }
 
+function SortableTaskRow({ id, isDragDisabled, children }: {
+  id: string; isDragDisabled: boolean; children: (dragHandleProps: any, isDragging: boolean) => React.ReactNode;
+}) {
+  const {
+    attributes, listeners, setNodeRef, transform, transition, isDragging
+  } = useSortable({ id, disabled: isDragDisabled });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+    position: 'relative' as const,
+    zIndex: isDragging ? 1 : 'auto' as any,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      {children({ ...attributes, ...listeners }, isDragging)}
+    </div>
+  );
+}
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function UniversityTracker() {
@@ -711,7 +742,13 @@ export default function UniversityTracker() {
   const bulkRef = useRef<HTMLDivElement>(null);
 
   const closeModal = useCallback(() => setModal(m=>({...m,isOpen:false})), []);
+  const [manualOrder, setManualOrder] = useState<string[]>([]);
+const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
 
+const sensors = useSensors(
+  useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+  useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+);
   // ✅ FIX: All useEffects at top level — no hooks after conditional returns
   useEffect(() => {
     const h = (e:MouseEvent) => { if (bulkRef.current&&!bulkRef.current.contains(e.target as Node)) setBulkMenuOpen(false); };
@@ -748,31 +785,72 @@ export default function UniversityTracker() {
     }
   }, [selectedCourseId, courses]);
 
+  
+
   // ── Derived state (always computed, never conditional) ────────────────────
   const activeCourse    = courses.find(c => c.id === selectedCourseId) ?? null;
   const color           = getCourseColor(activeCourse?.color);
   const rawCourseTasks  = useMemo(() => tasks.filter(t => t.courseId === selectedCourseId), [tasks, selectedCourseId]);
 
-  const displayTasks = useMemo(()=>{
-    let out = [...rawCourseTasks];
-    if (searchQuery.trim()) { const q=searchQuery.toLowerCase(); out=out.filter(t=>t.name.toLowerCase().includes(q)||t.type.toLowerCase().includes(q)); }
-    if (filterStatus==="STARRED") out=out.filter(t=>t.starred);
-    else if (filterStatus==="OVERDUE") out=out.filter(t=>t.status==="OPEN"&&isOverdueDate(t.deadline));
-    else if (filterStatus!=="ALL") out=out.filter(t=>t.status===filterStatus);
-    if (sortKey!=="none") {
-      out.sort((a,b)=>{
-        let av="",bv="";
-        if (sortKey==="deadline") { av=a.deadline||"9999"; bv=b.deadline||"9999"; }
-        else if (sortKey==="type")   { av=a.type; bv=b.type; }
-        else if (sortKey==="status") { av=a.status; bv=b.status; }
-        else if (sortKey==="name")   { av=a.name.toLowerCase(); bv=b.name.toLowerCase(); }
-        return sortAsc?av.localeCompare(bv):bv.localeCompare(av);
-      });
-    }
-    out.sort((a,b)=>(b.starred?1:0)-(a.starred?1:0));
-    return out;
-  },[rawCourseTasks,searchQuery,filterStatus,sortKey,sortAsc]);
+const displayTasks = useMemo(() => {
+  let out = [...rawCourseTasks];
+  if (searchQuery.trim()) { const q = searchQuery.toLowerCase(); out = out.filter(t => t.name.toLowerCase().includes(q) || t.type.toLowerCase().includes(q)); }
+  if (filterStatus === "STARRED") out = out.filter(t => t.starred);
+  else if (filterStatus === "OVERDUE") out = out.filter(t => t.status === "OPEN" && isOverdueDate(t.deadline));
+  else if (filterStatus !== "ALL") out = out.filter(t => t.status === filterStatus);
 
+  if (sortKey !== "none") {
+    out.sort((a, b) => {
+      let av = "", bv = "";
+      if (sortKey === "deadline") { av = a.deadline || "9999"; bv = b.deadline || "9999"; }
+      else if (sortKey === "type")   { av = a.type; bv = b.type; }
+      else if (sortKey === "status") { av = a.status; bv = b.status; }
+      else if (sortKey === "name")   { av = a.name.toLowerCase(); bv = b.name.toLowerCase(); }
+      return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
+    });
+  } else {
+    // ✅ Manual order when sort is "none"
+    out.sort((a, b) => {
+      const ai = manualOrder.indexOf(a.id);
+      const bi = manualOrder.indexOf(b.id);
+      if (ai === -1) return 1;
+      if (bi === -1) return -1;
+      return ai - bi;
+    });
+  }
+
+  out.sort((a, b) => (b.starred ? 1 : 0) - (a.starred ? 1 : 0));
+  return out;
+}, [rawCourseTasks, searchQuery, filterStatus, sortKey, sortAsc, manualOrder]);
+
+
+  useEffect(() => {
+  setManualOrder(rawCourseTasks.map(t => t.id));
+}, [selectedCourseId]);
+
+// Keep manualOrder in sync when new tasks are added/deleted
+useEffect(() => {
+  setManualOrder(prev => {
+    const existingIds = new Set(rawCourseTasks.map(t => t.id));
+    const newIds = rawCourseTasks.map(t => t.id).filter(id => !prev.includes(id));
+    return [...prev.filter(id => existingIds.has(id)), ...newIds];
+  });
+}, [rawCourseTasks]);
+
+const handleDragStart = (event: DragStartEvent) => {
+  setActiveTaskId(event.active.id as string);
+};
+
+const handleDragEnd = (event: DragEndEvent) => {
+  const { active, over } = event;
+  setActiveTaskId(null);
+  if (!over || active.id === over.id) return;
+  setManualOrder(prev => {
+    const oldIndex = prev.indexOf(active.id as string);
+    const newIndex = prev.indexOf(over.id as string);
+    return arrayMove(prev, oldIndex, newIndex);
+  });
+};
   // ── Actions ───────────────────────────────────────────────────────────────
   const handleAddCourse = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1117,7 +1195,7 @@ export default function UniversityTracker() {
       </div>
 
       {/* ── MOBILE CARD VIEW ── */}
-      <div className="md:hidden space-y-3">
+<div className="md:hidden space-y-3">
         {displayTasks.length===0 ? (
           <div className="py-20 text-center flex flex-col items-center gap-3">
             <div className="w-14 h-14 bg-zinc-50 dark:bg-zinc-900 rounded-2xl flex items-center justify-center text-zinc-300 dark:text-zinc-700"><FaClipboardList size={22}/></div>
@@ -1127,86 +1205,187 @@ export default function UniversityTracker() {
             </button>
           </div>
         ) : (
-          <AnimatePresence>
-            {displayTasks.map(task=>{
-              const isSelected = selectedTaskIds.has(task.id);
-              const typeMeta   = safeTypeMeta(task.type);
-              const statusMeta = safeStatusMeta(task.status);
-              return (
-                <motion.div key={task.id} initial={{opacity:0,y:-8}} animate={{opacity:1,y:0}} exit={{opacity:0,height:0}}
-                  className={`bg-white dark:bg-[#18181b] rounded-2xl border transition-all ${isSelected?"border-[#06402B] dark:border-emerald-500 bg-[#06402B]/5 dark:bg-emerald-500/5":task.starred?"border-amber-200 dark:border-amber-500/30 bg-amber-50/30 dark:bg-amber-500/5":"border-zinc-200 dark:border-zinc-800"}`}
-                >
-                  <div className="flex items-start gap-3 p-4 pb-3">
-                    <div className="flex flex-col items-center gap-2 pt-0.5 shrink-0">
-                      <input type="checkbox" checked={isSelected} onChange={()=>toggleSelectTask(task.id)} className="w-4 h-4 accent-[#06402B] cursor-pointer"/>
-                      <button onClick={()=>updateTask(task.id,"starred",!task.starred)} className={`transition-all touch-manipulation ${task.starred?"text-amber-400":"text-zinc-300 dark:text-zinc-700"}`}>
-                        <FaStar size={13}/>
-                      </button>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <InlineEdit value={task.name} onSave={v=>updateTask(task.id,"name",v)} placeholder="Untitled deliverable…"/>
-                      <div className="flex items-center gap-2 mt-2 flex-wrap px-2.5">
-                        <span className={`px-2 py-0.5 rounded-lg border text-[9px] font-bold uppercase tracking-wider ${typeMeta.color}`}>{task.type}</span>
-                        <UrgencyBadge deadline={task.deadline} status={task.status}/>
+          <>
+            {/* Drag hint — only shown when manual sort is active */}
+            {sortKey === 'none' && !searchQuery && filterStatus === 'ALL' && displayTasks.length > 1 && (
+              <div className="flex items-center gap-1.5 px-1">
+                <FaGripVertical size={9} className="text-zinc-400"/>
+                <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest">Hold & drag to reorder</p>
+              </div>
+            )}
+
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={displayTasks.map(t => t.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                <AnimatePresence>
+                  {displayTasks.map(task => {
+                    const isSelected     = selectedTaskIds.has(task.id);
+                    const typeMeta       = safeTypeMeta(task.type);
+                    const statusMeta     = safeStatusMeta(task.status);
+                    const isDragDisabled = sortKey !== 'none' || !!searchQuery || filterStatus !== 'ALL';
+
+                    return (
+                      <SortableTaskRow key={task.id} id={task.id} isDragDisabled={isDragDisabled}>
+                        {(dragHandleProps, isDragging) => (
+                          <motion.div
+                            initial={{ opacity: 0, y: -8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className={`bg-white dark:bg-[#18181b] rounded-2xl border transition-all ${
+                              isDragging
+                                ? 'shadow-2xl border-[#06402B]/30 dark:border-emerald-500/30 scale-[1.01]'
+                                : isSelected
+                                ? 'border-[#06402B] dark:border-emerald-500 bg-[#06402B]/5 dark:bg-emerald-500/5'
+                                : task.starred
+                                ? 'border-amber-200 dark:border-amber-500/30 bg-amber-50/30 dark:bg-amber-500/5'
+                                : 'border-zinc-200 dark:border-zinc-800'
+                            }`}
+                          >
+                            {/* Top row */}
+                            <div className="flex items-start gap-3 p-4 pb-3">
+                              <div className="flex flex-col items-center gap-2 pt-0.5 shrink-0">
+                                {/* Drag handle */}
+                                {!isDragDisabled ? (
+                                  <button
+                                    {...dragHandleProps}
+                                    className="text-zinc-300 dark:text-zinc-600 hover:text-zinc-500 dark:hover:text-zinc-400 cursor-grab active:cursor-grabbing touch-manipulation p-0.5 rounded transition-colors"
+                                    title="Drag to reorder"
+                                  >
+                                    <FaGripVertical size={13}/>
+                                  </button>
+                                ) : (
+                                  <div className="w-5 h-5" />
+                                )}
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={() => toggleSelectTask(task.id)}
+                                  className="w-4 h-4 accent-[#06402B] cursor-pointer"
+                                />
+                                <button
+                                  onClick={() => updateTask(task.id, "starred", !task.starred)}
+                                  className={`transition-all touch-manipulation ${task.starred ? "text-amber-400" : "text-zinc-300 dark:text-zinc-700"}`}
+                                >
+                                  <FaStar size={13}/>
+                                </button>
+                              </div>
+
+                              <div className="flex-1 min-w-0">
+                                <InlineEdit value={task.name} onSave={v => updateTask(task.id, "name", v)} placeholder="Untitled deliverable…"/>
+                                <div className="flex items-center gap-2 mt-2 flex-wrap px-2.5">
+                                  <span className={`px-2 py-0.5 rounded-lg border text-[9px] font-bold uppercase tracking-wider ${typeMeta.color}`}>{task.type}</span>
+                                  <UrgencyBadge deadline={task.deadline} status={task.status}/>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-1 shrink-0">
+                                <button onClick={() => duplicateTask(task)} className="p-2 text-zinc-300 dark:text-zinc-700 hover:text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-all active:scale-90 touch-manipulation">
+                                  <FaCopy size={11}/>
+                                </button>
+                                <button onClick={() => deleteTask(task.id)} className="p-2 text-zinc-300 dark:text-zinc-700 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-all active:scale-90 touch-manipulation">
+                                  <FaTrash size={11}/>
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Status / Deadline / Grade */}
+                            <div className="grid grid-cols-3 gap-2 px-4 pb-3 pt-1 border-t border-zinc-50 dark:border-zinc-800">
+                              <div>
+                                <p className="text-[8px] font-black text-zinc-400 uppercase tracking-widest mb-1.5 px-1">Status</p>
+                                <div className={`flex items-center px-2.5 py-2 rounded-xl border text-[9px] font-bold uppercase tracking-wider ${statusMeta.color}`}>
+                                  <Dropdown<TaskStatus>
+                                    value={safeStatus(task.status)} options={TASK_STATUSES}
+                                    onChange={v => updateTask(task.id, "status", v)}
+                                    renderValue={v => <span className="truncate text-[9px]">{v}</span>}
+                                    renderOption={v => <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border ${safeStatusMeta(v).color}`}>{v}</span>}
+                                  />
+                                </div>
+                              </div>
+                              <div>
+                                <p className="text-[8px] font-black text-zinc-400 uppercase tracking-widest mb-1.5 px-1">Due</p>
+                                <DateInput value={task.deadline} onChange={v => updateTask(task.id, "deadline", v)}/>
+                              </div>
+                              <div>
+                                <p className="text-[8px] font-black text-zinc-400 uppercase tracking-widest mb-1.5 px-1">Grade</p>
+                                <GradeEdit value={task.grade} onSave={v => updateTask(task.id, "grade", v)}/>
+                              </div>
+                            </div>
+
+                            {/* Notes */}
+                            <div className="px-4 pb-4 border-t border-zinc-50 dark:border-zinc-800 pt-2">
+                              <button
+                                onClick={() => setExpandedNoteId(prev => prev === task.id ? null : task.id)}
+                                className={`flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest transition-colors ${
+                                  task.notes?.trim() ? "text-amber-500" : "text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+                                }`}
+                              >
+                                <FaStickyNote size={9}/>
+                                {task.notes?.trim() ? "Note attached" : "Add note"}
+                              </button>
+                              <AnimatePresence>
+                                {expandedNoteId === task.id && (
+                                  <motion.div
+                                    initial={{ height: 0, opacity: 0 }}
+                                    animate={{ height: "auto", opacity: 1 }}
+                                    exit={{ height: 0, opacity: 0 }}
+                                    className="overflow-hidden mt-2"
+                                  >
+                                    <textarea
+                                      value={task.notes || ""}
+                                      onChange={e => updateTask(task.id, "notes", e.target.value)}
+                                      placeholder="Add a note... e.g. 'Prof said this counts 15% not 20%'"
+                                      rows={2} maxLength={300}
+                                      className="w-full bg-amber-50/50 dark:bg-amber-500/5 border border-amber-200/60 dark:border-amber-500/20 rounded-xl px-3 py-2 outline-none text-xs font-medium text-zinc-700 dark:text-zinc-300 placeholder:text-zinc-400 resize-none"
+                                    />
+                                    <div className="flex items-center justify-between mt-1">
+                                      <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest">{(task.notes || "").length}/300</span>
+                                      <button onClick={() => setExpandedNoteId(null)} className="text-[9px] font-bold text-zinc-400 hover:text-zinc-600 uppercase tracking-widest transition-colors">Done</button>
+                                    </div>
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
+                            </div>
+                          </motion.div>
+                        )}
+                      </SortableTaskRow>
+                    );
+                  })}
+                </AnimatePresence>
+              </SortableContext>
+
+              {/* Ghost card while dragging */}
+              <DragOverlay dropAnimation={{ duration: 180, easing: 'ease' }}>
+                {activeTaskId && (() => {
+                  const task = displayTasks.find(t => t.id === activeTaskId);
+                  if (!task) return null;
+                  return (
+                    <div className="bg-white dark:bg-[#18181b] rounded-2xl border border-[#06402B]/40 dark:border-emerald-500/40 p-4 shadow-2xl rotate-1 opacity-95">
+                      <div className="flex items-center gap-2 mb-1">
+                        <FaGripVertical size={11} className="text-zinc-400"/>
+                        <p className="text-sm font-bold text-zinc-800 dark:text-zinc-200 truncate">{task.name || "Untitled deliverable"}</p>
+                      </div>
+                      <div className="flex items-center gap-2 pl-5">
+                        <span className={`px-2 py-0.5 rounded-lg border text-[9px] font-bold uppercase tracking-wider ${safeTypeMeta(task.type).color}`}>{task.type}</span>
+                        {task.deadline && <span className="text-[9px] font-mono text-zinc-400">{task.deadline}</span>}
                       </div>
                     </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button onClick={()=>duplicateTask(task)} className="p-2 text-zinc-300 dark:text-zinc-700 hover:text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-all active:scale-90 touch-manipulation"><FaCopy size={11}/></button>
-                      <button onClick={()=>deleteTask(task.id)} className="p-2 text-zinc-300 dark:text-zinc-700 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-all active:scale-90 touch-manipulation"><FaTrash size={11}/></button>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2 px-4 pb-3 pt-1 border-t border-zinc-50 dark:border-zinc-800">
-                    <div>
-                      <p className="text-[8px] font-black text-zinc-400 uppercase tracking-widest mb-1.5 px-1">Status</p>
-                      <div className={`flex items-center px-2.5 py-2 rounded-xl border text-[9px] font-bold uppercase tracking-wider ${statusMeta.color}`}>
-                        <Dropdown<TaskStatus> value={safeStatus(task.status)} options={TASK_STATUSES} onChange={v=>updateTask(task.id,"status",v)}
-                          renderValue={v=><span className="truncate text-[9px]">{v}</span>}
-                          renderOption={v=><span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border ${safeStatusMeta(v).color}`}>{v}</span>}
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-[8px] font-black text-zinc-400 uppercase tracking-widest mb-1.5 px-1">Due</p>
-                      <DateInput value={task.deadline} onChange={v=>updateTask(task.id,"deadline",v)}/>
-                    </div>
-                    <div>
-                      <p className="text-[8px] font-black text-zinc-400 uppercase tracking-widest mb-1.5 px-1">Grade</p>
-                      <GradeEdit value={task.grade} onSave={v=>updateTask(task.id,"grade",v)}/>
-                    </div>
-                  </div>
-                  <div className="px-4 pb-4 border-t border-zinc-50 dark:border-zinc-800 pt-2">
-                    <button
-                      onClick={()=>setExpandedNoteId(prev => prev===task.id ? null : task.id)}
-                      className={`flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest transition-colors ${task.notes?.trim()?"text-amber-500":"text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"}`}
-                    >
-                      <FaStickyNote size={9}/>
-                      {task.notes?.trim() ? "Note attached" : "Add note"}
-                    </button>
-                    <AnimatePresence>
-                      {expandedNoteId===task.id && (
-                        <motion.div initial={{height:0,opacity:0}} animate={{height:"auto",opacity:1}} exit={{height:0,opacity:0}} className="overflow-hidden mt-2">
-                          <textarea
-                            value={task.notes||""}
-                            onChange={e=>updateTask(task.id,"notes",e.target.value)}
-                            placeholder="Add a note... e.g. 'Prof said this counts 15% not 20%'"
-                            rows={2} maxLength={300}
-                            className="w-full bg-amber-50/50 dark:bg-amber-500/5 border border-amber-200/60 dark:border-amber-500/20 rounded-xl px-3 py-2 outline-none text-xs font-medium text-zinc-700 dark:text-zinc-300 placeholder:text-zinc-400 resize-none"
-                          />
-                          <div className="flex items-center justify-between mt-1">
-                            <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest">{(task.notes||"").length}/300</span>
-                            <button onClick={()=>setExpandedNoteId(null)} className="text-[9px] font-bold text-zinc-400 hover:text-zinc-600 uppercase tracking-widest transition-colors">Done</button>
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                </motion.div>
-              );
-            })}
-          </AnimatePresence>
+                  );
+                })()}
+              </DragOverlay>
+            </DndContext>
+          </>
         )}
-        {displayTasks.length>0 && (
-          <button onClick={()=>handleAddTask(activeCourse.id)}
+
+        {displayTasks.length > 0 && (
+          <button
+            onClick={() => handleAddTask(activeCourse.id)}
             className="w-full py-4 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl text-zinc-400 font-bold uppercase tracking-widest text-xs hover:border-[#06402B] dark:hover:border-emerald-500 hover:text-[#06402B] dark:hover:text-emerald-400 flex items-center justify-center gap-2 transition-all active:scale-95 touch-manipulation"
           >
             <FaPlus size={10}/> New Deliverable
@@ -1215,11 +1394,20 @@ export default function UniversityTracker() {
       </div>
 
       {/* ── DESKTOP TABLE VIEW ── */}
-      <div className="hidden md:block w-full overflow-visible pb-32">
+<div className="hidden md:block w-full overflow-visible pb-32">
         <div className="min-w-[1020px] w-full bg-white dark:bg-[#18181b] rounded-[2rem] border border-zinc-200 dark:border-zinc-800 shadow-lg relative z-10">
-          <div className="grid grid-cols-[28px_24px_2fr_1.4fr_1.2fr_1.4fr_0.7fr_0.5fr_0.4fr_0.3fr] gap-2 px-5 py-3.5 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/80 dark:bg-[#111113] rounded-t-[2rem] text-[10px] font-black uppercase tracking-widest text-zinc-400 select-none">
+
+          {/* Header */}
+          <div className="grid grid-cols-[28px_20px_24px_2fr_1.4fr_1.2fr_1.4fr_0.7fr_0.5fr_0.4fr_0.3fr] gap-2 px-5 py-3.5 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/80 dark:bg-[#111113] rounded-t-[2rem] text-[10px] font-black uppercase tracking-widest text-zinc-400 select-none">
             <div className="flex items-center">
               <input type="checkbox" checked={selectedTaskIds.size===displayTasks.length&&displayTasks.length>0} onChange={selectAll} className="w-3.5 h-3.5 accent-[#06402B] cursor-pointer"/>
+            </div>
+            {/* Grip header */}
+            <div title="Drag to reorder" className="flex items-center justify-center">
+              {sortKey === 'none' && !searchQuery && filterStatus === 'ALL'
+                ? <FaGripVertical size={9} className="text-zinc-400"/>
+                : <div/>
+              }
             </div>
             <div/>
             {([["name","Deliverable"],["type","Type"],["status","Status"],["deadline","Deadline"]] as [SortKey,string][]).map(([key,label])=>(
@@ -1235,6 +1423,7 @@ export default function UniversityTracker() {
             <div title="Notes" className="flex items-center justify-center text-zinc-400"><FaStickyNote size={9}/></div>
           </div>
 
+          {/* Rows */}
           <div className="divide-y divide-zinc-50 dark:divide-zinc-800/40">
             {displayTasks.length===0 && (
               <motion.div initial={{opacity:0}} animate={{opacity:1}} className="p-16 text-center flex flex-col items-center">
@@ -1242,80 +1431,198 @@ export default function UniversityTracker() {
                 <span className="text-sm font-bold text-zinc-400 uppercase tracking-widest">{searchQuery||filterStatus!=="ALL"?"No matching tasks":"No deliverables yet"}</span>
               </motion.div>
             )}
-            <AnimatePresence>
-              {displayTasks.map(task=>{
-                const isSelected = selectedTaskIds.has(task.id);
-                return (
-                  <motion.div key={task.id} initial={{opacity:0,y:-8}} animate={{opacity:1,y:0}} exit={{opacity:0,height:0}} className="group">
-                    <div className={`grid grid-cols-[28px_24px_2fr_1.4fr_1.2fr_1.4fr_0.7fr_0.5fr_0.4fr_0.3fr] gap-2 px-5 py-2.5 items-center transition-colors border-l-[3px] ${
-                      isSelected ? "bg-[#06402B]/5 dark:bg-emerald-500/5 border-l-[#06402B] dark:border-l-emerald-500"
-                      : "hover:bg-zinc-50/60 dark:hover:bg-white/[0.03] border-l-transparent hover:border-l-[#06402B] dark:hover:border-l-emerald-500"
-                    } ${task.starred?"bg-amber-50/30 dark:bg-amber-500/5":""}`}>
-                      <div className="flex items-center"><input type="checkbox" checked={isSelected} onChange={()=>toggleSelectTask(task.id)} className="w-3.5 h-3.5 accent-[#06402B] cursor-pointer"/></div>
-                      <button onClick={()=>updateTask(task.id,"starred",!task.starred)} className={`flex items-center justify-center transition-all ${task.starred?"text-amber-400":"text-zinc-200 dark:text-zinc-700 hover:text-amber-400"}`}><FaStar size={12}/></button>
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className="flex-1 min-w-0"><InlineEdit value={task.name} onSave={v=>updateTask(task.id,"name",v)} placeholder="Untitled deliverable…"/></div>
-                        <UrgencyBadge deadline={task.deadline} status={task.status}/>
-                      </div>
-                      <TypePicker value={safeType(task.type)} onChange={v=>updateTask(task.id,"type",v)}/>
-                      <div className={`flex items-center px-2.5 py-1.5 rounded-xl border text-[10px] font-bold uppercase tracking-wider ${safeStatusMeta(task.status).color}`}>
-                        <Dropdown<TaskStatus> value={safeStatus(task.status)} options={TASK_STATUSES} onChange={v=>updateTask(task.id,"status",v)}
-                          renderValue={v=><span className="truncate">{v}</span>}
-                          renderOption={v=><span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border ${safeStatusMeta(v).color}`}>{v}</span>}
-                        />
-                      </div>
-                      <DateInput value={task.deadline} onChange={v=>updateTask(task.id,"deadline",v)}/>
-                      <GradeEdit value={task.grade} onSave={v=>updateTask(task.id,"grade",v)}/>
-                      <button onClick={()=>duplicateTask(task)} className="flex items-center justify-center p-1.5 text-zinc-300 dark:text-zinc-700 hover:text-zinc-500 dark:hover:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 opacity-0 group-hover:opacity-100 transition-all rounded-lg active:scale-90"><FaCopy size={11}/></button>
-                      <button onClick={()=>deleteTask(task.id)} className="flex items-center justify-center p-1.5 text-zinc-300 dark:text-zinc-700 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all rounded-lg active:scale-90"><FaTrash size={11}/></button>
-                      <button
-                        onClick={()=>setExpandedNoteId(prev => prev===task.id ? null : task.id)}
-                        title="Notes"
-                        className={`flex items-center justify-center p-1.5 rounded-lg transition-all ${
-                          expandedNoteId===task.id ? "text-[#06402B] dark:text-emerald-400 bg-[#06402B]/10"
-                          : task.notes?.trim() ? "text-amber-500 bg-amber-500/10"
-                          : "text-zinc-300 dark:text-zinc-700 hover:text-zinc-500 opacity-0 group-hover:opacity-100"
-                        }`}
-                      >
-                        <FaStickyNote size={11}/>
-                      </button>
-                    </div>
-                    <AnimatePresence>
-                      {expandedNoteId===task.id && (
-                        <motion.div initial={{height:0,opacity:0}} animate={{height:"auto",opacity:1}} exit={{height:0,opacity:0}} transition={{duration:0.18}} className="overflow-hidden">
-                          <div className="px-5 pb-3 pt-2 bg-amber-50/40 dark:bg-amber-500/5 border-l-[3px] border-l-amber-400/50">
-                            <textarea
-                              value={task.notes||""}
-                              onChange={e=>updateTask(task.id,"notes",e.target.value)}
-                              placeholder="Add a note... e.g. 'Prof said this counts 15% not 20%'"
-                              rows={2} maxLength={300}
-                              className="w-full bg-transparent outline-none text-xs font-medium text-zinc-700 dark:text-zinc-300 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 resize-none leading-relaxed"
-                            />
-                            <div className="flex items-center justify-between mt-1">
-                              <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest">{(task.notes||"").length}/300</span>
-                              <button onClick={()=>setExpandedNoteId(null)} className="text-[9px] font-bold text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 uppercase tracking-widest transition-colors">Done</button>
+
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={displayTasks.map(t => t.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                <AnimatePresence>
+                  {displayTasks.map(task => {
+                    const isSelected     = selectedTaskIds.has(task.id);
+                    const isDragDisabled = sortKey !== 'none' || !!searchQuery || filterStatus !== 'ALL';
+
+                    return (
+                      <SortableTaskRow key={task.id} id={task.id} isDragDisabled={isDragDisabled}>
+                        {(dragHandleProps, isDragging) => (
+                          <motion.div
+                            initial={{ opacity: 0, y: -8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="group"
+                          >
+                            {/* Main row */}
+                            <div className={`grid grid-cols-[28px_20px_24px_2fr_1.4fr_1.2fr_1.4fr_0.7fr_0.5fr_0.4fr_0.3fr] gap-2 px-5 py-2.5 items-center transition-colors border-l-[3px] ${
+                              isDragging
+                                ? 'bg-[#06402B]/5 dark:bg-emerald-500/5 border-l-[#06402B] dark:border-l-emerald-500 shadow-lg'
+                                : isSelected
+                                ? 'bg-[#06402B]/5 dark:bg-emerald-500/5 border-l-[#06402B] dark:border-l-emerald-500'
+                                : 'hover:bg-zinc-50/60 dark:hover:bg-white/[0.03] border-l-transparent hover:border-l-[#06402B] dark:hover:border-l-emerald-500'
+                            } ${task.starred && !isDragging ? 'bg-amber-50/30 dark:bg-amber-500/5' : ''}`}>
+
+                              {/* Checkbox */}
+                              <div className="flex items-center">
+                                <input type="checkbox" checked={isSelected} onChange={() => toggleSelectTask(task.id)} className="w-3.5 h-3.5 accent-[#06402B] cursor-pointer"/>
+                              </div>
+
+                              {/* Drag handle */}
+                              <div className="flex items-center justify-center">
+                                {!isDragDisabled ? (
+                                  <button
+                                    {...dragHandleProps}
+                                    className="flex items-center justify-center p-1 text-zinc-300 dark:text-zinc-700 hover:text-zinc-500 dark:hover:text-zinc-400 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing transition-all rounded"
+                                    title="Drag to reorder"
+                                  >
+                                    <FaGripVertical size={11}/>
+                                  </button>
+                                ) : (
+                                  <div/>
+                                )}
+                              </div>
+
+                              {/* Star */}
+                              <button onClick={() => updateTask(task.id, "starred", !task.starred)}
+                                className={`flex items-center justify-center transition-all ${task.starred ? "text-amber-400" : "text-zinc-200 dark:text-zinc-700 hover:text-amber-400"}`}>
+                                <FaStar size={12}/>
+                              </button>
+
+                              {/* Name + urgency */}
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div className="flex-1 min-w-0">
+                                  <InlineEdit value={task.name} onSave={v => updateTask(task.id, "name", v)} placeholder="Untitled deliverable…"/>
+                                </div>
+                                <UrgencyBadge deadline={task.deadline} status={task.status}/>
+                              </div>
+
+                              {/* Type */}
+                              <TypePicker value={safeType(task.type)} onChange={v => updateTask(task.id, "type", v)}/>
+
+                              {/* Status */}
+                              <div className={`flex items-center px-2.5 py-1.5 rounded-xl border text-[10px] font-bold uppercase tracking-wider ${safeStatusMeta(task.status).color}`}>
+                                <Dropdown<TaskStatus>
+                                  value={safeStatus(task.status)} options={TASK_STATUSES}
+                                  onChange={v => updateTask(task.id, "status", v)}
+                                  renderValue={v => <span className="truncate">{v}</span>}
+                                  renderOption={v => <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border ${safeStatusMeta(v).color}`}>{v}</span>}
+                                />
+                              </div>
+
+                              {/* Deadline */}
+                              <DateInput value={task.deadline} onChange={v => updateTask(task.id, "deadline", v)}/>
+
+                              {/* Grade */}
+                              <GradeEdit value={task.grade} onSave={v => updateTask(task.id, "grade", v)}/>
+
+                              {/* Duplicate */}
+                              <button onClick={() => duplicateTask(task)}
+                                className="flex items-center justify-center p-1.5 text-zinc-300 dark:text-zinc-700 hover:text-zinc-500 dark:hover:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 opacity-0 group-hover:opacity-100 transition-all rounded-lg active:scale-90">
+                                <FaCopy size={11}/>
+                              </button>
+
+                              {/* Delete */}
+                              <button onClick={() => deleteTask(task.id)}
+                                className="flex items-center justify-center p-1.5 text-zinc-300 dark:text-zinc-700 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all rounded-lg active:scale-90">
+                                <FaTrash size={11}/>
+                              </button>
+
+                              {/* Notes toggle */}
+                              <button
+                                onClick={() => setExpandedNoteId(prev => prev === task.id ? null : task.id)}
+                                title="Notes"
+                                className={`flex items-center justify-center p-1.5 rounded-lg transition-all ${
+                                  expandedNoteId === task.id
+                                    ? 'text-[#06402B] dark:text-emerald-400 bg-[#06402B]/10'
+                                    : task.notes?.trim()
+                                    ? 'text-amber-500 bg-amber-500/10'
+                                    : 'text-zinc-300 dark:text-zinc-700 hover:text-zinc-500 opacity-0 group-hover:opacity-100'
+                                }`}
+                              >
+                                <FaStickyNote size={11}/>
+                              </button>
                             </div>
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </motion.div>
-                );
-              })}
-            </AnimatePresence>
+
+                            {/* Expandable notes row */}
+                            <AnimatePresence>
+                              {expandedNoteId === task.id && (
+                                <motion.div
+                                  initial={{ height: 0, opacity: 0 }}
+                                  animate={{ height: 'auto', opacity: 1 }}
+                                  exit={{ height: 0, opacity: 0 }}
+                                  transition={{ duration: 0.18 }}
+                                  className="overflow-hidden"
+                                >
+                                  <div className="px-5 pb-3 pt-2 bg-amber-50/40 dark:bg-amber-500/5 border-l-[3px] border-l-amber-400/50">
+                                    <textarea
+                                      value={task.notes || ""}
+                                      onChange={e => updateTask(task.id, "notes", e.target.value)}
+                                      placeholder="Add a note... e.g. 'Prof said this counts 15% not 20%'"
+                                      rows={2} maxLength={300}
+                                      className="w-full bg-transparent outline-none text-xs font-medium text-zinc-700 dark:text-zinc-300 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 resize-none leading-relaxed"
+                                    />
+                                    <div className="flex items-center justify-between mt-1">
+                                      <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest">{(task.notes || "").length}/300</span>
+                                      <button onClick={() => setExpandedNoteId(null)} className="text-[9px] font-bold text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 uppercase tracking-widest transition-colors">Done</button>
+                                    </div>
+                                  </div>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </motion.div>
+                        )}
+                      </SortableTaskRow>
+                    );
+                  })}
+                </AnimatePresence>
+              </SortableContext>
+
+              {/* Ghost row while dragging */}
+              <DragOverlay dropAnimation={{ duration: 180, easing: 'ease' }}>
+                {activeTaskId && (() => {
+                  const task = displayTasks.find(t => t.id === activeTaskId);
+                  if (!task) return null;
+                  return (
+                    <div className="min-w-[1020px] bg-white dark:bg-[#18181b] border border-[#06402B]/30 dark:border-emerald-500/30 shadow-2xl rounded-xl opacity-95">
+                      <div className="grid grid-cols-[28px_20px_24px_2fr_1.4fr_1.2fr_1.4fr_0.7fr_0.5fr_0.4fr_0.3fr] gap-2 px-5 py-2.5 items-center border-l-[3px] border-l-[#06402B] dark:border-l-emerald-500 bg-[#06402B]/5 dark:bg-emerald-500/5">
+                        <div/>
+                        <div className="flex items-center justify-center">
+                          <FaGripVertical size={11} className="text-[#06402B] dark:text-emerald-400"/>
+                        </div>
+                        <div/>
+                        <p className="text-sm font-bold text-zinc-800 dark:text-zinc-200 truncate px-2.5">{task.name || "Untitled deliverable"}</p>
+                        <span className={`px-2.5 py-1.5 rounded-xl border text-[10px] font-bold uppercase tracking-wider ${safeTypeMeta(task.type).color}`}>{task.type}</span>
+                        <span className={`px-2.5 py-1.5 rounded-xl border text-[10px] font-bold uppercase tracking-wider ${safeStatusMeta(task.status).color}`}>{task.status}</span>
+                        <span className="text-xs font-mono text-zinc-400 px-2.5">{task.deadline || "—"}</span>
+                        <span className={`text-sm font-mono text-center ${task.grade ? gradeColorClass(task.grade) : "text-zinc-300"}`}>{task.grade || "—"}</span>
+                        <div/><div/><div/>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </DragOverlay>
+            </DndContext>
           </div>
 
+          {/* Footer */}
           <div className="px-4 py-3 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-[#111113] rounded-b-[2rem] flex items-center justify-between">
             <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest tabular-nums">
               {displayTasks.length} of {rawCourseTasks.length} task{rawCourseTasks.length!==1?"s":""}
               {(searchQuery||filterStatus!=="ALL")&&" (filtered)"}
+              {sortKey === 'none' && !searchQuery && filterStatus === 'ALL' && displayTasks.length > 1 && (
+                <span className="ml-3 text-zinc-300 dark:text-zinc-600 normal-case font-medium">· drag rows to reorder</span>
+              )}
             </p>
-            <button onClick={()=>handleAddTask(activeCourse.id)}
+            <button onClick={() => handleAddTask(activeCourse.id)}
               className="flex items-center gap-2 px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-zinc-400 hover:text-[#06402B] dark:hover:text-emerald-400 hover:bg-white dark:hover:bg-zinc-900 rounded-xl transition-all border border-transparent hover:border-zinc-200 dark:hover:border-zinc-800 shadow-sm hover:shadow-md"
             >
               <FaPlus size={11}/> New Deliverable <span className="opacity-40 font-mono ml-1">N</span>
             </button>
           </div>
+
         </div>
       </div>
     </motion.div>
