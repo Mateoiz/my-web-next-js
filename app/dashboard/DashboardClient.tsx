@@ -873,6 +873,11 @@ function DashboardInner() {
                           </label>
                           <input id="avatar-upload" type="file" accept="image/*" className="hidden" onChange={handleAvatarSelect} />
                         </div>
+                        <div className="flex flex-col items-center gap-1 text-center">
+                          <p className="text-[11px] font-mono text-zinc-400 dark:text-zinc-500">
+                                {userProfile?.username ? `@${userProfile.username}` : ""}
+                            </p>
+                        </div>
                         <p className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-widest">Tap to Upload</p>
                       </div>
 
