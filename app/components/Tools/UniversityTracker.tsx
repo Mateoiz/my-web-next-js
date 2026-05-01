@@ -9,11 +9,11 @@ import {
   FaClipboardList, FaTimes, FaPencilAlt, FaCalendarAlt,
   FaStar, FaSortAmountDown, FaKeyboard,
   FaExclamationCircle, FaSearch, FaChevronUp, FaCopy,
-  FaBell, FaEllipsisH, FaEllipsisV, FaStickyNote
+  FaBell, FaEllipsisH, FaEllipsisV, FaStickyNote, FaDoorOpen, FaClock
 } from "react-icons/fa";
 import {
   collection, query, where, orderBy, onSnapshot,
-  addDoc, updateDoc, deleteDoc, doc, serverTimestamp, writeBatch
+  addDoc, updateDoc, deleteDoc, doc, serverTimestamp, writeBatch, getDocs
 } from "firebase/firestore";
 import {
   DndContext, closestCenter, KeyboardSensor, PointerSensor,
@@ -38,7 +38,17 @@ type TaskStatus = "OPEN" | "Submitted" | "Graded";
 type SortKey = "deadline" | "type" | "status" | "name" | "none";
 type FilterStatus = "ALL" | TaskStatus | "STARRED" | "OVERDUE";
 
-interface Course { id: string; title: string; color?: string; }
+interface Course {
+  id: string;
+  title: string;
+  color?: string;
+  // ── Schedule metadata (set when imported from Schedule Maker) ──
+  scheduleCode?: string;
+  scheduleDays?: string[];
+  scheduleStartTime?: string;
+  scheduleEndTime?: string;
+  scheduleRoom?: string;
+}
 interface CourseTask {
   id: string; courseId: string; name: string;
   type: TaskType; status: TaskStatus; deadline: string; grade: string;
@@ -85,6 +95,43 @@ const safeTypeMeta   = (t: string) => TYPE_META[t as TaskType]     ?? { color: "
 const safeStatusMeta = (s: string) => STATUS_META[s as TaskStatus] ?? { color: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700", ring: "ring-zinc-300" };
 const safeType       = (t: string): TaskType   => TASK_TYPES.includes(t as TaskType)      ? (t as TaskType)   : "Assignment";
 const safeStatus     = (s: string): TaskStatus => TASK_STATUSES.includes(s as TaskStatus) ? (s as TaskStatus) : "OPEN";
+
+// ─── Schedule info helpers ────────────────────────────────────────────────────
+
+function formatTime12hr(t?: string): string {
+  if (!t) return "";
+  const [h, m] = t.split(':').map(Number);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  return `${h % 12 || 12}:${m.toString().padStart(2, '0')} ${ampm}`;
+}
+
+function ScheduleBadge({ course }: { course: Course }) {
+  const hasDays  = course.scheduleDays && course.scheduleDays.length > 0;
+  const hasTime  = course.scheduleStartTime;
+  const hasRoom  = course.scheduleRoom;
+  if (!hasDays && !hasTime && !hasRoom) return null;
+
+  return (
+    <div className="flex items-center gap-2 flex-wrap mt-1.5">
+      {hasDays && (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-lg text-[9px] font-black uppercase tracking-wider">
+          {course.scheduleDays!.join('·')}
+        </span>
+      )}
+      {hasTime && (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-lg text-[9px] font-mono font-bold">
+          <FaClock size={7}/>
+          {formatTime12hr(course.scheduleStartTime)}–{formatTime12hr(course.scheduleEndTime)}
+        </span>
+      )}
+      {hasRoom && (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-lg text-[9px] font-mono font-bold">
+          <FaDoorOpen size={7}/> {course.scheduleRoom}
+        </span>
+      )}
+    </div>
+  );
+}
 
 // ─── Urgency helpers ──────────────────────────────────────────────────────────
 
@@ -626,6 +673,87 @@ function CourseColorPicker({ value, onChange }: { value?:string; onChange:(c:str
   );
 }
 
+// ─── Schedule Info Editor (inline on course detail header) ───────────────────
+
+function ScheduleInfoEditor({ course, onSave }: {
+  course: Course;
+  onSave: (fields: Partial<Course>) => Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [days, setDays]       = useState<string[]>(course.scheduleDays ?? []);
+  const [start, setStart]     = useState(course.scheduleStartTime ?? "");
+  const [end, setEnd]         = useState(course.scheduleEndTime ?? "");
+  const [room, setRoom]       = useState(course.scheduleRoom ?? "");
+
+  const DAYS = ['M','T','W','Th','F','S'];
+
+  const handleSave = async () => {
+    await onSave({ scheduleDays: days, scheduleStartTime: start, scheduleEndTime: end, scheduleRoom: room });
+    setEditing(false);
+  };
+
+  if (!editing) {
+    const hasSched = (course.scheduleDays?.length ?? 0) > 0 || course.scheduleStartTime || course.scheduleRoom;
+    return (
+      <button onClick={() => {
+        setDays(course.scheduleDays ?? []);
+        setStart(course.scheduleStartTime ?? "");
+        setEnd(course.scheduleEndTime ?? "");
+        setRoom(course.scheduleRoom ?? "");
+        setEditing(true);
+      }}
+        className="flex items-center gap-2 px-3 py-1.5 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-xl text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-widest transition-colors group"
+      >
+        <FaClock size={9}/>
+        {hasSched ? "Edit Schedule" : "Add Schedule"}
+        <FaPencilAlt size={8} className="opacity-0 group-hover:opacity-100 transition-opacity"/>
+      </button>
+    );
+  }
+
+  return (
+    <motion.div initial={{opacity:0,y:-4}} animate={{opacity:1,y:0}} className="flex flex-col gap-3 p-4 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl">
+      {/* Day toggles */}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest w-10 shrink-0">Days</span>
+        <div className="flex gap-1">
+          {DAYS.map(d => (
+            <button key={d} type="button"
+              onClick={() => setDays(prev => prev.includes(d) ? prev.filter(x=>x!==d) : [...prev, d])}
+              className={`w-8 h-8 rounded-lg text-[10px] font-black uppercase transition-all border ${
+                days.includes(d)
+                  ? "bg-[#06402B] dark:bg-emerald-600 text-white border-transparent"
+                  : "bg-white dark:bg-zinc-800 text-zinc-500 border-zinc-200 dark:border-zinc-700 hover:border-[#06402B] dark:hover:border-emerald-500"
+              }`}>{d}</button>
+          ))}
+        </div>
+      </div>
+      {/* Time */}
+      <div className="flex items-center gap-2">
+        <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest w-10 shrink-0">Time</span>
+        <input type="time" value={start} onChange={e=>setStart(e.target.value)}
+          className="flex-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2 text-xs font-mono font-bold text-zinc-800 dark:text-zinc-200 outline-none focus:border-[#06402B]"/>
+        <span className="text-zinc-400 font-bold text-xs">–</span>
+        <input type="time" value={end} onChange={e=>setEnd(e.target.value)}
+          className="flex-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2 text-xs font-mono font-bold text-zinc-800 dark:text-zinc-200 outline-none focus:border-[#06402B]"/>
+      </div>
+      {/* Room */}
+      <div className="flex items-center gap-2">
+        <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest w-10 shrink-0">Room</span>
+        <div className="relative flex-1">
+          <FaDoorOpen size={11} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none"/>
+          <input type="text" value={room} onChange={e=>setRoom(e.target.value)} placeholder="e.g. GK-101"
+            className="w-full pl-8 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2 text-xs font-mono font-bold text-zinc-800 dark:text-zinc-200 outline-none focus:border-[#06402B]"/>
+        </div>
+      </div>
+      <div className="flex gap-2">
+        <button onClick={()=>setEditing(false)} className="flex-1 py-2 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">Cancel</button>
+        <button onClick={handleSave} className="flex-1 py-2 bg-[#06402B] dark:bg-emerald-600 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-[#0a5a38] transition-colors">Save</button>
+      </div>
+    </motion.div>
+  );
+}
+
 // ─── Course Card Context Menu ─────────────────────────────────────────────────
 
 function CourseCardMenu({
@@ -721,6 +849,7 @@ function SortableTaskRow({ id, isDragDisabled, children }: {
     </div>
   );
 }
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function UniversityTracker() {
@@ -743,13 +872,13 @@ export default function UniversityTracker() {
 
   const closeModal = useCallback(() => setModal(m=>({...m,isOpen:false})), []);
   const [manualOrder, setManualOrder] = useState<string[]>([]);
-const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
+  const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
 
-const sensors = useSensors(
-  useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-  useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
-);
-  // ✅ FIX: All useEffects at top level — no hooks after conditional returns
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
   useEffect(() => {
     const h = (e:MouseEvent) => { if (bulkRef.current&&!bulkRef.current.contains(e.target as Node)) setBulkMenuOpen(false); };
     document.addEventListener("mousedown", h);
@@ -778,79 +907,73 @@ const sensors = useSensors(
     return () => { unsubCourses(); unsubTasks(); };
   }, []);
 
-  // ✅ FIX: Guard effect at top level — resets selectedCourseId if course is deleted
   useEffect(() => {
     if (selectedCourseId && courses.length > 0 && !courses.find(c => c.id === selectedCourseId)) {
       setSelectedCourseId(null);
     }
   }, [selectedCourseId, courses]);
 
-  
-
-  // ── Derived state (always computed, never conditional) ────────────────────
   const activeCourse    = courses.find(c => c.id === selectedCourseId) ?? null;
   const color           = getCourseColor(activeCourse?.color);
   const rawCourseTasks  = useMemo(() => tasks.filter(t => t.courseId === selectedCourseId), [tasks, selectedCourseId]);
 
-const displayTasks = useMemo(() => {
-  let out = [...rawCourseTasks];
-  if (searchQuery.trim()) { const q = searchQuery.toLowerCase(); out = out.filter(t => t.name.toLowerCase().includes(q) || t.type.toLowerCase().includes(q)); }
-  if (filterStatus === "STARRED") out = out.filter(t => t.starred);
-  else if (filterStatus === "OVERDUE") out = out.filter(t => t.status === "OPEN" && isOverdueDate(t.deadline));
-  else if (filterStatus !== "ALL") out = out.filter(t => t.status === filterStatus);
+  const displayTasks = useMemo(() => {
+    let out = [...rawCourseTasks];
+    if (searchQuery.trim()) { const q = searchQuery.toLowerCase(); out = out.filter(t => t.name.toLowerCase().includes(q) || t.type.toLowerCase().includes(q)); }
+    if (filterStatus === "STARRED") out = out.filter(t => t.starred);
+    else if (filterStatus === "OVERDUE") out = out.filter(t => t.status === "OPEN" && isOverdueDate(t.deadline));
+    else if (filterStatus !== "ALL") out = out.filter(t => t.status === filterStatus);
 
-  if (sortKey !== "none") {
-    out.sort((a, b) => {
-      let av = "", bv = "";
-      if (sortKey === "deadline") { av = a.deadline || "9999"; bv = b.deadline || "9999"; }
-      else if (sortKey === "type")   { av = a.type; bv = b.type; }
-      else if (sortKey === "status") { av = a.status; bv = b.status; }
-      else if (sortKey === "name")   { av = a.name.toLowerCase(); bv = b.name.toLowerCase(); }
-      return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
-    });
-  } else {
-    // ✅ Manual order when sort is "none"
-    out.sort((a, b) => {
-      const ai = manualOrder.indexOf(a.id);
-      const bi = manualOrder.indexOf(b.id);
-      if (ai === -1) return 1;
-      if (bi === -1) return -1;
-      return ai - bi;
-    });
-  }
+    if (sortKey !== "none") {
+      out.sort((a, b) => {
+        let av = "", bv = "";
+        if (sortKey === "deadline") { av = a.deadline || "9999"; bv = b.deadline || "9999"; }
+        else if (sortKey === "type")   { av = a.type; bv = b.type; }
+        else if (sortKey === "status") { av = a.status; bv = b.status; }
+        else if (sortKey === "name")   { av = a.name.toLowerCase(); bv = b.name.toLowerCase(); }
+        return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
+      });
+    } else {
+      out.sort((a, b) => {
+        const ai = manualOrder.indexOf(a.id);
+        const bi = manualOrder.indexOf(b.id);
+        if (ai === -1) return 1;
+        if (bi === -1) return -1;
+        return ai - bi;
+      });
+    }
 
-  out.sort((a, b) => (b.starred ? 1 : 0) - (a.starred ? 1 : 0));
-  return out;
-}, [rawCourseTasks, searchQuery, filterStatus, sortKey, sortAsc, manualOrder]);
-
+    out.sort((a, b) => (b.starred ? 1 : 0) - (a.starred ? 1 : 0));
+    return out;
+  }, [rawCourseTasks, searchQuery, filterStatus, sortKey, sortAsc, manualOrder]);
 
   useEffect(() => {
-  setManualOrder(rawCourseTasks.map(t => t.id));
-}, [selectedCourseId]);
+    setManualOrder(rawCourseTasks.map(t => t.id));
+  }, [selectedCourseId]);
 
-// Keep manualOrder in sync when new tasks are added/deleted
-useEffect(() => {
-  setManualOrder(prev => {
-    const existingIds = new Set(rawCourseTasks.map(t => t.id));
-    const newIds = rawCourseTasks.map(t => t.id).filter(id => !prev.includes(id));
-    return [...prev.filter(id => existingIds.has(id)), ...newIds];
-  });
-}, [rawCourseTasks]);
+  useEffect(() => {
+    setManualOrder(prev => {
+      const existingIds = new Set(rawCourseTasks.map(t => t.id));
+      const newIds = rawCourseTasks.map(t => t.id).filter(id => !prev.includes(id));
+      return [...prev.filter(id => existingIds.has(id)), ...newIds];
+    });
+  }, [rawCourseTasks]);
 
-const handleDragStart = (event: DragStartEvent) => {
-  setActiveTaskId(event.active.id as string);
-};
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveTaskId(event.active.id as string);
+  };
 
-const handleDragEnd = (event: DragEndEvent) => {
-  const { active, over } = event;
-  setActiveTaskId(null);
-  if (!over || active.id === over.id) return;
-  setManualOrder(prev => {
-    const oldIndex = prev.indexOf(active.id as string);
-    const newIndex = prev.indexOf(over.id as string);
-    return arrayMove(prev, oldIndex, newIndex);
-  });
-};
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveTaskId(null);
+    if (!over || active.id === over.id) return;
+    setManualOrder(prev => {
+      const oldIndex = prev.indexOf(active.id as string);
+      const newIndex = prev.indexOf(over.id as string);
+      return arrayMove(prev, oldIndex, newIndex);
+    });
+  };
+
   // ── Actions ───────────────────────────────────────────────────────────────
   const handleAddCourse = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -877,6 +1000,11 @@ const handleDragEnd = (event: DragEndEvent) => {
     await deleteDoc(doc(db,"course_tasks",taskId));
   }, []);
 
+  // ── NEW: update course (schedule fields etc.) ─────────────────────────────
+  const updateCourse = useCallback(async (courseId: string, fields: Partial<Course>) => {
+    await updateDoc(doc(db, "courses", courseId), fields as Record<string, any>);
+  }, []);
+
   const bulkDeleteSelected = () => {
     if (selectedTaskIds.size===0) return;
     setModal({
@@ -898,17 +1026,40 @@ const handleDragEnd = (event: DragEndEvent) => {
     setSelectedTaskIds(new Set()); setBulkMenuOpen(false);
   };
 
-  const triggerDeleteCourse = useCallback((courseId:string, e:React.MouseEvent) => {
-    e.stopPropagation();
-    setModal({ isOpen:true, title:"Delete Course Folder", message:"Permanently delete this course and all its deliverables?", confirmText:"Delete Course", danger:true,
-      onConfirm: async () => {
-        if (selectedCourseId===courseId) setSelectedCourseId(null);
-        await deleteDoc(doc(db,"courses",courseId));
-        await Promise.all(tasks.filter(t=>t.courseId===courseId).map(t=>deleteDoc(doc(db,"course_tasks",t.id))));
+const triggerDeleteCourse = useCallback((courseId: string, e: React.MouseEvent) => {
+  e.stopPropagation();
+  setModal({
+    isOpen: true,
+    title: "Delete Course Folder",
+    message: "Permanently delete this course and all its deliverables?",
+    confirmText: "Delete Course",
+    danger: true,
+    onConfirm: async () => {
+      try {
+        if (selectedCourseId === courseId) setSelectedCourseId(null);
+
+        // 1. Fetch tasks directly from Firestore (don't rely on local state)
+const taskSnap = await getDocs(
+  query(
+    collection(db, "course_tasks"),
+    where("userId", "==", auth.currentUser!.uid), // ← add this
+    where("courseId", "==", courseId)
+  )
+);
+        // 2. Batch delete tasks + course atomically
+        const batch = writeBatch(db);
+        taskSnap.docs.forEach(d => batch.delete(d.ref));
+        batch.delete(doc(db, "courses", courseId));
+        await batch.commit();
+
+        closeModal();
+      } catch (err) {
+        console.error("Delete failed:", err);
         closeModal();
       }
-    });
-  }, [selectedCourseId, tasks, closeModal]);
+    }
+  });
+}, [selectedCourseId, closeModal]);
 
   const handleOpenSync = useCallback((course:Course, courseTasks:CourseTask[], e:React.MouseEvent) => {
     e.stopPropagation();
@@ -1006,9 +1157,11 @@ const handleDragEnd = (event: DragEndEvent) => {
                     </div>
                   </div>
 
-                  <div className="relative z-10 mb-4">
+                  <div className="relative z-10 mb-3">
                     <h3 className={`text-lg font-black text-zinc-900 dark:text-white leading-tight mb-0.5 truncate group-hover:${c.text} transition-colors`}>{course.title}</h3>
-                    <div className="flex items-center gap-3 flex-wrap">
+                    {/* ── NEW: Schedule badge on card ── */}
+                    <ScheduleBadge course={course}/>
+                    <div className="flex items-center gap-3 flex-wrap mt-1">
                       <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{ct.length} {ct.length===1?"deliverable":"deliverables"}</p>
                       {overdue>0 && <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-red-500/10 text-red-500 rounded text-[9px] font-black uppercase tracking-widest"><FaExclamationTriangle size={8} className="-mt-0.5"/>{overdue} overdue</span>}
                       {starred>0 && <span className="inline-flex items-center gap-1 text-amber-400 text-[9px] font-black">⭐{starred}</span>}
@@ -1056,7 +1209,6 @@ const handleDragEnd = (event: DragEndEvent) => {
     );
   }
 
-  // ✅ FIX: Safe null check after conditional return — no hooks below this line
   if (!activeCourse) return null;
 
   return (
@@ -1110,15 +1262,20 @@ const handleDragEnd = (event: DragEndEvent) => {
               <FaBook size={18}/>
             </div>
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-0.5">
+              <div className="flex items-center gap-2 mb-0.5 flex-wrap">
                 <h2 className="text-xl md:text-3xl font-black uppercase tracking-tight text-zinc-900 dark:text-white truncate">{activeCourse.title}</h2>
                 <div onClick={e=>e.stopPropagation()}>
                   <CourseColorPicker value={activeCourse.color} onChange={async c=>{await updateDoc(doc(db,"courses",activeCourse.id),{color:c});}}/>
                 </div>
               </div>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5">
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5 mb-2">
                 <FaCheckCircle className={color.text} size={10}/> Track deliverables, deadlines, and grades
               </p>
+              {/* ── NEW: Schedule info editor on detail header ── */}
+              <ScheduleInfoEditor
+                course={activeCourse}
+                onSave={async fields => { await updateCourse(activeCourse.id, fields); }}
+              />
             </div>
           </div>
           <StatsBar tasks={rawCourseTasks}/>
@@ -1195,7 +1352,7 @@ const handleDragEnd = (event: DragEndEvent) => {
       </div>
 
       {/* ── MOBILE CARD VIEW ── */}
-<div className="md:hidden space-y-3">
+      <div className="md:hidden space-y-3">
         {displayTasks.length===0 ? (
           <div className="py-20 text-center flex flex-col items-center gap-3">
             <div className="w-14 h-14 bg-zinc-50 dark:bg-zinc-900 rounded-2xl flex items-center justify-center text-zinc-300 dark:text-zinc-700"><FaClipboardList size={22}/></div>
@@ -1206,7 +1363,6 @@ const handleDragEnd = (event: DragEndEvent) => {
           </div>
         ) : (
           <>
-            {/* Drag hint — only shown when manual sort is active */}
             {sortKey === 'none' && !searchQuery && filterStatus === 'ALL' && displayTasks.length > 1 && (
               <div className="flex items-center gap-1.5 px-1">
                 <FaGripVertical size={9} className="text-zinc-400"/>
@@ -1214,16 +1370,8 @@ const handleDragEnd = (event: DragEndEvent) => {
               </div>
             )}
 
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragStart={handleDragStart}
-              onDragEnd={handleDragEnd}
-            >
-              <SortableContext
-                items={displayTasks.map(t => t.id)}
-                strategy={verticalListSortingStrategy}
-              >
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+              <SortableContext items={displayTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
                 <AnimatePresence>
                   {displayTasks.map(task => {
                     const isSelected     = selectedTaskIds.has(task.id);
@@ -1239,40 +1387,21 @@ const handleDragEnd = (event: DragEndEvent) => {
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, height: 0 }}
                             className={`bg-white dark:bg-[#18181b] rounded-2xl border transition-all ${
-                              isDragging
-                                ? 'shadow-2xl border-[#06402B]/30 dark:border-emerald-500/30 scale-[1.01]'
-                                : isSelected
-                                ? 'border-[#06402B] dark:border-emerald-500 bg-[#06402B]/5 dark:bg-emerald-500/5'
-                                : task.starred
-                                ? 'border-amber-200 dark:border-amber-500/30 bg-amber-50/30 dark:bg-amber-500/5'
-                                : 'border-zinc-200 dark:border-zinc-800'
+                              isDragging ? 'shadow-2xl border-[#06402B]/30 dark:border-emerald-500/30 scale-[1.01]'
+                              : isSelected ? 'border-[#06402B] dark:border-emerald-500 bg-[#06402B]/5 dark:bg-emerald-500/5'
+                              : task.starred ? 'border-amber-200 dark:border-amber-500/30 bg-amber-50/30 dark:bg-amber-500/5'
+                              : 'border-zinc-200 dark:border-zinc-800'
                             }`}
                           >
-                            {/* Top row */}
                             <div className="flex items-start gap-3 p-4 pb-3">
                               <div className="flex flex-col items-center gap-2 pt-0.5 shrink-0">
-                                {/* Drag handle */}
                                 {!isDragDisabled ? (
-                                  <button
-                                    {...dragHandleProps}
-                                    className="text-zinc-300 dark:text-zinc-600 hover:text-zinc-500 dark:hover:text-zinc-400 cursor-grab active:cursor-grabbing touch-manipulation p-0.5 rounded transition-colors"
-                                    title="Drag to reorder"
-                                  >
+                                  <button {...dragHandleProps} className="text-zinc-300 dark:text-zinc-600 hover:text-zinc-500 dark:hover:text-zinc-400 cursor-grab active:cursor-grabbing touch-manipulation p-0.5 rounded transition-colors" title="Drag to reorder">
                                     <FaGripVertical size={13}/>
                                   </button>
-                                ) : (
-                                  <div className="w-5 h-5" />
-                                )}
-                                <input
-                                  type="checkbox"
-                                  checked={isSelected}
-                                  onChange={() => toggleSelectTask(task.id)}
-                                  className="w-4 h-4 accent-[#06402B] cursor-pointer"
-                                />
-                                <button
-                                  onClick={() => updateTask(task.id, "starred", !task.starred)}
-                                  className={`transition-all touch-manipulation ${task.starred ? "text-amber-400" : "text-zinc-300 dark:text-zinc-700"}`}
-                                >
+                                ) : <div className="w-5 h-5" />}
+                                <input type="checkbox" checked={isSelected} onChange={() => toggleSelectTask(task.id)} className="w-4 h-4 accent-[#06402B] cursor-pointer"/>
+                                <button onClick={() => updateTask(task.id, "starred", !task.starred)} className={`transition-all touch-manipulation ${task.starred ? "text-amber-400" : "text-zinc-300 dark:text-zinc-700"}`}>
                                   <FaStar size={13}/>
                                 </button>
                               </div>
@@ -1295,14 +1424,11 @@ const handleDragEnd = (event: DragEndEvent) => {
                               </div>
                             </div>
 
-                            {/* Status / Deadline / Grade */}
                             <div className="grid grid-cols-3 gap-2 px-4 pb-3 pt-1 border-t border-zinc-50 dark:border-zinc-800">
                               <div>
                                 <p className="text-[8px] font-black text-zinc-400 uppercase tracking-widest mb-1.5 px-1">Status</p>
                                 <div className={`flex items-center px-2.5 py-2 rounded-xl border text-[9px] font-bold uppercase tracking-wider ${statusMeta.color}`}>
-                                  <Dropdown<TaskStatus>
-                                    value={safeStatus(task.status)} options={TASK_STATUSES}
-                                    onChange={v => updateTask(task.id, "status", v)}
+                                  <Dropdown<TaskStatus> value={safeStatus(task.status)} options={TASK_STATUSES} onChange={v => updateTask(task.id, "status", v)}
                                     renderValue={v => <span className="truncate text-[9px]">{v}</span>}
                                     renderOption={v => <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border ${safeStatusMeta(v).color}`}>{v}</span>}
                                   />
@@ -1318,32 +1444,18 @@ const handleDragEnd = (event: DragEndEvent) => {
                               </div>
                             </div>
 
-                            {/* Notes */}
                             <div className="px-4 pb-4 border-t border-zinc-50 dark:border-zinc-800 pt-2">
-                              <button
-                                onClick={() => setExpandedNoteId(prev => prev === task.id ? null : task.id)}
-                                className={`flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest transition-colors ${
-                                  task.notes?.trim() ? "text-amber-500" : "text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
-                                }`}
-                              >
+                              <button onClick={() => setExpandedNoteId(prev => prev === task.id ? null : task.id)}
+                                className={`flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest transition-colors ${task.notes?.trim() ? "text-amber-500" : "text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"}`}>
                                 <FaStickyNote size={9}/>
                                 {task.notes?.trim() ? "Note attached" : "Add note"}
                               </button>
                               <AnimatePresence>
                                 {expandedNoteId === task.id && (
-                                  <motion.div
-                                    initial={{ height: 0, opacity: 0 }}
-                                    animate={{ height: "auto", opacity: 1 }}
-                                    exit={{ height: 0, opacity: 0 }}
-                                    className="overflow-hidden mt-2"
-                                  >
-                                    <textarea
-                                      value={task.notes || ""}
-                                      onChange={e => updateTask(task.id, "notes", e.target.value)}
-                                      placeholder="Add a note... e.g. 'Prof said this counts 15% not 20%'"
-                                      rows={2} maxLength={300}
-                                      className="w-full bg-amber-50/50 dark:bg-amber-500/5 border border-amber-200/60 dark:border-amber-500/20 rounded-xl px-3 py-2 outline-none text-xs font-medium text-zinc-700 dark:text-zinc-300 placeholder:text-zinc-400 resize-none"
-                                    />
+                                  <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden mt-2">
+                                    <textarea value={task.notes || ""} onChange={e => updateTask(task.id, "notes", e.target.value)}
+                                      placeholder="Add a note..." rows={2} maxLength={300}
+                                      className="w-full bg-amber-50/50 dark:bg-amber-500/5 border border-amber-200/60 dark:border-amber-500/20 rounded-xl px-3 py-2 outline-none text-xs font-medium text-zinc-700 dark:text-zinc-300 placeholder:text-zinc-400 resize-none"/>
                                     <div className="flex items-center justify-between mt-1">
                                       <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest">{(task.notes || "").length}/300</span>
                                       <button onClick={() => setExpandedNoteId(null)} className="text-[9px] font-bold text-zinc-400 hover:text-zinc-600 uppercase tracking-widest transition-colors">Done</button>
@@ -1360,7 +1472,6 @@ const handleDragEnd = (event: DragEndEvent) => {
                 </AnimatePresence>
               </SortableContext>
 
-              {/* Ghost card while dragging */}
               <DragOverlay dropAnimation={{ duration: 180, easing: 'ease' }}>
                 {activeTaskId && (() => {
                   const task = displayTasks.find(t => t.id === activeTaskId);
@@ -1371,10 +1482,6 @@ const handleDragEnd = (event: DragEndEvent) => {
                         <FaGripVertical size={11} className="text-zinc-400"/>
                         <p className="text-sm font-bold text-zinc-800 dark:text-zinc-200 truncate">{task.name || "Untitled deliverable"}</p>
                       </div>
-                      <div className="flex items-center gap-2 pl-5">
-                        <span className={`px-2 py-0.5 rounded-lg border text-[9px] font-bold uppercase tracking-wider ${safeTypeMeta(task.type).color}`}>{task.type}</span>
-                        {task.deadline && <span className="text-[9px] font-mono text-zinc-400">{task.deadline}</span>}
-                      </div>
                     </div>
                   );
                 })()}
@@ -1384,30 +1491,23 @@ const handleDragEnd = (event: DragEndEvent) => {
         )}
 
         {displayTasks.length > 0 && (
-          <button
-            onClick={() => handleAddTask(activeCourse.id)}
-            className="w-full py-4 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl text-zinc-400 font-bold uppercase tracking-widest text-xs hover:border-[#06402B] dark:hover:border-emerald-500 hover:text-[#06402B] dark:hover:text-emerald-400 flex items-center justify-center gap-2 transition-all active:scale-95 touch-manipulation"
-          >
+          <button onClick={() => handleAddTask(activeCourse.id)}
+            className="w-full py-4 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl text-zinc-400 font-bold uppercase tracking-widest text-xs hover:border-[#06402B] dark:hover:border-emerald-500 hover:text-[#06402B] dark:hover:text-emerald-400 flex items-center justify-center gap-2 transition-all active:scale-95 touch-manipulation">
             <FaPlus size={10}/> New Deliverable
           </button>
         )}
       </div>
 
       {/* ── DESKTOP TABLE VIEW ── */}
-<div className="hidden md:block w-full overflow-visible pb-32">
+      <div className="hidden md:block w-full overflow-visible pb-32">
         <div className="min-w-[1020px] w-full bg-white dark:bg-[#18181b] rounded-[2rem] border border-zinc-200 dark:border-zinc-800 shadow-lg relative z-10">
 
-          {/* Header */}
           <div className="grid grid-cols-[28px_20px_24px_2fr_1.4fr_1.2fr_1.4fr_0.7fr_0.5fr_0.4fr_0.3fr] gap-2 px-5 py-3.5 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/80 dark:bg-[#111113] rounded-t-[2rem] text-[10px] font-black uppercase tracking-widest text-zinc-400 select-none">
             <div className="flex items-center">
               <input type="checkbox" checked={selectedTaskIds.size===displayTasks.length&&displayTasks.length>0} onChange={selectAll} className="w-3.5 h-3.5 accent-[#06402B] cursor-pointer"/>
             </div>
-            {/* Grip header */}
             <div title="Drag to reorder" className="flex items-center justify-center">
-              {sortKey === 'none' && !searchQuery && filterStatus === 'ALL'
-                ? <FaGripVertical size={9} className="text-zinc-400"/>
-                : <div/>
-              }
+              {sortKey === 'none' && !searchQuery && filterStatus === 'ALL' ? <FaGripVertical size={9} className="text-zinc-400"/> : <div/>}
             </div>
             <div/>
             {([["name","Deliverable"],["type","Type"],["status","Status"],["deadline","Deadline"]] as [SortKey,string][]).map(([key,label])=>(
@@ -1423,7 +1523,6 @@ const handleDragEnd = (event: DragEndEvent) => {
             <div title="Notes" className="flex items-center justify-center text-zinc-400"><FaStickyNote size={9}/></div>
           </div>
 
-          {/* Rows */}
           <div className="divide-y divide-zinc-50 dark:divide-zinc-800/40">
             {displayTasks.length===0 && (
               <motion.div initial={{opacity:0}} animate={{opacity:1}} className="p-16 text-center flex flex-col items-center">
@@ -1432,16 +1531,8 @@ const handleDragEnd = (event: DragEndEvent) => {
               </motion.div>
             )}
 
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragStart={handleDragStart}
-              onDragEnd={handleDragEnd}
-            >
-              <SortableContext
-                items={displayTasks.map(t => t.id)}
-                strategy={verticalListSortingStrategy}
-              >
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+              <SortableContext items={displayTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
                 <AnimatePresence>
                   {displayTasks.map(task => {
                     const isSelected     = selectedTaskIds.has(task.id);
@@ -1450,120 +1541,64 @@ const handleDragEnd = (event: DragEndEvent) => {
                     return (
                       <SortableTaskRow key={task.id} id={task.id} isDragDisabled={isDragDisabled}>
                         {(dragHandleProps, isDragging) => (
-                          <motion.div
-                            initial={{ opacity: 0, y: -8 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, height: 0 }}
-                            className="group"
-                          >
-                            {/* Main row */}
+                          <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, height: 0 }} className="group">
                             <div className={`grid grid-cols-[28px_20px_24px_2fr_1.4fr_1.2fr_1.4fr_0.7fr_0.5fr_0.4fr_0.3fr] gap-2 px-5 py-2.5 items-center transition-colors border-l-[3px] ${
-                              isDragging
-                                ? 'bg-[#06402B]/5 dark:bg-emerald-500/5 border-l-[#06402B] dark:border-l-emerald-500 shadow-lg'
-                                : isSelected
-                                ? 'bg-[#06402B]/5 dark:bg-emerald-500/5 border-l-[#06402B] dark:border-l-emerald-500'
-                                : 'hover:bg-zinc-50/60 dark:hover:bg-white/[0.03] border-l-transparent hover:border-l-[#06402B] dark:hover:border-l-emerald-500'
+                              isDragging ? 'bg-[#06402B]/5 dark:bg-emerald-500/5 border-l-[#06402B] dark:border-l-emerald-500 shadow-lg'
+                              : isSelected ? 'bg-[#06402B]/5 dark:bg-emerald-500/5 border-l-[#06402B] dark:border-l-emerald-500'
+                              : 'hover:bg-zinc-50/60 dark:hover:bg-white/[0.03] border-l-transparent hover:border-l-[#06402B] dark:hover:border-l-emerald-500'
                             } ${task.starred && !isDragging ? 'bg-amber-50/30 dark:bg-amber-500/5' : ''}`}>
-
-                              {/* Checkbox */}
                               <div className="flex items-center">
                                 <input type="checkbox" checked={isSelected} onChange={() => toggleSelectTask(task.id)} className="w-3.5 h-3.5 accent-[#06402B] cursor-pointer"/>
                               </div>
-
-                              {/* Drag handle */}
                               <div className="flex items-center justify-center">
                                 {!isDragDisabled ? (
-                                  <button
-                                    {...dragHandleProps}
-                                    className="flex items-center justify-center p-1 text-zinc-300 dark:text-zinc-700 hover:text-zinc-500 dark:hover:text-zinc-400 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing transition-all rounded"
-                                    title="Drag to reorder"
-                                  >
+                                  <button {...dragHandleProps} className="flex items-center justify-center p-1 text-zinc-300 dark:text-zinc-700 hover:text-zinc-500 dark:hover:text-zinc-400 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing transition-all rounded" title="Drag to reorder">
                                     <FaGripVertical size={11}/>
                                   </button>
-                                ) : (
-                                  <div/>
-                                )}
+                                ) : <div/>}
                               </div>
-
-                              {/* Star */}
                               <button onClick={() => updateTask(task.id, "starred", !task.starred)}
                                 className={`flex items-center justify-center transition-all ${task.starred ? "text-amber-400" : "text-zinc-200 dark:text-zinc-700 hover:text-amber-400"}`}>
                                 <FaStar size={12}/>
                               </button>
-
-                              {/* Name + urgency */}
                               <div className="flex items-center gap-2 min-w-0">
                                 <div className="flex-1 min-w-0">
                                   <InlineEdit value={task.name} onSave={v => updateTask(task.id, "name", v)} placeholder="Untitled deliverable…"/>
                                 </div>
                                 <UrgencyBadge deadline={task.deadline} status={task.status}/>
                               </div>
-
-                              {/* Type */}
                               <TypePicker value={safeType(task.type)} onChange={v => updateTask(task.id, "type", v)}/>
-
-                              {/* Status */}
                               <div className={`flex items-center px-2.5 py-1.5 rounded-xl border text-[10px] font-bold uppercase tracking-wider ${safeStatusMeta(task.status).color}`}>
-                                <Dropdown<TaskStatus>
-                                  value={safeStatus(task.status)} options={TASK_STATUSES}
-                                  onChange={v => updateTask(task.id, "status", v)}
+                                <Dropdown<TaskStatus> value={safeStatus(task.status)} options={TASK_STATUSES} onChange={v => updateTask(task.id, "status", v)}
                                   renderValue={v => <span className="truncate">{v}</span>}
                                   renderOption={v => <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border ${safeStatusMeta(v).color}`}>{v}</span>}
                                 />
                               </div>
-
-                              {/* Deadline */}
                               <DateInput value={task.deadline} onChange={v => updateTask(task.id, "deadline", v)}/>
-
-                              {/* Grade */}
                               <GradeEdit value={task.grade} onSave={v => updateTask(task.id, "grade", v)}/>
-
-                              {/* Duplicate */}
-                              <button onClick={() => duplicateTask(task)}
-                                className="flex items-center justify-center p-1.5 text-zinc-300 dark:text-zinc-700 hover:text-zinc-500 dark:hover:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 opacity-0 group-hover:opacity-100 transition-all rounded-lg active:scale-90">
+                              <button onClick={() => duplicateTask(task)} className="flex items-center justify-center p-1.5 text-zinc-300 dark:text-zinc-700 hover:text-zinc-500 dark:hover:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 opacity-0 group-hover:opacity-100 transition-all rounded-lg active:scale-90">
                                 <FaCopy size={11}/>
                               </button>
-
-                              {/* Delete */}
-                              <button onClick={() => deleteTask(task.id)}
-                                className="flex items-center justify-center p-1.5 text-zinc-300 dark:text-zinc-700 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all rounded-lg active:scale-90">
+                              <button onClick={() => deleteTask(task.id)} className="flex items-center justify-center p-1.5 text-zinc-300 dark:text-zinc-700 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all rounded-lg active:scale-90">
                                 <FaTrash size={11}/>
                               </button>
-
-                              {/* Notes toggle */}
-                              <button
-                                onClick={() => setExpandedNoteId(prev => prev === task.id ? null : task.id)}
-                                title="Notes"
+                              <button onClick={() => setExpandedNoteId(prev => prev === task.id ? null : task.id)} title="Notes"
                                 className={`flex items-center justify-center p-1.5 rounded-lg transition-all ${
-                                  expandedNoteId === task.id
-                                    ? 'text-[#06402B] dark:text-emerald-400 bg-[#06402B]/10'
-                                    : task.notes?.trim()
-                                    ? 'text-amber-500 bg-amber-500/10'
-                                    : 'text-zinc-300 dark:text-zinc-700 hover:text-zinc-500 opacity-0 group-hover:opacity-100'
-                                }`}
-                              >
+                                  expandedNoteId === task.id ? 'text-[#06402B] dark:text-emerald-400 bg-[#06402B]/10'
+                                  : task.notes?.trim() ? 'text-amber-500 bg-amber-500/10'
+                                  : 'text-zinc-300 dark:text-zinc-700 hover:text-zinc-500 opacity-0 group-hover:opacity-100'
+                                }`}>
                                 <FaStickyNote size={11}/>
                               </button>
                             </div>
 
-                            {/* Expandable notes row */}
                             <AnimatePresence>
                               {expandedNoteId === task.id && (
-                                <motion.div
-                                  initial={{ height: 0, opacity: 0 }}
-                                  animate={{ height: 'auto', opacity: 1 }}
-                                  exit={{ height: 0, opacity: 0 }}
-                                  transition={{ duration: 0.18 }}
-                                  className="overflow-hidden"
-                                >
+                                <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.18 }} className="overflow-hidden">
                                   <div className="px-5 pb-3 pt-2 bg-amber-50/40 dark:bg-amber-500/5 border-l-[3px] border-l-amber-400/50">
-                                    <textarea
-                                      value={task.notes || ""}
-                                      onChange={e => updateTask(task.id, "notes", e.target.value)}
-                                      placeholder="Add a note... e.g. 'Prof said this counts 15% not 20%'"
-                                      rows={2} maxLength={300}
-                                      className="w-full bg-transparent outline-none text-xs font-medium text-zinc-700 dark:text-zinc-300 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 resize-none leading-relaxed"
-                                    />
+                                    <textarea value={task.notes || ""} onChange={e => updateTask(task.id, "notes", e.target.value)}
+                                      placeholder="Add a note..." rows={2} maxLength={300}
+                                      className="w-full bg-transparent outline-none text-xs font-medium text-zinc-700 dark:text-zinc-300 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 resize-none leading-relaxed"/>
                                     <div className="flex items-center justify-between mt-1">
                                       <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest">{(task.notes || "").length}/300</span>
                                       <button onClick={() => setExpandedNoteId(null)} className="text-[9px] font-bold text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 uppercase tracking-widest transition-colors">Done</button>
@@ -1580,7 +1615,6 @@ const handleDragEnd = (event: DragEndEvent) => {
                 </AnimatePresence>
               </SortableContext>
 
-              {/* Ghost row while dragging */}
               <DragOverlay dropAnimation={{ duration: 180, easing: 'ease' }}>
                 {activeTaskId && (() => {
                   const task = displayTasks.find(t => t.id === activeTaskId);
@@ -1588,11 +1622,7 @@ const handleDragEnd = (event: DragEndEvent) => {
                   return (
                     <div className="min-w-[1020px] bg-white dark:bg-[#18181b] border border-[#06402B]/30 dark:border-emerald-500/30 shadow-2xl rounded-xl opacity-95">
                       <div className="grid grid-cols-[28px_20px_24px_2fr_1.4fr_1.2fr_1.4fr_0.7fr_0.5fr_0.4fr_0.3fr] gap-2 px-5 py-2.5 items-center border-l-[3px] border-l-[#06402B] dark:border-l-emerald-500 bg-[#06402B]/5 dark:bg-emerald-500/5">
-                        <div/>
-                        <div className="flex items-center justify-center">
-                          <FaGripVertical size={11} className="text-[#06402B] dark:text-emerald-400"/>
-                        </div>
-                        <div/>
+                        <div/><div className="flex items-center justify-center"><FaGripVertical size={11} className="text-[#06402B] dark:text-emerald-400"/></div><div/>
                         <p className="text-sm font-bold text-zinc-800 dark:text-zinc-200 truncate px-2.5">{task.name || "Untitled deliverable"}</p>
                         <span className={`px-2.5 py-1.5 rounded-xl border text-[10px] font-bold uppercase tracking-wider ${safeTypeMeta(task.type).color}`}>{task.type}</span>
                         <span className={`px-2.5 py-1.5 rounded-xl border text-[10px] font-bold uppercase tracking-wider ${safeStatusMeta(task.status).color}`}>{task.status}</span>
@@ -1607,7 +1637,6 @@ const handleDragEnd = (event: DragEndEvent) => {
             </DndContext>
           </div>
 
-          {/* Footer */}
           <div className="px-4 py-3 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-[#111113] rounded-b-[2rem] flex items-center justify-between">
             <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest tabular-nums">
               {displayTasks.length} of {rawCourseTasks.length} task{rawCourseTasks.length!==1?"s":""}
@@ -1617,12 +1646,10 @@ const handleDragEnd = (event: DragEndEvent) => {
               )}
             </p>
             <button onClick={() => handleAddTask(activeCourse.id)}
-              className="flex items-center gap-2 px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-zinc-400 hover:text-[#06402B] dark:hover:text-emerald-400 hover:bg-white dark:hover:bg-zinc-900 rounded-xl transition-all border border-transparent hover:border-zinc-200 dark:hover:border-zinc-800 shadow-sm hover:shadow-md"
-            >
+              className="flex items-center gap-2 px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-zinc-400 hover:text-[#06402B] dark:hover:text-emerald-400 hover:bg-white dark:hover:bg-zinc-900 rounded-xl transition-all border border-transparent hover:border-zinc-200 dark:hover:border-zinc-800 shadow-sm hover:shadow-md">
               <FaPlus size={11}/> New Deliverable <span className="opacity-40 font-mono ml-1">N</span>
             </button>
           </div>
-
         </div>
       </div>
     </motion.div>

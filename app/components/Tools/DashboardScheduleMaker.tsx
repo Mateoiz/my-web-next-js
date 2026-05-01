@@ -6,15 +6,20 @@ import {
   FaPlus, FaCalendarAlt, FaTimes, FaTrashAlt, 
   FaPalette, FaMobileAlt, FaDesktop, FaImage, FaDownload,
   FaBook, FaCheckCircle, FaUndo, FaRedo, FaCopy, FaSave,
-  FaExclamationTriangle, FaCloudUploadAlt
+  FaExclamationTriangle, FaCloudUploadAlt, FaFolderPlus, FaDoorOpen
 } from "react-icons/fa";
 import { useModal } from "../../context/ModalContext";
+import {
+  collection, addDoc, updateDoc, doc, serverTimestamp, getDocs, query, where
+} from "firebase/firestore";
+import { auth, db } from "@/lib/db";
 
 type Day = 'M' | 'T' | 'W' | 'Th' | 'F' | 'S';
 type ClassSession = {
   id: string;
   code: string;
   name: string;
+  room: string; // ← NEW
   days: Day[];
   startTime: string; 
   endTime: string;   
@@ -32,6 +37,8 @@ interface TrackerCourse {
 
 interface DashboardScheduleMakerProps {
   trackerCourses?: TrackerCourse[];
+  /** Called after courses are exported so the tracker can refresh */
+  onCoursesExported?: () => void;
 }
 
 const PASTEL_COLORS = [
@@ -49,6 +56,22 @@ const PASTEL_COLORS = [
   "bg-zinc-200 text-zinc-950 border-zinc-300"
 ];
 
+// Map pastel class string → a named colour for the tracker colour system
+const PASTEL_TO_TRACKER_COLOR: Record<string, string> = {
+  "bg-rose-200 text-rose-950 border-rose-300":    "rose",
+  "bg-orange-200 text-orange-950 border-orange-300": "amber",
+  "bg-amber-200 text-amber-950 border-amber-300": "amber",
+  "bg-emerald-200 text-emerald-950 border-emerald-300": "emerald",
+  "bg-teal-200 text-teal-950 border-teal-300":    "cyan",
+  "bg-cyan-200 text-cyan-950 border-cyan-300":    "cyan",
+  "bg-blue-200 text-blue-950 border-blue-300":    "blue",
+  "bg-indigo-200 text-indigo-950 border-indigo-300": "blue",
+  "bg-violet-200 text-violet-950 border-violet-300": "violet",
+  "bg-purple-200 text-purple-950 border-purple-300": "violet",
+  "bg-fuchsia-200 text-fuchsia-950 border-fuchsia-300": "rose",
+  "bg-zinc-200 text-zinc-950 border-zinc-300":    "emerald",
+};
+
 const THEME_STYLES = {
   light: { bg: 'bg-white', border: 'border-zinc-200', text: 'text-zinc-900', grid: 'bg-zinc-200/50', header: 'bg-zinc-100', subText: 'text-zinc-400' },
   black: { bg: 'bg-zinc-950', border: 'border-zinc-800', text: 'text-white', grid: 'bg-zinc-800/50', header: 'bg-zinc-900', subText: 'text-zinc-500' },
@@ -63,7 +86,6 @@ const TOTAL_MINUTES = (END_HOUR - START_HOUR) * 60;
 const STORAGE_KEY = 'jpcs_schedule_v1';
 const MAX_HISTORY = 30;
 
-// ─── Saved state shape ────────────────────────────────────────────────────────
 interface PersistedState {
   classes: ClassSession[];
   termName: string;
@@ -99,6 +121,138 @@ function timeToMin(t: string) {
   if (!t) return 0;
   const [h, m] = t.split(':').map(Number);
   return h * 60 + m;
+}
+
+// ─── Export to Tracker Modal ──────────────────────────────────────────────────
+function ExportToTrackerModal({
+  isOpen, onClose, classes, existingTitles, onExport,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  classes: ClassSession[];
+  existingTitles: string[];
+  onExport: (selected: ClassSession[]) => Promise<void>;
+}) {
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [loading, setLoading] = useState(false);
+  const [done, setDone] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) { setSelected(new Set()); setDone(false); }
+  }, [isOpen]);
+
+  const toggle = (id: string) => setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+
+  const handleExport = async () => {
+    setLoading(true);
+    await onExport(classes.filter(c => selected.has(c.id)));
+    setLoading(false);
+    setDone(true);
+    setTimeout(onClose, 1200);
+  };
+
+  const formatDays = (days: Day[]) =>
+    DAYS_OF_WEEK.filter(d => days.includes(d)).join('·');
+
+  const formatTime12hr = (t: string) => {
+    if (!t) return '';
+    const [h, m] = t.split(':').map(Number);
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    return `${h % 12 || 12}:${m.toString().padStart(2, '0')} ${ampm}`;
+  };
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onClick={onClose} className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <motion.div initial={{ opacity: 0, scale: 0.95, y: 8 }} animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 8 }} transition={{ type: "spring", stiffness: 400, damping: 30 }}
+            className="relative w-full max-w-md bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800 rounded-3xl p-7 shadow-2xl z-10 flex flex-col gap-5">
+
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-[#06402B]/10 text-[#06402B] dark:text-emerald-400 flex items-center justify-center shrink-0">
+                  <FaFolderPlus size={17} />
+                </div>
+                <div>
+                  <h3 className="text-base font-black uppercase tracking-tight text-zinc-900 dark:text-white leading-none">Export to Tracker</h3>
+                  <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mt-0.5">{classes.length} classes in schedule</p>
+                </div>
+              </div>
+              <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors p-1"><FaTimes size={14} /></button>
+            </div>
+
+            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 font-semibold leading-relaxed bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3">
+              Selected classes will be created as <span className="font-black text-zinc-700 dark:text-zinc-200">Course Folders</span> in the University Tracker, with their schedule (days, time, room) saved automatically.
+            </p>
+
+            <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+              {classes.length === 0 ? (
+                <div className="py-8 text-center text-zinc-400 text-sm font-bold">No classes in your schedule yet.</div>
+              ) : (
+                classes.map((cls, i) => {
+                  const label = cls.code || cls.name || "Untitled";
+                  const alreadyExists = existingTitles.some(t =>
+                    t.toLowerCase() === label.toLowerCase() || t.toLowerCase() === cls.name.toLowerCase()
+                  );
+                  const isChecked = selected.has(cls.id);
+                  return (
+                    <button key={cls.id} type="button" disabled={alreadyExists}
+                      onClick={() => !alreadyExists && toggle(cls.id)}
+                      className={`w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-all ${
+                        alreadyExists
+                          ? "bg-zinc-50 dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-800 opacity-50 cursor-not-allowed"
+                          : isChecked
+                          ? "bg-[#06402B]/5 dark:bg-emerald-500/10 border-[#06402B]/30 dark:border-emerald-500/30"
+                          : "bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 hover:border-[#06402B]/30 dark:hover:border-emerald-500/30"
+                      }`}>
+                      <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center shrink-0 transition-all ${
+                        alreadyExists ? "border-zinc-300 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800"
+                        : isChecked ? "border-[#06402B] dark:border-emerald-500 bg-[#06402B] dark:bg-emerald-500"
+                        : "border-zinc-300 dark:border-zinc-700"}`}>
+                        {(isChecked || alreadyExists) && <FaCheckCircle size={10} className={alreadyExists ? "text-zinc-400" : "text-white"} />}
+                      </div>
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-[9px] font-black shrink-0 border ${cls.color}`}>
+                        {(cls.code || cls.name || "?").slice(0, 2).toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-black text-zinc-800 dark:text-zinc-200 truncate">{label}</p>
+                        <p className="text-[10px] font-semibold text-zinc-400 truncate">{cls.name}</p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          {cls.days.length > 0 && (
+                            <span className="text-[9px] font-mono font-bold text-zinc-500">{formatDays(cls.days)}</span>
+                          )}
+                          {cls.startTime && (
+                            <span className="text-[9px] font-mono text-zinc-400">{formatTime12hr(cls.startTime)}–{formatTime12hr(cls.endTime)}</span>
+                          )}
+                          {cls.room && (
+                            <span className="text-[9px] font-mono text-zinc-400 flex items-center gap-0.5">
+                              <FaDoorOpen size={7}/> {cls.room}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      {alreadyExists && <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest shrink-0">Exists</span>}
+                    </button>
+                  );
+                })
+              )}
+            </div>
+
+            <div className="flex gap-2.5">
+              <button onClick={onClose} className="flex-1 py-3 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">Cancel</button>
+              <button onClick={handleExport} disabled={selected.size === 0 || loading || done}
+                className={`flex-1 py-3 rounded-xl font-bold text-xs uppercase tracking-widest shadow-md transition-all disabled:opacity-40 ${done ? "bg-emerald-500 text-white" : "bg-[#06402B] dark:bg-emerald-600 text-white hover:bg-[#0a5a38] dark:hover:bg-emerald-500"}`}>
+                {done ? "✓ Exported!" : loading ? "Exporting…" : `Export${selected.size > 0 ? ` (${selected.size})` : ""}`}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
+  );
 }
 
 // ─── Import from Tracker Modal ────────────────────────────────────────────────
@@ -220,67 +374,61 @@ function SaveIndicator({ savedAt }: { savedAt: number | null }) {
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
-export default function DashboardScheduleMaker({ trackerCourses = [] }: DashboardScheduleMakerProps) {
+export default function DashboardScheduleMaker({ trackerCourses = [], onCoursesExported }: DashboardScheduleMakerProps) {
   const { showAlert, showConfirm } = useModal();
 
-  // ── Persisted state (loaded from localStorage on mount) ──
   const [classes, setClassesRaw] = useState<ClassSession[]>([]);
   const [termName, setTermNameRaw] = useState("2nd Term, A.Y. 2025-2026");
   const [activeTheme, setActiveTheme] = useState<ThemeMode>('light');
   const [format, setFormat] = useState<FormatMode>('desktop');
 
-  // ── UI-only state ────────────────────────────────────────
   const [view, setView] = useState<ViewMode>('editor');
   const [isExporting, setIsExporting] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false); // ← NEW
   const [bgImage, setBgImage] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [hydrated, setHydrated] = useState(false);
 
-  // ── Undo/Redo history ────────────────────────────────────
   const [history, setHistory] = useState<ClassSession[][]>([]);
   const [future, setFuture] = useState<ClassSession[][]>([]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // ── Hydrate from localStorage on mount ──────────────────
+  // ── Hydrate ──────────────────────────────────────────────
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed: PersistedState = JSON.parse(raw);
-        setClassesRaw(parsed.classes || []);
+        setClassesRaw((parsed.classes || []).map(c => ({ ...c, room: '' })));
         setTermNameRaw(parsed.termName || "2nd Term, A.Y. 2025-2026");
         setActiveTheme(parsed.activeTheme || 'light');
         setFormat(parsed.format || 'desktop');
         setSavedAt(parsed.savedAt || null);
       } else {
-        // Default sample data for first-time users
         setClassesRaw([
-          { id: '1', code: 'CS101', name: 'Intro to Computing', days: ['M', 'W'], startTime: '08:00', endTime: '09:30', color: PASTEL_COLORS[3] },
-          { id: '2', code: 'MATH20', name: 'Discrete Mathematics', days: ['T', 'Th'], startTime: '10:00', endTime: '12:00', color: PASTEL_COLORS[6] }
+          { id: '1', code: 'CS101', name: 'Intro to Computing', room: 'GK-101', days: ['M', 'W'], startTime: '08:00', endTime: '09:30', color: PASTEL_COLORS[3] },
+          { id: '2', code: 'MATH20', name: 'Discrete Mathematics', room: 'AGN-301', days: ['T', 'Th'], startTime: '10:00', endTime: '12:00', color: PASTEL_COLORS[6] }
         ]);
       }
-    } catch { /* ignore parse errors */ }
+    } catch { /* ignore */ }
     setHydrated(true);
   }, []);
 
-  // ── Debounced auto-save ──────────────────────────────────
-  const persist = useCallback((
-    cls: ClassSession[], name: string, theme: ThemeMode, fmt: FormatMode
-  ) => {
+  // ── Persist ──────────────────────────────────────────────
+  const persist = useCallback((cls: ClassSession[], name: string, theme: ThemeMode, fmt: FormatMode) => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
       try {
         const state: PersistedState = { classes: cls, termName: name, activeTheme: theme, format: fmt, savedAt: Date.now() };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
         setSavedAt(state.savedAt);
-      } catch { /* storage quota exceeded etc */ }
+      } catch { /* quota */ }
     }, 800);
   }, []);
 
-  // ── Wrapped setters that trigger save + history push ─────
   const pushHistory = useCallback((prev: ClassSession[]) => {
     setHistory(h => [...h.slice(-MAX_HISTORY), prev]);
     setFuture([]);
@@ -310,7 +458,7 @@ export default function DashboardScheduleMaker({ trackerCourses = [] }: Dashboar
     persist(classes, termName, activeTheme, f);
   }, [classes, termName, activeTheme, persist]);
 
-  // ── Undo / Redo ─────────────────────────────────────────
+  // ── Undo / Redo ──────────────────────────────────────────
   const undo = () => {
     if (history.length === 0) return;
     const prev = history[history.length - 1];
@@ -329,7 +477,6 @@ export default function DashboardScheduleMaker({ trackerCourses = [] }: Dashboar
     persist(next, termName, activeTheme, format);
   };
 
-  // Keyboard shortcuts: Ctrl+Z / Ctrl+Y
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
@@ -339,23 +486,20 @@ export default function DashboardScheduleMaker({ trackerCourses = [] }: Dashboar
     return () => window.removeEventListener('keydown', handler);
   });
 
-  // ── Conflict detection ──────────────────────────────────
+  // ── Conflicts ────────────────────────────────────────────
   const conflicts = detectConflicts(classes);
-  const conflictCount = new Set([...conflicts.keys()].flatMap(k => conflicts.get(k)!)).size / 2 +
-    (conflicts.size > 0 ? Math.ceil(conflicts.size / 2) : 0);
-  // Simpler: just count unique conflict pairs
   const conflictPairs = new Set<string>();
   conflicts.forEach((vals, key) => vals.forEach(v => conflictPairs.add([key, v].sort().join('|'))));
 
-  // ── Image upload ────────────────────────────────────────
+  // ── Image upload ─────────────────────────────────────────
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) setBgImage(URL.createObjectURL(e.target.files[0]));
   };
 
-  // ── Class operations ────────────────────────────────────
+  // ── Class CRUD ───────────────────────────────────────────
   const addClass = () => {
     setClasses(prev => [...prev, {
-      id: Date.now().toString(), code: '', name: '',
+      id: Date.now().toString(), code: '', name: '', room: '',
       days: [], startTime: '08:00', endTime: '09:00',
       color: PASTEL_COLORS[prev.length % PASTEL_COLORS.length]
     }]);
@@ -373,10 +517,42 @@ export default function DashboardScheduleMaker({ trackerCourses = [] }: Dashboar
     };
     setClasses(prev => [...prev, ...selected.map((course, i) => ({
       id: `tracker-${course.id}-${Date.now()}`,
-      code: deriveCode(course.title), name: course.title,
+      code: deriveCode(course.title), name: course.title, room: '',
       days: [] as Day[], startTime: "08:00", endTime: "09:00",
       color: PASTEL_COLORS[(prev.length + i) % PASTEL_COLORS.length],
     }))]);
+  };
+
+  // ── NEW: Export to Tracker (Firestore) ───────────────────
+  const handleExportToTracker = async (selected: ClassSession[]) => {
+    if (!auth.currentUser) return;
+    const uid = auth.currentUser.uid;
+
+    // Fetch existing course titles to avoid duplication
+    const existing = await getDocs(query(collection(db, "courses"), where("userId", "==", uid)));
+    const existingTitles = existing.docs.map(d => (d.data().title as string).toLowerCase());
+
+    for (const cls of selected) {
+      const title = cls.name?.trim() || cls.code?.trim() || "Untitled Course";
+      if (existingTitles.includes(title.toLowerCase())) continue;
+
+      const trackerColor = PASTEL_TO_TRACKER_COLOR[cls.color] ?? "emerald";
+
+      await addDoc(collection(db, "courses"), {
+        userId: uid,
+        title,
+        color: trackerColor,
+        // Schedule metadata stored on the course document
+        scheduleCode: cls.code,
+        scheduleDays: cls.days,
+        scheduleStartTime: cls.startTime,
+        scheduleEndTime: cls.endTime,
+        scheduleRoom: cls.room,
+        createdAt: serverTimestamp(),
+      });
+    }
+
+    onCoursesExported?.();
   };
 
   const updateClass = (id: string, field: keyof ClassSession, value: any) => {
@@ -433,7 +609,7 @@ export default function DashboardScheduleMaker({ trackerCourses = [] }: Dashboar
   const sortClassesByTime = (dayClasses: ClassSession[]) =>
     [...dayClasses].sort((a, b) => timeToMin(a.startTime) - timeToMin(b.startTime));
 
-  // ── Export ───────────────────────────────────────────────
+  // ── Export JPG ───────────────────────────────────────────
   const downloadJPG = async () => {
     setIsExporting(true);
     try {
@@ -459,7 +635,7 @@ export default function DashboardScheduleMaker({ trackerCourses = [] }: Dashboar
   );
 
   // ==========================================
-  // VIEW: 1. EDITOR
+  // VIEW: EDITOR
   // ==========================================
   if (view === 'editor') {
     return (
@@ -469,6 +645,14 @@ export default function DashboardScheduleMaker({ trackerCourses = [] }: Dashboar
           isOpen={showImportModal} onClose={() => setShowImportModal(false)}
           trackerCourses={trackerCourses} existingCodes={classes.map(c => c.code)}
           onImport={handleImportFromTracker}
+        />
+
+        {/* ← NEW: Export to Tracker modal */}
+        <ExportToTrackerModal
+          isOpen={showExportModal} onClose={() => setShowExportModal(false)}
+          classes={classes}
+          existingTitles={trackerCourses.map(c => c.title)}
+          onExport={handleExportToTracker}
         />
 
         {/* Header Block */}
@@ -491,16 +675,19 @@ export default function DashboardScheduleMaker({ trackerCourses = [] }: Dashboar
                   <FaBook size={10} /> Import from Tracker ({trackerCourses.length})
                 </button>
               )}
-              {/* Conflict warning */}
+              {/* ← NEW: Export to Tracker button */}
+              {classes.length > 0 && (
+                <button onClick={() => setShowExportModal(true)}
+                  className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 bg-violet-500/10 border border-violet-500/20 rounded-xl text-[10px] sm:text-xs font-bold uppercase tracking-widest text-violet-600 dark:text-violet-400 hover:bg-violet-500/20 transition-colors">
+                  <FaFolderPlus size={10} /> Export to Tracker
+                </button>
+              )}
               <ConflictBadge count={conflictPairs.size} />
-              {/* Save indicator */}
               <SaveIndicator savedAt={savedAt} />
             </div>
           </div>
 
           <div className="shrink-0 relative z-10 flex flex-col sm:flex-row lg:flex-col justify-end gap-3 w-full lg:w-auto">
-
-            {/* Undo/Redo row */}
             <div className="flex gap-2 w-full sm:w-auto">
               <button onClick={undo} disabled={history.length === 0} title="Undo (Ctrl+Z)"
                 className="flex-1 lg:flex-none px-4 py-3 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 rounded-2xl font-bold uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-zinc-200 dark:hover:bg-zinc-700 disabled:opacity-30 transition-all text-[10px] sm:text-xs">
@@ -539,9 +726,8 @@ export default function DashboardScheduleMaker({ trackerCourses = [] }: Dashboar
               className="w-full sm:w-auto lg:w-full px-6 sm:px-8 py-3 bg-[#06402B] text-white rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-95 transition-all shadow-[0_0_20px_rgba(6,64,43,0.3)] text-[10px] sm:text-xs">
               <FaCalendarAlt size={14} /> View Timetable
             </button>
-          </div>{/* closes action buttons div */}
-        </div>{/* closes header block */}
-
+          </div>
+        </div>
 
         {/* Class Input List */}
         <div className="space-y-4 w-full">
@@ -551,90 +737,99 @@ export default function DashboardScheduleMaker({ trackerCourses = [] }: Dashboar
               return (
                 <motion.div
                   key={cls.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }}
-                  className={`bg-white/60 dark:bg-zinc-900/60 backdrop-blur-md border rounded-[1.5rem] p-4 sm:p-5 flex flex-col lg:flex-row gap-4 group transition-colors w-full shadow-sm ${
+                  className={`bg-white/60 dark:bg-zinc-900/60 backdrop-blur-md border rounded-[1.5rem] p-4 sm:p-5 flex flex-col gap-4 group transition-colors w-full shadow-sm ${
                     hasConflict
-                      ? 'border-red-400/50 dark:border-red-500/40 bg-red-500/3'
+                      ? 'border-red-400/50 dark:border-red-500/40'
                       : 'border-zinc-200 dark:border-zinc-800 hover:border-[#06402B]/30'
                   }`}
                 >
-                  {/* Conflict indicator */}
                   {hasConflict && (
-                    <div className="flex items-center gap-1.5 px-3 py-1 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 text-[9px] font-black uppercase tracking-widest w-full lg:hidden">
+                    <div className="flex items-center gap-1.5 px-3 py-1 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 text-[9px] font-black uppercase tracking-widest w-full">
                       <FaExclamationTriangle size={9} /> Time conflict detected
                     </div>
                   )}
 
-                  <div className="flex items-center gap-3 w-full lg:w-48 shrink-0">
-                    <button onClick={() => cycleColor(cls.id, cls.color)} title="Click to change color"
-                      className={`w-12 h-12 lg:w-10 lg:h-10 rounded-xl lg:rounded-full ${cls.color} flex items-center justify-center transition-all shadow-inner shrink-0 border-2 hover:scale-110 active:scale-90`}>
-                      <FaPalette size={14} className="opacity-60" />
-                    </button>
-                    <input
-                      type="text" placeholder="Code" value={cls.code}
-                      onChange={(e) => updateClass(cls.id, 'code', e.target.value)}
-                      className="flex-1 lg:w-full bg-zinc-100 dark:bg-zinc-950/50 border border-zinc-200 dark:border-zinc-800 outline-none font-black text-zinc-900 dark:text-zinc-100 p-3 sm:p-4 lg:p-3 rounded-xl focus:border-[#06402B] transition-colors uppercase text-sm sm:text-base"
-                    />
-                  </div>
-
-                  <div className="flex-1 w-full">
-                    <input
-                      type="text" placeholder="Course Name" value={cls.name}
-                      onChange={(e) => updateClass(cls.id, 'name', e.target.value)}
-                      className="w-full bg-zinc-100 dark:bg-zinc-950/50 border border-zinc-200 dark:border-zinc-800 outline-none font-bold text-zinc-700 dark:text-zinc-300 p-3 sm:p-4 lg:p-3 rounded-xl focus:border-[#06402B] transition-colors text-sm sm:text-base"
-                    />
-                  </div>
-
-                  <div className="flex justify-between sm:justify-center items-center gap-1 sm:gap-2 bg-zinc-100 dark:bg-zinc-950/50 p-2 sm:p-3 lg:p-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800 w-full lg:w-auto shrink-0">
-                    {DAYS_OF_WEEK.map(day => {
-                      const isActive = cls.days.includes(day);
-                      return (
-                        <button key={day} onClick={() => toggleDay(cls.id, day)}
-                          className={`flex-1 sm:w-10 sm:h-10 lg:w-8 lg:h-8 py-2 sm:py-0 rounded-lg text-xs sm:text-sm lg:text-xs font-black transition-all border ${
-                            isActive ? `${cls.color} shadow-sm` : 'border-transparent text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800'}`}>
-                          {day}
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  <div className="flex items-center justify-between gap-2 w-full lg:w-auto shrink-0">
-                    <input
-                      type="time" value={cls.startTime}
-                      onChange={(e) => updateClass(cls.id, 'startTime', e.target.value)}
-                      className="flex-1 lg:w-28 bg-zinc-100 dark:bg-zinc-950/50 border border-zinc-200 dark:border-zinc-800 outline-none font-bold text-zinc-700 dark:text-zinc-300 p-3 sm:p-4 lg:p-2.5 rounded-xl focus:border-[#06402B] text-center text-sm sm:text-base"
-                    />
-                    <span className="text-zinc-400 font-bold">–</span>
-                    <input
-                      type="time" value={cls.endTime}
-                      onChange={(e) => updateClass(cls.id, 'endTime', e.target.value)}
-                      className="flex-1 lg:w-28 bg-zinc-100 dark:bg-zinc-950/50 border border-zinc-200 dark:border-zinc-800 outline-none font-bold text-zinc-700 dark:text-zinc-300 p-3 sm:p-4 lg:p-2.5 rounded-xl focus:border-[#06402B] text-center text-sm sm:text-base"
-                    />
-                  </div>
-
-                  {/* Action buttons: duplicate + delete */}
-                  <div className="flex lg:flex-col gap-2 w-full lg:w-auto shrink-0 mt-2 lg:mt-0">
-                    <button onClick={() => duplicateClass(cls)} title="Duplicate class"
-                      className="flex-1 lg:flex-none bg-zinc-100 dark:bg-zinc-800 text-zinc-400 hover:text-[#06402B] dark:hover:text-emerald-400 transition-colors p-3 rounded-xl flex items-center justify-center gap-2 lg:opacity-0 group-hover:opacity-100 font-bold text-[10px] uppercase tracking-widest">
-                      <span className="lg:hidden">Duplicate</span><FaCopy size={13} />
-                    </button>
-                    <button onClick={() => removeClass(cls.id)} title="Remove class"
-                      className="flex-1 lg:flex-none bg-red-500/10 lg:bg-transparent text-red-500 hover:text-red-600 transition-colors p-3 rounded-xl lg:rounded-none flex items-center justify-center gap-2 lg:opacity-0 group-hover:opacity-100 font-bold text-[10px] uppercase tracking-widest">
-                      <span className="lg:hidden">Remove</span><FaTrashAlt size={13} />
-                    </button>
-                  </div>
-
-                  {/* Desktop conflict note */}
-                  {hasConflict && (
-                    <div className="hidden lg:flex items-center gap-1 text-red-500 text-[9px] font-black uppercase tracking-widest absolute top-3 right-16">
-                      <FaExclamationTriangle size={9} />
+                  {/* Row 1: Color + Code + Name */}
+                  <div className="flex flex-col lg:flex-row gap-3">
+                    <div className="flex items-center gap-3 w-full lg:w-48 shrink-0">
+                      <button onClick={() => cycleColor(cls.id, cls.color)} title="Click to change color"
+                        className={`w-12 h-12 lg:w-10 lg:h-10 rounded-xl lg:rounded-full ${cls.color} flex items-center justify-center transition-all shadow-inner shrink-0 border-2 hover:scale-110 active:scale-90`}>
+                        <FaPalette size={14} className="opacity-60" />
+                      </button>
+                      <input
+                        type="text" placeholder="Code" value={cls.code}
+                        onChange={(e) => updateClass(cls.id, 'code', e.target.value)}
+                        className="flex-1 lg:w-full bg-zinc-100 dark:bg-zinc-950/50 border border-zinc-200 dark:border-zinc-800 outline-none font-black text-zinc-900 dark:text-zinc-100 p-3 sm:p-4 lg:p-3 rounded-xl focus:border-[#06402B] transition-colors uppercase text-sm sm:text-base"
+                      />
                     </div>
-                  )}
+                    <div className="flex-1 w-full">
+                      <input
+                        type="text" placeholder="Course Name" value={cls.name}
+                        onChange={(e) => updateClass(cls.id, 'name', e.target.value)}
+                        className="w-full bg-zinc-100 dark:bg-zinc-950/50 border border-zinc-200 dark:border-zinc-800 outline-none font-bold text-zinc-700 dark:text-zinc-300 p-3 sm:p-4 lg:p-3 rounded-xl focus:border-[#06402B] transition-colors text-sm sm:text-base"
+                      />
+                    </div>
+                    {/* ← NEW: Room field */}
+                    <div className="w-full lg:w-36 shrink-0">
+                      <div className="relative">
+                        <FaDoorOpen size={11} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none"/>
+                        <input
+                          type="text" placeholder="Room" value={cls.room}
+                          onChange={(e) => updateClass(cls.id, 'room', e.target.value)}
+                          className="w-full pl-8 bg-zinc-100 dark:bg-zinc-950/50 border border-zinc-200 dark:border-zinc-800 outline-none font-bold text-zinc-700 dark:text-zinc-300 p-3 sm:p-4 lg:p-3 rounded-xl focus:border-[#06402B] transition-colors text-sm"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Row 2: Days + Times + Actions */}
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    {/* Day toggles */}
+                    <div className="flex justify-between sm:justify-center items-center gap-1 sm:gap-2 bg-zinc-100 dark:bg-zinc-950/50 p-2 sm:p-3 lg:p-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800 flex-1 sm:flex-none">
+                      {DAYS_OF_WEEK.map(day => {
+                        const isActive = cls.days.includes(day);
+                        return (
+                          <button key={day} onClick={() => toggleDay(cls.id, day)}
+                            className={`flex-1 sm:w-10 sm:h-10 lg:w-8 lg:h-8 py-2 sm:py-0 rounded-lg text-xs sm:text-sm lg:text-xs font-black transition-all border ${
+                              isActive ? `${cls.color} shadow-sm` : 'border-transparent text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800'}`}>
+                            {day}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Times */}
+                    <div className="flex items-center gap-2 flex-1">
+                      <input
+                        type="time" value={cls.startTime}
+                        onChange={(e) => updateClass(cls.id, 'startTime', e.target.value)}
+                        className="flex-1 bg-zinc-100 dark:bg-zinc-950/50 border border-zinc-200 dark:border-zinc-800 outline-none font-bold text-zinc-700 dark:text-zinc-300 p-3 sm:p-4 lg:p-2.5 rounded-xl focus:border-[#06402B] text-center text-sm sm:text-base"
+                      />
+                      <span className="text-zinc-400 font-bold shrink-0">–</span>
+                      <input
+                        type="time" value={cls.endTime}
+                        onChange={(e) => updateClass(cls.id, 'endTime', e.target.value)}
+                        className="flex-1 bg-zinc-100 dark:bg-zinc-950/50 border border-zinc-200 dark:border-zinc-800 outline-none font-bold text-zinc-700 dark:text-zinc-300 p-3 sm:p-4 lg:p-2.5 rounded-xl focus:border-[#06402B] text-center text-sm sm:text-base"
+                      />
+                    </div>
+
+                    {/* Duplicate + Delete */}
+                    <div className="flex gap-2 shrink-0">
+                      <button onClick={() => duplicateClass(cls)} title="Duplicate class"
+                        className="flex-1 sm:flex-none bg-zinc-100 dark:bg-zinc-800 text-zinc-400 hover:text-[#06402B] dark:hover:text-emerald-400 transition-colors p-3 rounded-xl flex items-center justify-center gap-2 font-bold text-[10px] uppercase tracking-widest">
+                        <span className="sm:hidden">Duplicate</span><FaCopy size={13} />
+                      </button>
+                      <button onClick={() => removeClass(cls.id)} title="Remove class"
+                        className="flex-1 sm:flex-none bg-red-500/10 text-red-500 hover:text-red-600 hover:bg-red-500/20 transition-colors p-3 rounded-xl flex items-center justify-center gap-2 font-bold text-[10px] uppercase tracking-widest">
+                        <span className="sm:hidden">Remove</span><FaTrashAlt size={13} />
+                      </button>
+                    </div>
+                  </div>
                 </motion.div>
               );
             })}
           </AnimatePresence>
 
-          {/* Empty state */}
           {classes.length === 0 && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
               className="flex flex-col items-center justify-center py-12 gap-3 text-zinc-400">
@@ -657,7 +852,6 @@ export default function DashboardScheduleMaker({ trackerCourses = [] }: Dashboar
             )}
           </div>
 
-          {/* Keyboard shortcut hint */}
           <p className="text-center text-[10px] text-zinc-400 font-mono font-bold uppercase tracking-widest pt-2">
             Ctrl+Z to undo · Ctrl+Y to redo · Changes auto-saved
           </p>
@@ -667,7 +861,7 @@ export default function DashboardScheduleMaker({ trackerCourses = [] }: Dashboar
   }
 
   // ==========================================
-  // VIEW: 2. CANVAS & EXPORT
+  // VIEW: CANVAS & EXPORT
   // ==========================================
   if (view === 'canvas') {
     const currentTheme = THEME_STYLES[activeTheme];
@@ -679,9 +873,9 @@ export default function DashboardScheduleMaker({ trackerCourses = [] }: Dashboar
         <div className="h-16 md:h-20 border-b border-zinc-200 dark:border-zinc-800 px-3 sm:px-4 md:px-8 flex items-center justify-between shrink-0 bg-white/80 dark:bg-black/80 backdrop-blur-xl z-30">
           <div className="flex items-center gap-2 sm:gap-3 md:gap-4 min-w-0">
             <button onClick={() => setView('editor')}
-  className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all text-zinc-500 shrink-0">
-  <FaTimes size={14} />
-</button>
+              className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all text-zinc-500 shrink-0">
+              <FaTimes size={14} />
+            </button>
             <div className="min-w-0">
               <h3 className="font-black text-xs sm:text-sm md:text-lg uppercase tracking-tight truncate text-zinc-900 dark:text-white">{termName || "My Schedule"}</h3>
               <p className="text-[8px] sm:text-[9px] md:text-[10px] font-mono font-bold text-[#06402B] uppercase tracking-widest truncate">Preview & Export</p>
@@ -689,6 +883,12 @@ export default function DashboardScheduleMaker({ trackerCourses = [] }: Dashboar
           </div>
 
           <div className="flex items-center gap-2 md:gap-4 shrink-0">
+            {/* ← NEW: Export to Tracker button in canvas view */}
+            <button onClick={() => setShowExportModal(true)}
+              className="hidden sm:flex items-center gap-1.5 px-3 py-2 bg-violet-500/10 border border-violet-500/20 text-violet-600 dark:text-violet-400 rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-violet-500/20 transition-colors">
+              <FaFolderPlus size={11}/> To Tracker
+            </button>
+
             <div className="flex bg-zinc-200 dark:bg-zinc-800 p-1 rounded-xl">
               <button onClick={() => handleFormatChange('desktop')}
                 className={`px-3 py-2 rounded-lg text-[10px] sm:text-xs font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-1.5 ${format === 'desktop' ? 'bg-white dark:bg-zinc-950 shadow-md text-zinc-900 dark:text-white' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}>
@@ -709,6 +909,14 @@ export default function DashboardScheduleMaker({ trackerCourses = [] }: Dashboar
           </div>
         </div>
 
+        {/* Export modal accessible from canvas view too */}
+        <ExportToTrackerModal
+          isOpen={showExportModal} onClose={() => setShowExportModal(false)}
+          classes={classes}
+          existingTitles={trackerCourses.map(c => c.title)}
+          onExport={handleExportToTracker}
+        />
+
         {/* MAIN LAYOUT */}
         <div className="flex-1 flex flex-col md:flex-row overflow-hidden relative w-full">
 
@@ -727,7 +935,7 @@ export default function DashboardScheduleMaker({ trackerCourses = [] }: Dashboar
             ))}
           </div>
 
-          {/* CANVAS SCROLL AREA */}
+          {/* CANVAS */}
           <div className="flex-1 overflow-auto p-4 md:p-8 flex md:items-start justify-center bg-zinc-100/50 dark:bg-black/20 w-full relative">
             {format === 'desktop' && (
               <div className="md:hidden absolute top-6 left-1/2 -translate-x-1/2 bg-black/70 text-white text-[10px] font-bold px-4 py-1.5 rounded-full z-40 backdrop-blur-md animate-pulse whitespace-nowrap pointer-events-none">
@@ -748,6 +956,7 @@ export default function DashboardScheduleMaker({ trackerCourses = [] }: Dashboar
                 <div className={`absolute inset-0 z-0 backdrop-blur-md ${activeTheme === 'black' ? 'bg-black/70' : activeTheme === 'blue' ? 'bg-slate-900/70' : activeTheme === 'pink' ? 'bg-rose-100/70' : 'bg-white/70'}`} />
               )}
 
+              {/* ── DESKTOP CANVAS ── */}
               {format === 'desktop' ? (
                 <>
                   <div className="mb-8 text-center relative z-10">
@@ -800,6 +1009,12 @@ export default function DashboardScheduleMaker({ trackerCourses = [] }: Dashboar
                             >
                               <h4 className="font-black leading-tight text-sm truncate">{cls.code}</h4>
                               <p className="font-bold uppercase tracking-widest mt-0.5 text-[10px] truncate opacity-90">{cls.name}</p>
+                              {/* ← NEW: Room shown on canvas block */}
+                              {cls.room && (
+                                <p className="font-mono text-[9px] opacity-70 truncate mt-0.5 flex items-center gap-0.5">
+                                  <FaDoorOpen size={7}/> {cls.room}
+                                </p>
+                              )}
                               <p className="font-mono font-bold mt-auto opacity-80 text-[10px] truncate">
                                 {formatTime12hr(cls.startTime)} - {formatTime12hr(cls.endTime)}
                               </p>
@@ -811,6 +1026,7 @@ export default function DashboardScheduleMaker({ trackerCourses = [] }: Dashboar
                   </div>
                 </>
               ) : (
+                /* ── MOBILE CANVAS ── */
                 <div className="flex flex-col h-full w-full relative z-10">
                   <div className={`mb-6 border-b-2 pb-5 sm:pb-6 ${currentTheme.border}`}>
                     <h1 className={`text-2xl sm:text-3xl font-black uppercase tracking-tighter leading-none mb-3 ${currentTheme.text}`}>
@@ -834,13 +1050,19 @@ export default function DashboardScheduleMaker({ trackerCourses = [] }: Dashboar
                           </div>
                           <div className={`flex-1 flex flex-col gap-2 sm:gap-3 border-l-2 pl-3 sm:pl-4 min-w-0 ${currentTheme.border}`}>
                             {dayClasses.map(c => (
-                              <div key={c.id} className={`p-3 sm:p-4 rounded-[1rem] shadow-sm flex justify-between items-center border w-full ${c.color} ${conflicts.has(c.id) ? 'ring-2 ring-red-500' : ''}`}>
+                              <div key={c.id} className={`p-3 sm:p-4 rounded-[1rem] shadow-sm flex justify-between items-start border w-full ${c.color} ${conflicts.has(c.id) ? 'ring-2 ring-red-500' : ''}`}>
                                 <div className="min-w-0 pr-2">
                                   <div className="text-sm sm:text-lg font-bold truncate leading-tight mb-1">{c.code}</div>
                                   <div className="text-[8px] sm:text-[10px] uppercase tracking-widest opacity-90 font-medium truncate">{c.name}</div>
+                                  {/* ← NEW: Room on mobile canvas */}
+                                  {c.room && (
+                                    <div className="text-[8px] sm:text-[9px] font-mono opacity-70 mt-0.5 flex items-center gap-0.5 truncate">
+                                      <FaDoorOpen size={7}/> {c.room}
+                                    </div>
+                                  )}
                                 </div>
                                 <div className="text-right shrink-0">
-                                  <div className="text-[8px] sm:text-[9px] font-mono font-bold opacity-80 mix-blend-multiply dark:mix-blend-color-burn px-2 py-1.5 rounded-lg inline-block text-center leading-tight">
+                                  <div className="text-[8px] sm:text-[9px] font-mono font-bold opacity-80 px-2 py-1.5 rounded-lg inline-block text-center leading-tight">
                                     {formatTime12hr(c.startTime)}<br />{formatTime12hr(c.endTime)}
                                   </div>
                                 </div>
