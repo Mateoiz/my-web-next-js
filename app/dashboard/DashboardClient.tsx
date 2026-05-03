@@ -1191,50 +1191,53 @@ const handleSaveProfile = async () => {
       </main>
 
       {/* MOBILE BOTTOM NAV */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-        <div className="mx-3 mb-3 bg-white/90 dark:bg-[#121214]/90 backdrop-blur-2xl border border-zinc-200 dark:border-zinc-800/80 rounded-[2rem] shadow-2xl transition-colors duration-300">
-          <div className="flex items-center justify-between px-2 py-2">
-            {NAV_ITEMS.map((item) => {
-              const isActive = activeView === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => setActiveView(item.id as any)}
-                  className={`relative flex flex-col items-center justify-center transition-all duration-300 ease-out rounded-2xl
-                    ${isActive
-                      ? 'bg-[#06402B] dark:bg-emerald-600 text-white px-4 py-3 shadow-md'
-                      : 'text-zinc-400 dark:text-zinc-500 p-3 hover:text-zinc-700 dark:hover:text-zinc-300'
-                    }`}
-                >
-                  {isActive && (
-                    <motion.div
-                      layoutId="mobileNavGlow"
-                      className="absolute inset-0 bg-[#06402B] dark:bg-emerald-600 rounded-2xl shadow-[0_0_20px_rgba(6,64,43,0.4)] dark:shadow-[0_0_20px_rgba(16,185,129,0.3)]"
-                      transition={{ type: "spring", stiffness: 400, damping: 35 }}
-                    />
-                  )}
-                  <span className={`relative z-10 transition-transform duration-200 ${isActive ? 'scale-110' : 'scale-100'}`}>
-                    {item.icon}
-                  </span>
-                  <AnimatePresence>
-                    {isActive && (
-                      <motion.span
-                        initial={{ opacity: 0, height: 0, marginTop: 0 }}
-                        animate={{ opacity: 1, height: 'auto', marginTop: 4 }}
-                        exit={{ opacity: 0, height: 0, marginTop: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="relative z-10 text-[9px] font-black uppercase tracking-widest whitespace-nowrap overflow-hidden"
-                      >
-                        {item.label}
-                      </motion.span>
-                    )}
-                  </AnimatePresence>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </nav>
+{/* MOBILE BOTTOM NAV */}
+{!isStudying && (
+  <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+    <div className="mx-3 mb-3 bg-white/90 dark:bg-[#121214]/90 backdrop-blur-2xl border border-zinc-200 dark:border-zinc-800/80 rounded-[2rem] shadow-2xl transition-colors duration-300">
+      <div className="flex items-center justify-between px-2 py-2">
+        {NAV_ITEMS.map((item) => {
+          const isActive = activeView === item.id;
+          return (
+            <button
+              key={item.id}
+              onClick={() => setActiveView(item.id as any)}
+              className={`relative flex flex-col items-center justify-center transition-all duration-300 ease-out rounded-2xl
+                ${isActive
+                  ? 'bg-[#06402B] dark:bg-emerald-600 text-white px-4 py-3 shadow-md'
+                  : 'text-zinc-400 dark:text-zinc-500 p-3 hover:text-zinc-700 dark:hover:text-zinc-300'
+                }`}
+            >
+              {isActive && (
+                <motion.div
+                  layoutId="mobileNavGlow"
+                  className="absolute inset-0 bg-[#06402B] dark:bg-emerald-600 rounded-2xl shadow-[0_0_20px_rgba(6,64,43,0.4)] dark:shadow-[0_0_20px_rgba(16,185,129,0.3)]"
+                  transition={{ type: "spring", stiffness: 400, damping: 35 }}
+                />
+              )}
+              <span className={`relative z-10 transition-transform duration-200 ${isActive ? 'scale-110' : 'scale-100'}`}>
+                {item.icon}
+              </span>
+              <AnimatePresence>
+                {isActive && (
+                  <motion.span
+                    initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                    animate={{ opacity: 1, height: 'auto', marginTop: 4 }}
+                    exit={{ opacity: 0, height: 0, marginTop: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="relative z-10 text-[9px] font-black uppercase tracking-widest whitespace-nowrap overflow-hidden"
+                  >
+                    {item.label}
+                  </motion.span>
+                )}
+              </AnimatePresence>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  </nav>
+)}
 
       {/* COMMAND CENTER */}
 <CommandCenter
