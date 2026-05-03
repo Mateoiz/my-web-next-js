@@ -5,12 +5,12 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   FaPlus, FaCalendarAlt, FaTimes, FaTrashAlt, 
   FaPalette, FaMobileAlt, FaDesktop, FaImage, FaDownload,
-  FaBook, FaCheckCircle, FaUndo, FaRedo, FaCopy, FaSave,
+  FaBook, FaCheckCircle, FaUndo, FaRedo, FaCopy,
   FaExclamationTriangle, FaCloudUploadAlt, FaFolderPlus, FaDoorOpen
 } from "react-icons/fa";
 import { useModal } from "../../context/ModalContext";
 import {
-  collection, addDoc, updateDoc, doc, serverTimestamp, getDocs, query, where
+  collection, addDoc, serverTimestamp, getDocs, query, where
 } from "firebase/firestore";
 import { auth, db } from "@/lib/db";
 
@@ -40,7 +40,7 @@ interface DashboardScheduleMakerProps {
   /** Called after courses are exported so the tracker can refresh */
   onCoursesExported?: () => void;
 }
-
+// Add this state in the component
 const PASTEL_COLORS = [
   "bg-rose-200 text-rose-950 border-rose-300",
   "bg-orange-200 text-orange-950 border-orange-300",
@@ -160,7 +160,6 @@ function ExportToTrackerModal({
     const ampm = h >= 12 ? 'PM' : 'AM';
     return `${h % 12 || 12}:${m.toString().padStart(2, '0')} ${ampm}`;
   };
-
   return (
     <AnimatePresence>
       {isOpen && (
@@ -192,7 +191,7 @@ function ExportToTrackerModal({
               {classes.length === 0 ? (
                 <div className="py-8 text-center text-zinc-400 text-sm font-bold">No classes in your schedule yet.</div>
               ) : (
-                classes.map((cls, i) => {
+                classes.map((cls) => {
                   const label = cls.code || cls.name || "Untitled";
                   const alreadyExists = existingTitles.some(t =>
                     t.toLowerCase() === label.toLowerCase() || t.toLowerCase() === cls.name.toLowerCase()
@@ -386,6 +385,7 @@ export default function DashboardScheduleMaker({ trackerCourses = [], onCoursesE
   const [isExporting, setIsExporting] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false); // ← NEW
+  const [wallpaperMode, setWallpaperMode] = useState<'lockscreen' | 'homescreen'>('lockscreen');
   const [bgImage, setBgImage] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [hydrated, setHydrated] = useState(false);
@@ -617,7 +617,7 @@ export default function DashboardScheduleMaker({ trackerCourses = [], onCoursesE
       const element = document.getElementById('schedule-canvas');
       if (!element) return;
       const dataUrl = await toJpeg(element, {
-        quality: 1.0, pixelRatio: format === 'mobile' ? 3 : 2,
+        quality: 1.0, pixelRatio: format === 'mobile' ? 4 : 2,
         backgroundColor: activeTheme === 'black' ? '#09090b' : activeTheme === 'blue' ? '#0f172a' : activeTheme === 'pink' ? '#fff1f2' : '#ffffff',
       });
       const link = document.createElement('a');
@@ -900,6 +900,19 @@ export default function DashboardScheduleMaker({ trackerCourses = [], onCoursesE
               </button>
             </div>
 
+            {format === 'mobile' && (
+              <div className="flex bg-zinc-200 dark:bg-zinc-800 p-1 rounded-xl">
+                <button onClick={() => setWallpaperMode('lockscreen')}
+                  className={`px-2.5 py-2 rounded-lg text-[9px] font-bold uppercase tracking-widest transition-all ${wallpaperMode === 'lockscreen' ? 'bg-white dark:bg-zinc-950 shadow-md text-zinc-900 dark:text-white' : 'text-zinc-500'}`}>
+                  Lock
+                </button>
+                <button onClick={() => setWallpaperMode('homescreen')}
+                  className={`px-2.5 py-2 rounded-lg text-[9px] font-bold uppercase tracking-widest transition-all ${wallpaperMode === 'homescreen' ? 'bg-white dark:bg-zinc-950 shadow-md text-zinc-900 dark:text-white' : 'text-zinc-500'}`}>
+                  Home
+                </button>
+              </div>
+            )}
+
             <div className="w-px h-6 bg-zinc-300 dark:bg-zinc-700 hidden md:block" />
 
             <button onClick={downloadJPG} disabled={isExporting}
@@ -947,8 +960,8 @@ export default function DashboardScheduleMaker({ trackerCourses = [], onCoursesE
               id="schedule-canvas"
               className={`relative transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] ${!bgImage && currentTheme.bg} ${currentTheme.border} border shadow-2xl overflow-hidden shrink-0 flex flex-col ${
                 format === 'desktop'
-                  ? 'w-full min-w-[1000px] max-w-7xl rounded-[2rem] p-8 md:p-10 h-[1000px]'
-                  : 'w-[340px] sm:w-[400px] min-h-[750px] sm:min-h-[850px] rounded-[2.5rem] sm:rounded-[3rem] p-6 sm:p-8 border-8 md:border-[12px] shadow-[0_0_50px_rgba(0,0,0,0.15)]'
+                  ? 'w-full min-w-250 max-w-7xl rounded-4xl p-8 md:p-10 h-250'
+                  : 'w-90 h-195 rounded-[2.5rem] border-8 shadow-[0_0_50px_rgba(0,0,0,0.15)] overflow-hidden'
               }`}
               style={{ backgroundImage: bgImage ? `url(${bgImage})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center' }}
             >
@@ -1028,61 +1041,87 @@ export default function DashboardScheduleMaker({ trackerCourses = [], onCoursesE
               ) : (
                 /* ── MOBILE CANVAS ── */
                 <div className="flex flex-col h-full w-full relative z-10">
-                  <div className={`mb-6 border-b-2 pb-5 sm:pb-6 ${currentTheme.border}`}>
-                    <h1 className={`text-2xl sm:text-3xl font-black uppercase tracking-tighter leading-none mb-3 ${currentTheme.text}`}>
-                      {termName || "My Schedule"}
-                    </h1>
-                    <div className={`flex justify-between items-center opacity-80 ${currentTheme.text}`}>
-                      <p className="text-[10px] sm:text-xs font-bold tracking-widest uppercase">Lasallian Hub</p>
-                      <p className="text-[8px] sm:text-[10px] font-mono font-bold uppercase">A.Y. 2025-2026</p>
-                    </div>
-                  </div>
+                  {wallpaperMode === 'lockscreen' ? (
+                    <div className="flex flex-col h-full w-full relative z-10 justify-end">
+                      <div className="flex flex-col gap-1.5 px-4 pt-2 pb-6 overflow-hidden">
+                        <div className={`flex items-center justify-between mb-1 ${currentTheme.text}`}>
+                          <p className="text-[8px] font-black uppercase tracking-[0.25em] opacity-60">{termName}</p>
+                          <p className="text-[7px] font-mono opacity-30">JPCS DLSAU</p>
+                        </div>
 
-                  <div className="flex flex-col gap-5 sm:gap-6 flex-1 pb-4">
-                    {DAYS_OF_WEEK.map(day => {
-                      const dayClasses = sortClassesByTime(classes.filter(c => c.days.includes(day)));
-                      if (dayClasses.length === 0) return null;
-                      const fullDay = { 'M':'MON', 'T':'TUE', 'W':'WED', 'Th':'THU', 'F':'FRI', 'S':'SAT' }[day];
-                      return (
-                        <div key={day} className="flex gap-3 sm:gap-4">
-                          <div className="w-8 sm:w-10 pt-1 shrink-0">
-                            <span className={`text-base sm:text-xl font-black tracking-widest opacity-60 ${currentTheme.text}`}>{fullDay}</span>
-                          </div>
-                          <div className={`flex-1 flex flex-col gap-2 sm:gap-3 border-l-2 pl-3 sm:pl-4 min-w-0 ${currentTheme.border}`}>
-                            {dayClasses.map(c => (
-                              <div key={c.id} className={`p-3 sm:p-4 rounded-[1rem] shadow-sm flex justify-between items-start border w-full ${c.color} ${conflicts.has(c.id) ? 'ring-2 ring-red-500' : ''}`}>
-                                <div className="min-w-0 pr-2">
-                                  <div className="text-sm sm:text-lg font-bold truncate leading-tight mb-1">{c.code}</div>
-                                  <div className="text-[8px] sm:text-[10px] uppercase tracking-widest opacity-90 font-medium truncate">{c.name}</div>
-                                  {/* ← NEW: Room on mobile canvas */}
-                                  {c.room && (
-                                    <div className="text-[8px] sm:text-[9px] font-mono opacity-70 mt-0.5 flex items-center gap-0.5 truncate">
-                                      <FaDoorOpen size={7}/> {c.room}
+                        {DAYS_OF_WEEK.map(day => {
+                          const dayClasses = sortClassesByTime(classes.filter(c => c.days.includes(day)));
+                          if (dayClasses.length === 0) return null;
+                          const fullDay = { 'M':'MON','T':'TUE','W':'WED','Th':'THU','F':'FRI','S':'SAT' }[day];
+                          return (
+                            <div key={day} className={`flex gap-1.5 items-stretch rounded-xl overflow-hidden border ${currentTheme.border}`}>
+                              <div className={`w-9 shrink-0 flex items-center justify-center ${activeTheme === 'light' ? 'bg-zinc-900' : activeTheme === 'pink' ? 'bg-rose-300' : 'bg-white/10'}`}>
+                                <span className={`text-[7px] font-black uppercase tracking-widest ${activeTheme === 'light' ? 'text-white' : currentTheme.text}`} style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
+                                  {fullDay}
+                                </span>
+                              </div>
+                              <div className="flex-1 flex flex-col gap-1 py-1 pr-2 min-w-0">
+                                {dayClasses.map(c => (
+                                  <div key={c.id} className={`flex items-center gap-1.5 rounded-lg px-2 py-1.5 ${c.color} ${conflicts.has(c.id) ? 'ring-1 ring-red-500' : ''}`}>
+                                    {c.room && <span className="shrink-0 text-[7px] font-black font-mono bg-black/15 px-1 py-0.5 rounded">{c.room}</span>}
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-[9px] font-black leading-none truncate">{c.code}</p>
+                                      <p className="text-[7px] font-bold opacity-70 leading-none truncate mt-0.5 uppercase">{c.name}</p>
                                     </div>
-                                  )}
-                                </div>
-                                <div className="text-right shrink-0">
-                                  <div className="text-[8px] sm:text-[9px] font-mono font-bold opacity-80 px-2 py-1.5 rounded-lg inline-block text-center leading-tight">
-                                    {formatTime12hr(c.startTime)}<br />{formatTime12hr(c.endTime)}
+                                    <div className="shrink-0 text-right">
+                                      <p className="text-[7px] font-mono font-bold opacity-80 leading-none">{formatTime12hr(c.startTime)}</p>
+                                      <p className="text-[7px] font-mono font-bold opacity-80 leading-none mt-0.5">{formatTime12hr(c.endTime)}</p>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col h-full px-4 pt-8 pb-28 gap-1.5">
+                      <div className={`flex items-center justify-between mb-1 ${currentTheme.text}`}>
+                        <p className="text-[8px] font-black uppercase tracking-[0.25em] opacity-60">{termName}</p>
+                        <p className="text-[7px] font-mono opacity-30">JPCS DLSAU</p>
+                      </div>
+
+                      {DAYS_OF_WEEK.map(day => {
+                        const dayClasses = sortClassesByTime(classes.filter(c => c.days.includes(day)));
+                        if (dayClasses.length === 0) return null;
+                        const fullDay = { 'M':'MON','T':'TUE','W':'WED','Th':'THU','F':'FRI','S':'SAT' }[day];
+                        return (
+                          <div key={day} className={`flex gap-1.5 items-stretch rounded-xl overflow-hidden border ${currentTheme.border}`}>
+                            <div className={`w-9 shrink-0 flex items-center justify-center ${activeTheme === 'light' ? 'bg-zinc-900' : activeTheme === 'pink' ? 'bg-rose-300' : 'bg-white/10'}`}>
+                              <span className={`text-[7px] font-black uppercase tracking-widest ${activeTheme === 'light' ? 'text-white' : currentTheme.text}`} style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
+                                {fullDay}
+                              </span>
+                            </div>
+                            <div className="flex-1 flex flex-col gap-1 py-1 pr-2 min-w-0">
+                              {dayClasses.map(c => (
+                                <div key={c.id} className={`flex items-center gap-1.5 rounded-lg px-2 py-1.5 ${c.color} ${conflicts.has(c.id) ? 'ring-1 ring-red-500' : ''}`}>
+                                  {c.room && <span className="shrink-0 text-[7px] font-black font-mono bg-black/15 px-1 py-0.5 rounded">{c.room}</span>}
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-[9px] font-black leading-none truncate">{c.code}</p>
+                                    <p className="text-[7px] font-bold opacity-70 leading-none truncate mt-0.5 uppercase">{c.name}</p>
+                                  </div>
+                                  <div className="shrink-0 text-right">
+                                    <p className="text-[7px] font-mono font-bold opacity-80 leading-none">{formatTime12hr(c.startTime)}</p>
+                                    <p className="text-[7px] font-mono font-bold opacity-80 leading-none mt-0.5">{formatTime12hr(c.endTime)}</p>
                                   </div>
                                 </div>
-                              </div>
-                            ))}
+                              ))}
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
 
-                    {classes.length === 0 && (
-                      <div className={`flex-1 flex items-center justify-center opacity-40 ${currentTheme.text}`}>
-                        <div className="text-xs sm:text-sm font-bold uppercase tracking-widest text-center">No Classes Added</div>
+                      <div className={`mt-auto pt-2 text-center opacity-15 ${currentTheme.text}`}>
+                        <p className="text-[6px] font-mono uppercase tracking-widest">dock area</p>
                       </div>
-                    )}
-                  </div>
-
-                  <div className={`mt-auto pt-5 sm:pt-6 border-t border-dashed ${currentTheme.border} text-center opacity-60 ${currentTheme.text}`}>
-                    <p className="text-[7px] sm:text-[9px] font-bold tracking-[0.4em] uppercase">Generated by JPCS</p>
-                  </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
