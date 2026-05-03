@@ -286,15 +286,21 @@ useEffect(() => {
       let unsubFriends = () => {}; 
 
       try {
-        const userDoc = await getDoc(doc(db, "users", user.uid));
-        if (userDoc.exists()) {
-          const data = userDoc.data();
-          setUserProfile(data);
-          setEditBio(data.bio || "");
-          setEditYearLevel(data.yearLevel || "1st Year");
-          setEditAvatarUrl(data.avatarUrl || "");
-          setEditCollege(data.college || ""); // ✅ FIX 1: properly set from loaded data
+const userDoc = await getDoc(doc(db, "users", user.uid));
+if (userDoc.exists()) {
+  const data = userDoc.data();
 
+  // ✅ Wipe broken blob URLs that were accidentally saved to Firestore
+  if (data.avatarUrl?.startsWith("blob:")) {
+    await updateDoc(doc(db, "users", user.uid), { avatarUrl: "" });
+    data.avatarUrl = "";
+  }
+
+  setUserProfile(data);
+  setEditBio(data.bio || "");
+  setEditYearLevel(data.yearLevel || "1st Year");
+  setEditAvatarUrl(data.avatarUrl || "");
+  setEditCollege(data.college || "");
           if (!data.hasSeenOnboarding) {
             setShowOnboarding(true);
           }
@@ -332,35 +338,59 @@ useEffect(() => {
     if (task.isCourseTask) await deleteDoc(doc(db, "course_tasks", task.id));
     else await deleteDoc(doc(db, "tasks", task.id));
   };
-
-  const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      if (e.target.files[0].size > 5 * 1024 * 1024) return showAlert("File Too Large", "Please select an image file under 5MB.");
-      setAvatarFile(e.target.files[0]); setEditAvatarUrl(URL.createObjectURL(e.target.files[0])); 
+const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  if (e.target.files && e.target.files[0]) {
+    const file = e.target.files[0];
+    if (file.size > 5 * 1024 * 1024) {
+      return showAlert("File Too Large", "Please select an image file under 5MB.");
     }
-  };
+    setAvatarFile(file); // ✅ actual file stored for upload
+    setEditAvatarUrl(URL.createObjectURL(file)); // ✅ blob only used for preview in the UI
+  }
+};
 
-  const handleSaveProfile = async () => {
-    if (!authUser) return;
-    setIsSavingProfile(true);
-    try {
-      let finalAvatarUrl = editAvatarUrl;
-      if (avatarFile) {
-        const fileRef = ref(storage, `avatars/${authUser.uid}`);
-        await uploadBytes(fileRef, avatarFile);
-        finalAvatarUrl = await getDownloadURL(fileRef); 
+const handleSaveProfile = async () => {
+  if (!authUser) return;
+  setIsSavingProfile(true);
+  try {
+    let finalAvatarUrl = userProfile?.avatarUrl || ""; // ✅ start from the saved URL, not editAvatarUrl
+
+    if (avatarFile) {
+      const fileRef = ref(storage, `avatars/${authUser.uid}`);
+      await uploadBytes(fileRef, avatarFile);
+      finalAvatarUrl = await getDownloadURL(fileRef);
+
+      // ✅ Revoke the blob URL to free memory
+      if (editAvatarUrl.startsWith("blob:")) {
+        URL.revokeObjectURL(editAvatarUrl);
       }
-      await updateDoc(doc(db, "users", authUser.uid), {
-        bio: editBio,
-        yearLevel: editYearLevel,
-        avatarUrl: finalAvatarUrl,
-        college: editCollege, // ✅ persists college to Firestore
-      });
-      setUserProfile((prev: any) => ({ ...prev, avatarUrl: finalAvatarUrl, bio: editBio, yearLevel: editYearLevel, college: editCollege }));
-      setAvatarFile(null);
-      showAlert("Profile Updated", "Your profile has been saved.");
-    } catch (error) {} finally { setIsSavingProfile(false); }
-  };
+    }
+
+    await updateDoc(doc(db, "users", authUser.uid), {
+      bio: editBio,
+      yearLevel: editYearLevel,
+      avatarUrl: finalAvatarUrl,
+      college: editCollege,
+    });
+
+    // ✅ Update local state with the real Firebase URL
+    setEditAvatarUrl(finalAvatarUrl);
+    setUserProfile((prev: any) => ({
+      ...prev,
+      avatarUrl: finalAvatarUrl,
+      bio: editBio,
+      yearLevel: editYearLevel,
+      college: editCollege,
+    }));
+    setAvatarFile(null);
+    showAlert("Profile Updated", "Your profile has been saved.");
+  } catch (error) {
+    console.error(error);
+    showAlert("Save Failed", "Something went wrong. Please try again.");
+  } finally {
+    setIsSavingProfile(false);
+  }
+};
 
   // --- SMART DASHBOARD ALGORITHMS ---
   const mergedActiveTasks = [
@@ -977,45 +1007,60 @@ useEffect(() => {
                   </div>
 
                   {/* ── Public Profile ── */}
-                  <div className="bg-white/60 dark:bg-[#121214]/80 backdrop-blur-xl rounded-[2rem] border border-zinc-200 dark:border-zinc-800/80 p-6 md:p-8 shadow-xl transition-colors duration-300 w-full">
-                    <h3 className="text-sm font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-100 mb-6 flex items-center gap-2">
-                      <FaIdBadge className="text-[#06402B] dark:text-emerald-400" /> Public Profile
-                    </h3>
-                    <div className="flex flex-col md:flex-row gap-8 items-center md:items-start">
-                      <div className="flex flex-col items-center gap-4 shrink-0 w-full md:w-auto">
-                        <div className="relative w-32 h-32 rounded-full bg-zinc-200 dark:bg-[#18181b] flex items-center justify-center text-4xl font-bold text-zinc-500 border-4 border-white dark:border-zinc-950 shadow-lg overflow-hidden group">
-                          {editAvatarUrl ? <Image src={editAvatarUrl} alt="Avatar" fill sizes="128px" className="object-cover" /> : <span>{userProfile?.fullName?.charAt(0) || "U"}</span>}
-                          <label htmlFor="avatar-upload" className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer z-10 backdrop-blur-sm">
-                            <FaCamera size={24} /><span className="text-[10px] font-bold uppercase tracking-widest mt-2">Change</span>
-                          </label>
-                          <input id="avatar-upload" type="file" accept="image/*" className="hidden" onChange={handleAvatarSelect} />
-                        </div>
-                        <div className="flex flex-col items-center gap-1 text-center">
-                          <p className="text-[11px] font-mono text-zinc-400 dark:text-zinc-500">
-                                {userProfile?.username ? `@${userProfile.username}` : ""}
-                            </p>
-                        </div>
-                        <p className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-widest">Tap to Upload</p>
-                      </div>
+<div className="bg-white/60 dark:bg-[#121214]/80 backdrop-blur-xl rounded-[2rem] border border-zinc-200 dark:border-zinc-800/80 p-6 md:p-8 shadow-xl transition-colors duration-300 w-full">
+  <h3 className="text-sm font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-100 mb-6 flex items-center gap-2">
+    <FaIdBadge className="text-[#06402B] dark:text-emerald-400" /> Public Profile
+  </h3>
+  <div className="flex flex-col md:flex-row gap-8 items-center md:items-start">
+    <div className="flex flex-col items-center gap-4 shrink-0 w-full md:w-auto">
+      <div className="relative w-32 h-32 rounded-full bg-zinc-200 dark:bg-[#18181b] flex items-center justify-center text-4xl font-bold text-zinc-500 border-4 border-white dark:border-zinc-950 shadow-lg overflow-hidden group">
+        {editAvatarUrl
+          ? <Image src={editAvatarUrl} alt="Avatar" fill sizes="128px" className="object-cover" />
+          : <span>{userProfile?.fullName?.charAt(0) || "U"}</span>
+        }
+        <label htmlFor="avatar-upload" className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer z-10 backdrop-blur-sm">
+          <FaCamera size={24} /><span className="text-[10px] font-bold uppercase tracking-widest mt-2">Change</span>
+        </label>
+        <input id="avatar-upload" type="file" accept="image/*" className="hidden" onChange={handleAvatarSelect} />
+      </div>
 
-                      <div className="flex-1 space-y-5 w-full">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                          <div>
-                            <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1 mb-1 block">Full Name</label>
-                            <input type="text" value={userProfile?.fullName || ""} disabled className="w-full bg-zinc-100 dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800/80 rounded-xl px-4 py-3 text-sm font-bold text-zinc-500 dark:text-zinc-400 cursor-not-allowed" />
-                          </div>
-                          <div>
-                            <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1 mb-1 block">Year Level</label>
-                            <select value={editYearLevel} onChange={e => setEditYearLevel(e.target.value)} className="w-full bg-white dark:bg-[#121214] border border-zinc-200 dark:border-zinc-800/80 rounded-xl px-4 py-3 text-sm font-bold text-zinc-800 dark:text-zinc-200 outline-none focus:border-[#06402B] dark:focus:border-emerald-500 shadow-sm">
-                              <option value="1st Year">1st Year</option>
-                              <option value="2nd Year">2nd Year</option>
-                              <option value="3rd Year">3rd Year</option>
-                              <option value="4th Year">4th Year</option>
-                              <option value="Irregular">Irregular</option>
-                              <option value="Alumni">Alumni</option>
-                            </select>
-                          </div>
-                        </div>
+      <div className="flex flex-col items-center gap-1 text-center">
+        <p className="text-[11px] font-mono text-zinc-400 dark:text-zinc-500">
+          {userProfile?.username ? `@${userProfile.username}` : ""}
+        </p>
+      </div>
+
+      {/* ✅ No avatar warning */}
+      {!editAvatarUrl ? (
+        <div className="flex items-center gap-1.5 px-3 py-2 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+          <FaExclamationCircle size={11} className="text-amber-500 shrink-0" />
+          <p className="text-[10px] font-bold text-amber-500 uppercase tracking-widest">
+            No avatar saved — upload one
+          </p>
+        </div>
+      ) : (
+        <p className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-widest">Tap to Upload</p>
+      )}
+    </div>
+
+    <div className="flex-1 space-y-5 w-full">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+        <div>
+          <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1 mb-1 block">Full Name</label>
+          <input type="text" value={userProfile?.fullName || ""} disabled className="w-full bg-zinc-100 dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800/80 rounded-xl px-4 py-3 text-sm font-bold text-zinc-500 dark:text-zinc-400 cursor-not-allowed" />
+        </div>
+        <div>
+          <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1 mb-1 block">Year Level</label>
+          <select value={editYearLevel} onChange={e => setEditYearLevel(e.target.value)} className="w-full bg-white dark:bg-[#121214] border border-zinc-200 dark:border-zinc-800/80 rounded-xl px-4 py-3 text-sm font-bold text-zinc-800 dark:text-zinc-200 outline-none focus:border-[#06402B] dark:focus:border-emerald-500 shadow-sm">
+            <option value="1st Year">1st Year</option>
+            <option value="2nd Year">2nd Year</option>
+            <option value="3rd Year">3rd Year</option>
+            <option value="4th Year">4th Year</option>
+            <option value="Irregular">Irregular</option>
+            <option value="Alumni">Alumni</option>
+          </select>
+        </div>
+      </div>
 
                         {/* ── College ── */}
                         <div>
