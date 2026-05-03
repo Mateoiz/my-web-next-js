@@ -1,14 +1,14 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useState, useMemo, useRef, useCallback } from "react";
+import { motion, AnimatePresence, useDragControls, Reorder } from "framer-motion";
 import { 
   FaTimes, FaPlus, FaCheckCircle, FaRegCircle, 
   FaTrashAlt, FaUserFriends, FaChevronLeft, FaChevronRight,
   FaFire, FaClock, FaExclamationTriangle, FaInbox,
-  FaCalendarAlt, FaSortAmountDown
+  FaCalendarAlt, FaSortAmountDown, FaBolt, FaLayerGroup,
+  FaGripVertical, FaCheck
 } from "react-icons/fa";
-import Image from "next/image";
 
 interface CommandCenterProps {
   isOpen: boolean;
@@ -19,6 +19,10 @@ interface CommandCenterProps {
   onToggleTask: (task: any) => Promise<void>;
   onDeleteTask: (task: any) => Promise<void>;
   onNavigate: (view: string) => void;
+  courses: any[];
+  courseTasks: any[];
+  onNavigateToCourse: (courseId: string) => void;
+  userProfile: any;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -40,9 +44,15 @@ function daysUntil(deadline: string): number | null {
   return Math.floor((due.getTime() - today.getTime()) / 86400000);
 }
 
-// ── Checks if a task is "done" (no urgency should apply) ──────────────────────
 function isTaskDone(status: string): boolean {
   return status === "Graded" || status === "Submitted" || status === "completed";
+}
+
+// Get next weekday date string
+function getNextWeekday(dayOffset: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + dayOffset);
+  return toDateStr(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
 function UrgencyChip({ deadline, status }: { deadline: string; status: string }) {
@@ -56,6 +66,172 @@ function UrgencyChip({ deadline, status }: { deadline: string; status: string })
   return <span className="text-[9px] font-medium text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded-md">{deadline}</span>;
 }
 
+// ─── Progress Ring ────────────────────────────────────────────────────────────
+
+function ProgressRing({ done, total }: { done: number; total: number }) {
+  const pct = total === 0 ? 0 : Math.round((done / total) * 100);
+  const r = 20;
+  const circ = 2 * Math.PI * r;
+  const offset = circ - (pct / 100) * circ;
+  const color = pct >= 80 ? "#10b981" : pct >= 50 ? "#f59e0b" : "#06402B";
+
+  return (
+    <div className="relative w-14 h-14 shrink-0">
+      <svg className="w-full h-full -rotate-90" viewBox="0 0 48 48">
+        <circle cx="24" cy="24" r={r} fill="none" stroke="currentColor" strokeWidth="4" className="text-zinc-100 dark:text-zinc-800" />
+        <motion.circle
+          cx="24" cy="24" r={r} fill="none"
+          stroke={color} strokeWidth="4"
+          strokeLinecap="round"
+          strokeDasharray={circ}
+          initial={{ strokeDashoffset: circ }}
+          animate={{ strokeDashoffset: offset }}
+          transition={{ duration: 0.8, ease: "easeOut" }}
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-[11px] font-black text-zinc-900 dark:text-white leading-none">{pct}%</span>
+        <span className="text-[8px] font-bold text-zinc-400 leading-none mt-0.5">done</span>
+      </div>
+    </div>
+  );
+}
+
+// ─── Quick Templates ──────────────────────────────────────────────────────────
+
+const TEMPLATES = [
+  { label: "Quiz tmrw", icon: "⚡", title: "Quiz", deadline: () => getNextWeekday(1) },
+  { label: "Assignment", icon: "📝", title: "Assignment", deadline: () => getNextWeekday(3) },
+  { label: "Project due", icon: "📁", title: "Project", deadline: () => getNextWeekday(7) },
+  { label: "Exam prep", icon: "📚", title: "Exam Review", deadline: () => getNextWeekday(2) },
+  { label: "Lab report", icon: "🔬", title: "Lab Report", deadline: () => getNextWeekday(5) },
+  { label: "Presentation", icon: "🎤", title: "Presentation", deadline: () => getNextWeekday(4) },
+];
+
+function QuickTemplates({ onSelect }: { onSelect: (title: string, deadline: string) => void }) {
+  return (
+    <div>
+      <p className="text-[9px] font-black text-zinc-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+        <FaBolt size={8} className="text-amber-400" /> Quick Add
+      </p>
+      <div className="grid grid-cols-3 gap-1.5">
+        {TEMPLATES.map(t => (
+          <button
+            key={t.label}
+            onClick={() => onSelect(t.title, t.deadline())}
+            className="flex flex-col items-center gap-1 p-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl hover:border-[#06402B]/40 hover:bg-[#06402B]/5 transition-all active:scale-95 touch-manipulation"
+          >
+            <span className="text-base leading-none">{t.icon}</span>
+            <span className="text-[9px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider leading-tight text-center">{t.label}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Swipeable Task Item ──────────────────────────────────────────────────────
+
+function SwipeableTaskItem({ task, onToggle, onDelete, today }: {
+  task: any;
+  onToggle: () => void;
+  onDelete: () => void;
+  today: string;
+}) {
+  const [swipeX, setSwipeX] = useState(0);
+  const startX = useRef(0);
+  const isDone = isTaskDone(task.status);
+  const isOverdue = !isDone && task.deadline && task.deadline < today;
+  const days = daysUntil(task.deadline);
+  const isUrgent = !isDone && days !== null && days <= 1 && days >= 0;
+  const THRESHOLD = 60;
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    startX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    const diff = e.touches[0].clientX - startX.current;
+    setSwipeX(Math.max(-80, Math.min(80, diff)));
+  };
+
+  const handleTouchEnd = () => {
+    if (swipeX < -THRESHOLD) onDelete();
+    else if (swipeX > THRESHOLD) onToggle();
+    setSwipeX(0);
+  };
+  const showComplete = swipeX > 10;
+  const showDelete = swipeX < -10;
+
+return (
+    <div className="relative rounded-xl overflow-hidden">
+      {/* Left reveal — complete — only visible when swiping right */}
+      {showComplete && (
+        <div className="absolute inset-y-0 left-0 w-16 flex items-center justify-center bg-emerald-500 rounded-xl">
+          <FaCheck size={13} className="text-white" />
+        </div>
+      )}
+      {/* Right reveal — delete — only visible when swiping left */}
+      {showDelete && (
+        <div className="absolute inset-y-0 right-0 w-16 flex items-center justify-center bg-red-500 rounded-xl">
+          <FaTrashAlt size={13} className="text-white" />
+        </div>
+      )}
+
+       <motion.div
+        style={{ x: swipeX }}
+        transition={{ type: "spring", stiffness: 500, damping: 40 }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        className={`group relative flex items-start gap-3 p-3 rounded-xl border z-10
+          ${isDone
+            ? "bg-zinc-50 dark:bg-zinc-900/50 border-zinc-100 dark:border-zinc-800/50 opacity-70"
+            : isOverdue
+            ? "bg-red-50/50 dark:bg-red-500/5 border-red-200/60 dark:border-red-500/20"
+            : isUrgent
+            ? "bg-amber-50/50 dark:bg-amber-500/5 border-amber-200/60 dark:border-amber-500/20"
+            : "bg-white dark:bg-[#18181b] border-zinc-200 dark:border-zinc-800 hover:border-[#06402B]/30"
+          }`}
+      >
+        {/* Drag handle — desktop only */}
+        <div className="hidden md:flex items-center shrink-0 text-zinc-300 dark:text-zinc-700 cursor-grab active:cursor-grabbing mt-0.5">
+          <FaGripVertical size={11} />
+        </div>
+
+        <button onClick={onToggle} className={`mt-0.5 shrink-0 transition-colors ${
+          task.status === "Graded" ? "text-emerald-500"
+          : task.status === "Submitted" ? "text-blue-500"
+          : "text-zinc-300 dark:text-zinc-600 hover:text-emerald-500"
+        }`}>
+          {isDone ? <FaCheckCircle size={15} /> : <FaRegCircle size={15} />}
+        </button>
+
+        <div className="flex-1 min-w-0">
+          <p className={`text-xs font-semibold leading-snug truncate ${isDone ? "line-through text-zinc-400" : "text-zinc-800 dark:text-zinc-200"}`}>
+            {task.title}
+          </p>
+          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+            {task.status === "Graded" && (
+              <span className="text-[9px] font-black text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-md uppercase tracking-widest">Graded</span>
+            )}
+            {task.isCourseTask && task.type && (
+              <span className="text-[9px] font-bold text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded uppercase tracking-widest">
+                {task.type}
+              </span>
+            )}
+            {!isDone && <UrgencyChip deadline={task.deadline} status={task.status} />}
+          </div>
+        </div>
+
+        <button onClick={onDelete}
+          className="shrink-0 text-zinc-300 dark:text-zinc-700 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all active:scale-90 p-1">
+          <FaTrashAlt size={11} />
+        </button>
+      </motion.div>
+    </div>
+  );
+}
 // ─── Mini Calendar ────────────────────────────────────────────────────────────
 
 function MiniCalendar({ activeTasks }: { activeTasks: any[] }) {
@@ -109,7 +285,7 @@ function MiniCalendar({ activeTasks }: { activeTasks: any[] }) {
       <button
         key={d} type="button"
         onClick={() => setSelectedDate(prev => prev === dateStr ? null : dateStr)}
-        className={`relative w-7 h-7 flex items-center justify-center text-[11px] rounded-lg transition-all font-medium focus:outline-none
+        className={`relative w-7 h-7 flex items-center justify-center text-[11px] rounded-lg transition-all font-medium focus:outline-none touch-manipulation
           ${isSelected ? "bg-[#06402B] text-white ring-2 ring-[#06402B]/30"
           : isToday ? "bg-[#06402B] text-white font-black"
           : "text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800"
@@ -130,7 +306,7 @@ function MiniCalendar({ activeTasks }: { activeTasks: any[] }) {
     <div className="bg-white dark:bg-[#18181b] rounded-2xl border border-zinc-200 dark:border-zinc-800/80 overflow-hidden">
       <div className="flex justify-between items-center px-4 py-3 border-b border-zinc-100 dark:border-zinc-800">
         <button type="button" onClick={prevMonth}
-          className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-800 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
+          className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-800 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors touch-manipulation">
           <FaChevronLeft size={9} />
         </button>
         <button type="button"
@@ -139,7 +315,7 @@ function MiniCalendar({ activeTasks }: { activeTasks: any[] }) {
           {MONTH_NAMES[viewMonth]} {viewYear}
         </button>
         <button type="button" onClick={nextMonth}
-          className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-800 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
+          className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-800 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors touch-manipulation">
           <FaChevronRight size={9} />
         </button>
       </div>
@@ -206,110 +382,52 @@ function MiniCalendar({ activeTasks }: { activeTasks: any[] }) {
   );
 }
 
-// ─── Task Item ────────────────────────────────────────────────────────────────
-
-function TaskItem({ task, onToggle, onDelete, today }: {
-  task: any; onToggle: () => void; onDelete: () => void; today: string;
-}) {
-  const isSubmitted = task.status === "Submitted";
-  const isGraded = task.status === "Graded";
-  const isDone = isSubmitted || isGraded;
-
-  // Only flag overdue if the task hasn't been submitted or graded
-  const isOverdue = !isDone && task.deadline && task.deadline < today;
-  const days = daysUntil(task.deadline);
-  const isUrgent = !isDone && days !== null && days <= 1 && days >= 0;
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, height: 0 }}
-      className={`group flex items-start gap-3 p-3 rounded-xl border transition-all
-        ${isDone
-          ? "bg-zinc-50 dark:bg-zinc-900/50 border-zinc-100 dark:border-zinc-800/50 opacity-70"
-          : isOverdue
-          ? "bg-red-50/50 dark:bg-red-500/5 border-red-200/60 dark:border-red-500/20"
-          : isUrgent
-          ? "bg-amber-50/50 dark:bg-amber-500/5 border-amber-200/60 dark:border-amber-500/20"
-          : "bg-white dark:bg-[#18181b] border-zinc-200 dark:border-zinc-800 hover:border-[#06402B]/30"
-        }`}
-    >
-      <button onClick={onToggle} className={`mt-0.5 shrink-0 transition-colors ${
-        isGraded ? "text-emerald-500"
-        : isSubmitted ? "text-blue-500"
-        : "text-zinc-300 dark:text-zinc-600 hover:text-emerald-500"
-      }`}>
-        {isDone ? <FaCheckCircle size={15} /> : <FaRegCircle size={15} />}
-      </button>
-
-      <div className="flex-1 min-w-0">
-        <p className={`text-xs font-semibold leading-snug truncate ${isDone ? "line-through text-zinc-400" : "text-zinc-800 dark:text-zinc-200"}`}>
-          {task.title}
-        </p>
-        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-          {/* Status badge for graded tasks */}
-          {isGraded && (
-            <span className="text-[9px] font-black text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-md uppercase tracking-widest">Graded</span>
-          )}
-          {task.isCourseTask && task.type && (
-            <span className="text-[9px] font-bold text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded uppercase tracking-widest">
-              {task.type}
-            </span>
-          )}
-          {/* Only show urgency chip for non-done tasks */}
-          {!isDone && <UrgencyChip deadline={task.deadline} status={task.status} />}
-        </div>
-      </div>
-
-      <button onClick={onDelete}
-        className="shrink-0 text-zinc-300 dark:text-zinc-700 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all active:scale-90 p-1">
-        <FaTrashAlt size={11} />
-      </button>
-    </motion.div>
-  );
-}
-
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function CommandCenter({ 
-  isOpen, onClose, activeTasks, friends, onAddTask, onToggleTask, onDeleteTask, onNavigate 
+export default function CommandCenter({
+  isOpen, onClose, activeTasks, friends, onAddTask, onToggleTask, onDeleteTask, onNavigate,
+  courses, courseTasks, onNavigateToCourse, userProfile
 }: CommandCenterProps) {
-  
+
   const [isAddingTask, setIsAddingTask] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskDeadline, setNewTaskDeadline] = useState("");
   const [activeTab, setActiveTab] = useState<'tasks' | 'calendar' | 'network'>('tasks');
-  const [sortByUrgency, setSortByUrgency] = useState(true);
+  const [groupByCourse, setGroupByCourse] = useState(false);
+  const [orderedTasks, setOrderedTasks] = useState<any[]>([]);
+  const [showTemplates, setShowTemplates] = useState(false);
 
   const today = new Date().toISOString().slice(0, 10);
+
+  // Sync ordered tasks when activeTasks changes
+  useMemo(() => {
+    setOrderedTasks(prev => {
+      const prevIds = new Set(prev.map((t: any) => t.id));
+      const newIds = new Set(activeTasks.map(t => t.id));
+      // Remove deleted, add new
+      const filtered = prev.filter((t: any) => newIds.has(t.id));
+      const added = activeTasks.filter(t => !prevIds.has(t.id));
+      return [...filtered, ...added];
+    });
+  }, [activeTasks]);
 
   const handleTaskSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTaskTitle.trim()) return;
     await onAddTask(newTaskTitle, newTaskDeadline);
     setNewTaskTitle(""); setNewTaskDeadline(""); setIsAddingTask(false);
+    setShowTemplates(false);
   };
 
-  // ── Smart task sorting — exclude Graded from pending ──────────────────────
-  const sortedTasks = useMemo(() => {
-    const pending   = activeTasks.filter(t => t.status === "OPEN" || t.status === "pending");
-    const submitted = activeTasks.filter(t => t.status === "Submitted");
-    const graded    = activeTasks.filter(t => t.status === "Graded");
+  const handleTemplateSelect = async (title: string, deadline: string) => {
+    await onAddTask(title, deadline);
+    setShowTemplates(false);
+  };
 
-    if (sortByUrgency) {
-      const sorted = [...pending].sort((a, b) => {
-        const da = daysUntil(a.deadline);
-        const db = daysUntil(b.deadline);
-        if (da === null && db === null) return 0;
-        if (da === null) return 1;
-        if (db === null) return -1;
-        return da - db;
-      });
-      return { pending: sorted, submitted, graded };
-    }
-    return { pending, submitted, graded };
-  }, [activeTasks, sortByUrgency]);
+  // ── Stats ──────────────────────────────────────────────────────────────────
+  const totalTasks = activeTasks.length;
+  const doneTasks = activeTasks.filter(t => isTaskDone(t.status)).length;
 
-  // Only count overdue/urgent for truly open (non-done) tasks
   const overdueCount = activeTasks.filter(t =>
     (t.status === "OPEN" || t.status === "pending") && t.deadline && t.deadline < today
   ).length;
@@ -320,6 +438,34 @@ export default function CommandCenter({
   }).length;
 
   const onlineCount = friends.filter(f => f.isOnline).length;
+
+  // ── Sorted tasks ───────────────────────────────────────────────────────────
+  const sortedTasks = useMemo(() => {
+    const pending   = orderedTasks.filter(t => t.status === "OPEN" || t.status === "pending");
+    const submitted = orderedTasks.filter(t => t.status === "Submitted");
+    const graded    = orderedTasks.filter(t => t.status === "Graded" || t.status === "completed");
+    return { pending, submitted, graded };
+  }, [orderedTasks]);
+
+  // ── Group by course ────────────────────────────────────────────────────────
+  const courseGroups = useMemo(() => {
+    if (!groupByCourse) return null;
+    const groups: Record<string, { course: any; tasks: any[] }> = {};
+    const general: any[] = [];
+
+    orderedTasks.forEach(task => {
+      if (!task.isCourseTask || !task.courseId) {
+        general.push(task);
+        return;
+      }
+      const course = courses.find(c => c.id === task.courseId);
+      const key = task.courseId;
+      if (!groups[key]) groups[key] = { course: course || { title: "Unknown Course", id: key }, tasks: [] };
+      groups[key].tasks.push(task);
+    });
+
+    return { groups: Object.values(groups), general };
+  }, [orderedTasks, courses, groupByCourse]);
 
   const TABS = [
     { id: 'tasks', icon: <FaInbox size={12} />, label: 'Tasks', badge: overdueCount > 0 ? overdueCount : null, badgeColor: 'bg-red-500' },
@@ -347,21 +493,25 @@ export default function CommandCenter({
       >
         {/* ── Header ── */}
         <div className="shrink-0 px-4 pt-4 pb-0 border-b border-zinc-100 dark:border-zinc-800/80">
-          {/* Top row */}
-          <div className="flex items-center justify-between mb-4">
-            <div>
+          {/* Top row — progress ring + title + close */}
+          <div className="flex items-center gap-3 mb-4">
+            <ProgressRing done={doneTasks} total={totalTasks} />
+            <div className="flex-1 min-w-0">
               <h2 className="text-xs font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-100">Command Center</h2>
               <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest mt-0.5">
-                {activeTasks.length} active · {friends.length} in network
+                {doneTasks}/{totalTasks} tasks complete
+              </p>
+              <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest">
+                {friends.length} in network
               </p>
             </div>
             <button onClick={onClose}
-              className="md:hidden w-8 h-8 rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-500 hover:text-zinc-800 dark:hover:text-white transition-colors">
+              className="md:hidden w-8 h-8 rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-500 hover:text-zinc-800 dark:hover:text-white transition-colors shrink-0">
               <FaTimes size={13} />
             </button>
           </div>
 
-          {/* Urgency summary strip — only shown when there are truly open overdue/urgent tasks */}
+          {/* Urgency strip */}
           {(overdueCount > 0 || urgentCount > 0) && (
             <div className="flex gap-2 mb-3">
               {overdueCount > 0 && (
@@ -383,7 +533,7 @@ export default function CommandCenter({
           <div className="flex gap-1 -mx-1 px-1">
             {TABS.map(tab => (
               <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                className={`relative flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[10px] font-black uppercase tracking-widest transition-all rounded-t-xl border-b-2
+                className={`relative flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[10px] font-black uppercase tracking-widest transition-all rounded-t-xl border-b-2 touch-manipulation
                   ${activeTab === tab.id
                     ? 'text-[#06402B] dark:text-emerald-400 border-[#06402B] dark:border-emerald-400 bg-[#06402B]/5 dark:bg-emerald-500/5'
                     : 'text-zinc-400 border-transparent hover:text-zinc-600 dark:hover:text-zinc-300'
@@ -413,22 +563,38 @@ export default function CommandCenter({
                 className="p-4 space-y-4"
               >
                 {/* Toolbar */}
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
-                    {sortedTasks.pending.length} pending · {sortedTasks.submitted.length} submitted
-                    {sortedTasks.graded.length > 0 && ` · ${sortedTasks.graded.length} graded`}
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <button onClick={() => setSortByUrgency(v => !v)} title="Sort by urgency"
-                      className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${
-                        sortByUrgency
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5">
+                    {/* Group by course toggle */}
+                    <button
+                      onClick={() => setGroupByCourse(v => !v)}
+                      title="Group by course"
+                      className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all touch-manipulation ${
+                        groupByCourse
                           ? 'bg-[#06402B]/10 text-[#06402B] dark:text-emerald-400 dark:bg-emerald-500/10'
                           : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500'
-                      }`}>
-                      <FaSortAmountDown size={9} /> Urgency
+                      }`}
+                    >
+                      <FaLayerGroup size={9} /> Course
                     </button>
-                    <button onClick={() => setIsAddingTask(v => !v)}
-                      className={`w-7 h-7 rounded-xl flex items-center justify-center transition-all ${
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    {/* Templates toggle */}
+                    <button
+                      onClick={() => setShowTemplates(v => !v)}
+                      className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all touch-manipulation ${
+                        showTemplates
+                          ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
+                          : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500'
+                      }`}
+                    >
+                      <FaBolt size={9} /> Quick
+                    </button>
+
+                    {/* Add task */}
+                    <button onClick={() => { setIsAddingTask(v => !v); setShowTemplates(false); }}
+                      className={`w-7 h-7 rounded-xl flex items-center justify-center transition-all touch-manipulation ${
                         isAddingTask
                           ? 'bg-[#06402B] text-white'
                           : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 hover:text-[#06402B] dark:hover:text-emerald-400'
@@ -437,6 +603,18 @@ export default function CommandCenter({
                     </button>
                   </div>
                 </div>
+
+                {/* Quick templates */}
+                <AnimatePresence>
+                  {showTemplates && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
+                      className="overflow-hidden"
+                    >
+                      <QuickTemplates onSelect={handleTemplateSelect} />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
                 {/* Add task form */}
                 <AnimatePresence>
@@ -475,70 +653,151 @@ export default function CommandCenter({
                   )}
                 </AnimatePresence>
 
-                {/* Task lists */}
-                {sortedTasks.pending.length === 0 && sortedTasks.submitted.length === 0 && sortedTasks.graded.length === 0 ? (
-                  <div className="py-12 flex flex-col items-center gap-3 text-zinc-400">
-                    <FaCheckCircle size={24} className="opacity-20" />
-                    <p className="text-xs font-bold uppercase tracking-widest">All clear!</p>
-                    <p className="text-[10px] text-zinc-400 text-center">No active tasks. Enjoy the peace.</p>
+                {/* Swipe hint — mobile only, shown once */}
+                {activeTasks.length > 0 && (
+                  <p className="text-[9px] text-zinc-400 font-medium text-center md:hidden">
+                    ← swipe to delete · swipe to complete →
+                  </p>
+                )}
+
+                {/* ── GROUPED BY COURSE ── */}
+                {groupByCourse && courseGroups ? (
+                  <div className="space-y-5">
+                    {courseGroups.groups.map(({ course, tasks }) => (
+                      <div key={course.id} className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <button
+                            onClick={() => { onNavigateToCourse(course.id); onClose(); }}
+                            className="flex items-center gap-1.5 text-[9px] font-black text-[#06402B] dark:text-emerald-400 uppercase tracking-widest hover:underline"
+                          >
+                            <FaLayerGroup size={8} />
+                            {course.title}
+                          </button>
+                          <span className="text-[9px] font-bold text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded-full">
+                            {tasks.length}
+                          </span>
+                        </div>
+                        <Reorder.Group
+  axis="y"
+  values={sortedTasks.pending}
+  onReorder={(reordered) => {
+    setOrderedTasks(prev => {
+      const reorderedIds = new Set(reordered.map((t: any) => t.id));
+      const rest = prev.filter(t => !reorderedIds.has(t.id));
+      return [...reordered, ...rest];
+    });
+  }}
+  className="space-y-2"
+>
+  {sortedTasks.pending.map(task => (
+    <Reorder.Item key={task.id} value={task} className="list-none">
+      <SwipeableTaskItem
+        task={task}
+        today={today}
+        onToggle={() => onToggleTask(task)}
+        onDelete={() => onDeleteTask(task)}
+      />
+    </Reorder.Item>
+  ))}
+</Reorder.Group>
+                      </div>
+                    ))}
+
+                    {/* General tasks */}
+                    {courseGroups.general.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">General</p>
+                        {courseGroups.general.map(task => (
+                          <SwipeableTaskItem
+                            key={task.id} task={task} today={today}
+                            onToggle={() => onToggleTask(task)}
+                            onDelete={() => onDeleteTask(task)}
+                          />
+                        ))}
+                      </div>
+                    )}
                   </div>
+
                 ) : (
+                  // ── FLAT LIST with drag reorder ──
                   <>
-                    {sortedTasks.pending.length > 0 && (
-                      <div className="space-y-2">
-                        <p className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">
-                          Pending — {sortedTasks.pending.length}
-                        </p>
-                        <AnimatePresence>
-                          {sortedTasks.pending.map(task => (
-                            <TaskItem
-                              key={task.id} task={task} today={today}
-                              onToggle={() => onToggleTask(task)}
-                              onDelete={() => onDeleteTask(task)}
-                            />
-                          ))}
-                        </AnimatePresence>
+                    {sortedTasks.pending.length === 0 && sortedTasks.submitted.length === 0 && sortedTasks.graded.length === 0 ? (
+                      <div className="py-12 flex flex-col items-center gap-3 text-zinc-400">
+                        <FaCheckCircle size={24} className="opacity-20" />
+                        <p className="text-xs font-bold uppercase tracking-widest">All clear!</p>
+                        <p className="text-[10px] text-zinc-400 text-center">No active tasks. Enjoy the peace.</p>
                       </div>
-                    )}
+                    ) : (
+                      <div className="space-y-5">
+                        {sortedTasks.pending.length > 0 && (
+                          <div className="space-y-2">
+                            <p className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">
+                              Pending — {sortedTasks.pending.length}
+                            </p>
+<Reorder.Group
+  axis="y"
+  values={sortedTasks.pending}
+  onReorder={(reordered) => {
+    setOrderedTasks(prev => {
+      const reorderedIds = new Set(reordered.map((t: any) => t.id));
+      const rest = prev.filter(t => !reorderedIds.has(t.id));
+      return [...reordered, ...rest];
+    });
+  }}
+  className="space-y-2"
+>
+  {sortedTasks.pending.map(task => (
+    <Reorder.Item key={task.id} value={task} className="list-none">
+      <SwipeableTaskItem
+        task={task}
+        today={today}
+        onToggle={() => onToggleTask(task)}
+        onDelete={() => onDeleteTask(task)}
+      />
+    </Reorder.Item>
+  ))}
+</Reorder.Group>
+                          </div>
+                        )}
 
-                    {sortedTasks.submitted.length > 0 && (
-                      <div className="space-y-2">
-                        <p className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">
-                          Submitted — {sortedTasks.submitted.length}
-                        </p>
-                        <AnimatePresence>
-                          {sortedTasks.submitted.map(task => (
-                            <TaskItem
-                              key={task.id} task={task} today={today}
-                              onToggle={() => onToggleTask(task)}
-                              onDelete={() => onDeleteTask(task)}
-                            />
-                          ))}
-                        </AnimatePresence>
-                      </div>
-                    )}
+                        {sortedTasks.submitted.length > 0 && (
+                          <div className="space-y-2">
+                            <p className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">
+                              Submitted — {sortedTasks.submitted.length}
+                            </p>
+                            <AnimatePresence>
+                              {sortedTasks.submitted.map(task => (
+                                <SwipeableTaskItem
+                                  key={task.id} task={task} today={today}
+                                  onToggle={() => onToggleTask(task)}
+                                  onDelete={() => onDeleteTask(task)}
+                                />
+                              ))}
+                            </AnimatePresence>
+                          </div>
+                        )}
 
-                    {/* Graded tasks — shown separately, never flagged as overdue */}
-                    {sortedTasks.graded.length > 0 && (
-                      <div className="space-y-2">
-                        <p className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">
-                          Graded — {sortedTasks.graded.length}
-                        </p>
-                        <AnimatePresence>
-                          {sortedTasks.graded.map(task => (
-                            <TaskItem
-                              key={task.id} task={task} today={today}
-                              onToggle={() => onToggleTask(task)}
-                              onDelete={() => onDeleteTask(task)}
-                            />
-                          ))}
-                        </AnimatePresence>
+                        {sortedTasks.graded.length > 0 && (
+                          <div className="space-y-2">
+                            <p className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">
+                              Graded — {sortedTasks.graded.length}
+                            </p>
+                            <AnimatePresence>
+                              {sortedTasks.graded.map(task => (
+                                <SwipeableTaskItem
+                                  key={task.id} task={task} today={today}
+                                  onToggle={() => onToggleTask(task)}
+                                  onDelete={() => onDeleteTask(task)}
+                                />
+                              ))}
+                            </AnimatePresence>
+                          </div>
+                        )}
                       </div>
                     )}
                   </>
                 )}
 
-                {/* Navigate to tracker */}
                 <button onClick={() => { onNavigate('tracker'); onClose(); }}
                   className="w-full py-2.5 border border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl text-[10px] font-bold text-zinc-400 hover:text-[#06402B] dark:hover:text-emerald-400 hover:border-[#06402B]/40 dark:hover:border-emerald-500/40 transition-all flex items-center justify-center gap-1.5">
                   Open Full Tracker →
@@ -554,8 +813,6 @@ export default function CommandCenter({
                 className="p-4 space-y-4"
               >
                 <MiniCalendar activeTasks={activeTasks} />
-
-                {/* Upcoming this week — exclude done tasks */}
                 {(() => {
                   const upcoming = activeTasks
                     .filter(t => {
@@ -582,7 +839,6 @@ export default function CommandCenter({
                     </div>
                   );
                 })()}
-
                 <button onClick={() => { onNavigate('calendar'); onClose(); }}
                   className="w-full py-2.5 border border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl text-[10px] font-bold text-zinc-400 hover:text-[#06402B] dark:hover:text-emerald-400 hover:border-[#06402B]/40 transition-all flex items-center justify-center gap-1.5">
                   Open Master Calendar →
@@ -597,7 +853,6 @@ export default function CommandCenter({
                 transition={{ duration: 0.15 }}
                 className="p-4 space-y-4"
               >
-                {/* Online summary */}
                 {onlineCount > 0 && (
                   <div className="flex items-center gap-2 px-3 py-2.5 bg-emerald-500/5 border border-emerald-500/20 rounded-xl">
                     <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse shrink-0" />
@@ -606,7 +861,6 @@ export default function CommandCenter({
                     </span>
                   </div>
                 )}
-
                 {friends.length === 0 ? (
                   <div className="py-12 flex flex-col items-center gap-3 text-zinc-400">
                     <FaUserFriends size={24} className="opacity-20" />
@@ -634,7 +888,6 @@ export default function CommandCenter({
                             </div>
                             <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white dark:border-[#0d0d0f] transition-colors ${friend.isOnline ? "bg-emerald-500" : "bg-zinc-300 dark:bg-zinc-600"}`} />
                           </div>
-
                           <div className="min-w-0 flex-1">
                             <p className="text-xs font-bold text-zinc-900 dark:text-zinc-100 truncate">{friend.fullName}</p>
                             <div className="flex items-center gap-1.5">
@@ -649,7 +902,6 @@ export default function CommandCenter({
                               )}
                             </div>
                           </div>
-
                           {friend.yearLevel && (
                             <span className="text-[9px] font-black text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded-lg uppercase tracking-widest shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                               {friend.yearLevel}
@@ -659,7 +911,6 @@ export default function CommandCenter({
                       ))}
                   </div>
                 )}
-
                 <button onClick={() => { onNavigate('studyhub'); onClose(); }}
                   className="w-full py-2.5 border border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl text-[10px] font-bold text-zinc-400 hover:text-[#06402B] dark:hover:text-emerald-400 hover:border-[#06402B]/40 transition-all flex items-center justify-center gap-1.5">
                   Open Study Lounge →

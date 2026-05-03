@@ -55,6 +55,11 @@ interface CourseTask {
   starred?: boolean; notes?: string;
 }
 
+interface UniversityTrackerProps {
+  defaultCourseId?: string | null;
+  onCourseSelected?: () => void;
+}
+
 // ─── Course accent colors ─────────────────────────────────────────────────────
 
 const COURSE_COLORS = [
@@ -852,7 +857,13 @@ function SortableTaskRow({ id, isDragDisabled, children }: {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function UniversityTracker() {
+export default function UniversityTracker({
+  defaultCourseId,
+  onCourseSelected,
+}: {
+  defaultCourseId?: string | null;
+  onCourseSelected?: () => void;
+}) {
   const [courses, setCourses]                   = useState<Course[]>([]);
   const [tasks, setTasks]                       = useState<CourseTask[]>([]);
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
@@ -878,6 +889,7 @@ export default function UniversityTracker() {
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
+  
 
   useEffect(() => {
     const h = (e:MouseEvent) => { if (bulkRef.current&&!bulkRef.current.contains(e.target as Node)) setBulkMenuOpen(false); };
@@ -912,6 +924,12 @@ export default function UniversityTracker() {
       setSelectedCourseId(null);
     }
   }, [selectedCourseId, courses]);
+  useEffect(() => {
+  if (defaultCourseId) {
+    setSelectedCourseId(defaultCourseId);
+    onCourseSelected?.();
+  }
+}, [defaultCourseId]);
 
   const activeCourse    = courses.find(c => c.id === selectedCourseId) ?? null;
   const color           = getCourseColor(activeCourse?.color);

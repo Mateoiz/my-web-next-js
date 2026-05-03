@@ -7,7 +7,7 @@ import { useTheme } from "next-themes";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {  FaCalculator, FaLayerGroup, FaTasks, FaSignOutAlt, FaPlus, FaCheckCircle, 
-  FaTrashAlt, FaTachometerAlt, FaGlobe, FaClock, FaUserFriends, FaChevronRight, 
+  FaTachometerAlt, FaGlobe, FaClock, FaUserFriends, FaChevronRight, 
   FaCog, FaSun, FaMoon, FaDesktop, FaPalette, FaIdBadge, FaSave, FaCamera, 
   FaFolderOpen, FaCalendarDay, FaQuoteLeft, FaBook, FaFire, FaChartBar, FaFacebook, FaInstagram, FaExternalLinkAlt, FaHeart, FaExclamationCircle, FaSpinner
 } from "react-icons/fa";
@@ -31,7 +31,7 @@ const GWACalculator = dynamic(() => import('../components/Tools/GWACalculator'))
 const FlashcardMaker = dynamic(() => import('../components/Tools/FlashcardMaker'), { ssr: false });
 const FlashcardExchange = dynamic(() => import('../components/Community/FlashcardExchange'), { ssr: false });
 const StudyLounge = dynamic(() => import('../components/Community/StudyLounge'), { ssr: false });
-const UniversityTracker = dynamic(() => import('../components/Tools/UniversityTracker'), { ssr: false });
+const UniversityTracker: any = dynamic(() => import('../components/Tools/UniversityTracker'), { ssr: false });
 const AcademicCalendar = dynamic(() => import('../components/Community/AcademicCalendar').then(mod => mod.default), { ssr: false });
 const CampusBulletin = dynamic(() => import('../components/Community/CampusBulletin'), { ssr: false });
 import OnboardingFlow from "../components/Onboarding/OnboardingFlow";
@@ -43,14 +43,7 @@ const COLLEGE_LOGOS: Record<string, string> = {
   COED:  "/College/coed.png",
 };
 
-// ── College badge colors ──────────────────────────────────────────────────────
-const COLLEGE_BADGE_CLASSES: Record<string, string> = {
-  CAST:  "bg-blue-500/10 text-blue-600 border-blue-200 dark:bg-white/10 dark:text-white dark:border-white/20",
-  CBMA:  "bg-amber-500/10 text-amber-600 border-amber-200 dark:bg-white/10 dark:text-white dark:border-white/20",
-  CVMAS: "bg-purple-500/10 text-purple-600 border-purple-200 dark:bg-white/10 dark:text-white dark:border-white/20",
-  COED:  "bg-red-500/10 text-red-600 border-red-200 dark:bg-white/10 dark:text-white dark:border-white/20",
-  default: "bg-[#06402B]/10 text-[#06402B] border-[#06402B]/20 dark:bg-white/10 dark:text-white dark:border-white/20",
-};
+// (removed unused COLLEGE_BADGE_CLASSES)
 
 const NAV_ITEMS = [
   { id: 'dashboard', icon: <FaTachometerAlt size={20} />, label: "Home" },
@@ -145,7 +138,7 @@ function DashboardInner() {
   const [editAvatarUrl, setEditAvatarUrl] = useState("");
   const [avatarFile, setAvatarFile] = useState<File | null>(null); 
   const [isSavingProfile, setIsSavingProfile] = useState(false);
-
+  const [defaultCourseId, setDefaultCourseId] = useState<string | null>(null);
   const router = useRouter();
   const confirmSignOut = () => showConfirm("Log Out", "Are you sure you want to log out?", () => signOut(auth), "Log Out", false);
 
@@ -198,74 +191,93 @@ function DashboardInner() {
 
   // --- PRESENCE SYSTEM ---
 // --- PRESENCE SYSTEM ---
-  useEffect(() => {
-    if (!authUser) return;
+useEffect(() => {
+  if (!authUser) return;
 
-    const userRef = doc(db, "users", authUser.uid);
-    let offlineTimeout: NodeJS.Timeout;
-    let onlineDebounce: NodeJS.Timeout;
+  const userRef = doc(db, "users", authUser.uid);
+  let heartbeatInterval: NodeJS.Timeout;
+  let offlineTimer: NodeJS.Timeout;
+  let isCurrentlyOnline = false;
 
-    const goOnline = () => {
-      clearTimeout(offlineTimeout);
-      clearTimeout(onlineDebounce);
-      
-      onlineDebounce = setTimeout(async () => {
-        try {
-          await updateDoc(userRef, { isOnline: true, lastSeen: new Date().toISOString() });
-        } catch (err) {
-          console.warn("Presence online failed:", err);
-        }
-      }, 2000); // 2-second buffer safely avoids hot-reload crossfire
-    };
+  const setOnline = async () => {
+    if (isCurrentlyOnline) return; // debounce — don't spam if already marked online
+    isCurrentlyOnline = true;
+    clearTimeout(offlineTimer);
+    try {
+      await updateDoc(userRef, {
+        isOnline: true,
+        lastSeen: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.warn("Presence setOnline failed:", err);
+    }
+  };
 
-    const goOffline = () => {
-      clearTimeout(onlineDebounce);
-      updateDoc(userRef, { isOnline: false, lastSeen: new Date().toISOString() })
-        .catch(err => console.warn("Presence offline failed:", err));
-    };
+  const setOffline = async () => {
+    isCurrentlyOnline = false;
+    clearInterval(heartbeatInterval);
+    try {
+      await updateDoc(userRef, {
+        isOnline: false,
+        lastSeen: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.warn("Presence setOffline failed:", err);
+    }
+  };
 
-    const handleVisibility = () => {
-      clearTimeout(offlineTimeout);
-      if (document.visibilityState === 'visible') {
-        goOnline();
-      } else {
-        offlineTimeout = setTimeout(() => goOffline(), 60000);
+  const startHeartbeat = () => {
+    clearInterval(heartbeatInterval);
+    heartbeatInterval = setInterval(async () => {
+      if (document.visibilityState !== "visible") return;
+      try {
+        await updateDoc(userRef, { lastSeen: new Date().toISOString() });
+      } catch (err) {
+        console.warn("Heartbeat failed:", err);
       }
-    };
+    }, 60_000); // ping every 60 seconds
+  };
 
-    const handlePageHide = () => {
-      clearTimeout(onlineDebounce);
-      clearTimeout(offlineTimeout);
-      goOffline();
-    };
+  const handleVisible = () => {
+    clearTimeout(offlineTimer);
+    setOnline();
+    startHeartbeat();
+  };
 
-    const handleFocus = () => goOnline();
-    const handleBlur = () => {
-      clearTimeout(offlineTimeout);
-      offlineTimeout = setTimeout(() => goOffline(), 60000);
-    };
+  const handleHidden = () => {
+    // Give a 90s grace period — phone screen off, quick tab switch, etc.
+    offlineTimer = setTimeout(() => setOffline(), 90_000);
+  };
 
-    goOnline();
+  const handlePageHide = () => {
+    clearInterval(heartbeatInterval);
+    clearTimeout(offlineTimer);
+    setOffline();
+  };
 
-    document.addEventListener('visibilitychange', handleVisibility);
-    window.addEventListener('pagehide', handlePageHide);
-    window.addEventListener('focus', handleFocus);
-    window.addEventListener('blur', handleBlur);
+  const handleVisibilityChange = () => {
+    if (document.visibilityState === "visible") {
+      handleVisible();
+    } else {
+      handleHidden();
+    }
+  };
 
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibility);
-      window.removeEventListener('pagehide', handlePageHide);
-      window.removeEventListener('focus', handleFocus);
-      window.removeEventListener('blur', handleBlur);
-      clearTimeout(offlineTimeout);
-      clearTimeout(onlineDebounce);
-      
-      // CRITICAL FIX: DO NOT call goOffline() here!
-      // React 18 Strict Mode and Next.js Hot Reloads run this cleanup constantly.
-      // Forcing a Firebase write here collides with active WebSocket teardowns and corrupts the SDK.
-      // We rely entirely on the 'pagehide' and 'visibilitychange' window events to catch real exits.
-    };
-  }, [authUser]);
+  // Boot
+  setOnline();
+  startHeartbeat();
+
+  document.addEventListener("visibilitychange", handleVisibilityChange);
+  window.addEventListener("pagehide", handlePageHide);
+
+  return () => {
+    document.removeEventListener("visibilitychange", handleVisibilityChange);
+    window.removeEventListener("pagehide", handlePageHide);
+    clearInterval(heartbeatInterval);
+    clearTimeout(offlineTimer);
+    // DO NOT call setOffline() here — React 18 strict mode fires cleanup constantly
+  };
+}, [authUser]);
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
       if (!user) return router.push("/Workspace");
@@ -560,221 +572,326 @@ function DashboardInner() {
 
             {/* === 1. SMART DASHBOARD === */}
             {activeView === 'dashboard' && (
-              <motion.div
-                key="dash"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                className="space-y-4 max-w-6xl mx-auto w-full"
-              >
-                {/* ── ROW 1: Compact greeting ── */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-1">
-                  <div>
-                    <p className="text-[10px] font-mono font-bold tracking-[0.25em] text-zinc-400 uppercase mb-0.5">
-                      {currentTime.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-                    </p>
-                    <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-zinc-900 dark:text-zinc-100 leading-none">
-                      {getGreeting()},{" "}
-                      <span className="text-[#06402B] dark:text-emerald-400 font-light italic">
-                        {userProfile?.fullName?.split(" ")[0] || "Scholar"}
-                      </span>
-                    </h2>
-                  </div>
-                  <div className="hidden lg:flex items-start gap-2 max-w-xs px-4 py-3 rounded-2xl bg-white/60 dark:bg-[#121214]/80 border border-zinc-200 dark:border-zinc-800/80 backdrop-blur-xl shrink-0">
-                    <FaQuoteLeft className="text-[#06402B]/25 dark:text-emerald-400/25 mt-0.5 shrink-0" size={11} />
-                    <p className="text-[11px] font-medium italic text-zinc-500 dark:text-zinc-400 leading-snug line-clamp-2">
-                      {todaysQuote.q}
-                      <span className="not-italic font-bold text-[#06402B] dark:text-emerald-500"> — {todaysQuote.a}</span>
-                    </p>
-                  </div>
-                </div>
+  <motion.div
+    key="dash"
+    initial={{ opacity: 0, y: 10 }}
+    animate={{ opacity: 1, y: 0 }}
+    exit={{ opacity: 0 }}
+    className="space-y-4 max-w-6xl mx-auto w-full"
+  >
+    {/* ── ROW 1: Greeting + Quote ── */}
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-1">
+      <div>
+        <p className="text-[10px] font-mono font-bold tracking-[0.25em] text-zinc-400 uppercase mb-0.5">
+          {currentTime.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+        </p>
+        <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-zinc-900 dark:text-zinc-100 leading-none">
+          {getGreeting()},{" "}
+          <span className="text-[#06402B] dark:text-emerald-400 font-light italic">
+            {userProfile?.fullName?.split(" ")[0] || "Scholar"}
+          </span>
+        </h2>
+      </div>
+      <div className="hidden lg:flex items-start gap-2 max-w-xs px-4 py-3 rounded-2xl bg-white/60 dark:bg-[#121214]/80 border border-zinc-200 dark:border-zinc-800/80 backdrop-blur-xl shrink-0">
+        <FaQuoteLeft className="text-[#06402B]/25 dark:text-emerald-400/25 mt-0.5 shrink-0" size={11} />
+        <p className="text-[11px] font-medium italic text-zinc-500 dark:text-zinc-400 leading-snug line-clamp-2">
+          {todaysQuote.q}
+          <span className="not-italic font-bold text-[#06402B] dark:text-emerald-500"> — {todaysQuote.a}</span>
+        </p>
+      </div>
+    </div>
 
-                {/* ── ROW 2: Stat pills ── */}
-                <div className="grid grid-cols-3 gap-2 sm:gap-3">
-                  {[
-                    { label: "Done", value: totalCompleted, color: "text-[#06402B] dark:text-emerald-400", bg: "bg-[#06402B]/5 dark:bg-emerald-500/10", border: "border-[#06402B]/10 dark:border-emerald-500/20", icon: <FaCheckCircle size={12} /> },
-                    { label: "Active", value: currentWorkload, color: "text-orange-600 dark:text-orange-400", bg: "bg-orange-500/5 dark:bg-orange-500/10", border: "border-orange-500/10 dark:border-orange-500/20", icon: <FaTasks size={12} /> },
-                    { label: "Network", value: friendsList.length, color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-500/5 dark:bg-blue-500/10", border: "border-blue-500/10 dark:border-blue-500/20", icon: <FaUserFriends size={12} /> },
-                  ].map((s) => (
-                    <div key={s.label} className={`flex items-center gap-2 sm:gap-3 p-3 sm:p-4 rounded-2xl border ${s.bg} ${s.border}`}>
-                      <span className={`${s.color} shrink-0`}>{s.icon}</span>
-                      <div className="min-w-0">
-                        <p className={`text-xl sm:text-2xl font-black leading-none ${s.color}`}>{s.value}</p>
-                        <p className="text-[9px] font-bold uppercase tracking-widest text-zinc-500 dark:text-zinc-400 mt-0.5">{s.label}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+    {/* ── ROW 2: Clickable stat pills ── */}
+    <div className="grid grid-cols-3 gap-2 sm:gap-3">
+      {[
+        {
+          label: "Done", value: totalCompleted,
+          color: "text-[#06402B] dark:text-emerald-400",
+          bg: "bg-[#06402B]/5 dark:bg-emerald-500/10",
+          border: "border-[#06402B]/10 dark:border-emerald-500/20",
+          icon: <FaCheckCircle size={12} />,
+          onClick: () => setActiveView("tracker"),
+          hint: "Open Tracker",
+        },
+        {
+          label: "Active", value: currentWorkload,
+          color: "text-orange-600 dark:text-orange-400",
+          bg: "bg-orange-500/5 dark:bg-orange-500/10",
+          border: "border-orange-500/10 dark:border-orange-500/20",
+          icon: <FaTasks size={12} />,
+          onClick: () => setActiveView("tracker"),
+          hint: "Open Tracker",
+        },
+        {
+          label: "Network", value: friendsList.length,
+          color: "text-blue-600 dark:text-blue-400",
+          bg: "bg-blue-500/5 dark:bg-blue-500/10",
+          border: "border-blue-500/10 dark:border-blue-500/20",
+          icon: <FaUserFriends size={12} />,
+          onClick: () => { setActiveView("studyhub"); setStudyTab("lounge"); },
+          hint: "Study Lounge",
+        },
+      ].map((s) => (
+        <button
+          key={s.label}
+          onClick={s.onClick}
+          title={s.hint}
+          className={`group flex items-center gap-2 sm:gap-3 p-3 sm:p-4 rounded-2xl border ${s.bg} ${s.border} hover:scale-[1.03] active:scale-[0.97] transition-all cursor-pointer text-left w-full`}
+        >
+          <span className={`${s.color} shrink-0 group-hover:scale-110 transition-transform`}>{s.icon}</span>
+          <div className="min-w-0">
+            <p className={`text-xl sm:text-2xl font-black leading-none ${s.color}`}>{s.value}</p>
+            <p className="text-[9px] font-bold uppercase tracking-widest text-zinc-500 dark:text-zinc-400 mt-0.5">{s.label}</p>
+          </div>
+          <FaChevronRight size={8} className={`ml-auto shrink-0 ${s.color} opacity-0 group-hover:opacity-60 transition-opacity`} />
+        </button>
+      ))}
+    </div>
 
-                {/* ── ROW 3: Main panels ── */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5">
+    {/* ── ROW 3: Main panels ── */}
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5">
 
-                  {/* ── Col 1: UP NEXT ── */}
-                  <div className="bg-white/60 dark:bg-[#121214]/80 backdrop-blur-xl rounded-[1.5rem] border border-zinc-200 dark:border-zinc-800/80 p-4 sm:p-5 shadow-sm flex flex-col gap-3">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-xs font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                        <FaFire className="text-orange-500" /> Up Next
-                      </h3>
-                      <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest bg-zinc-100 dark:bg-zinc-800 px-2 py-1 rounded-lg">48 hrs</span>
-                    </div>
-                    <div className="flex flex-col gap-2">
-                      {urgentTasks.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-6 text-zinc-400 opacity-50 gap-2">
-                          <FaCheckCircle size={24} />
-                          <p className="text-[10px] font-bold uppercase tracking-widest">All clear!</p>
-                        </div>
-                      ) : (
-                        urgentTasks.map((task) => {
-                          const ms = new Date(task.deadline).getTime() - Date.now();
-                          const daysLeft = Math.ceil(ms / (1000 * 60 * 60 * 24));
-                          return (
-                            <div
-                              key={task.id}
-                              onClick={() => setActiveView("tracker")}
-                              className="group p-3 rounded-xl border border-red-500/20 bg-red-500/5 dark:bg-red-500/10 flex items-start justify-between gap-2 cursor-pointer hover:border-red-500/40 active:scale-[0.98] transition-all"
-                            >
-                              <div className="min-w-0">
-                                <p className="text-sm font-bold text-zinc-900 dark:text-white leading-snug line-clamp-2">{task.title}</p>
-                                <p className="text-[10px] font-mono text-red-500 dark:text-red-400 font-bold mt-0.5">{task.deadline}</p>
-                              </div>
-                              <span className={`shrink-0 text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-full ${daysLeft <= 1 ? "bg-red-500 text-white" : "bg-orange-500/20 text-orange-600 dark:text-orange-400"}`}>
-                                {daysLeft <= 0 ? "Today" : daysLeft === 1 ? "Tmrw" : `${daysLeft}d`}
-                              </span>
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                    <button
-                      onClick={() => setActiveView("tracker")}
-                      className="mt-auto w-full py-2.5 rounded-xl border border-dashed border-zinc-300 dark:border-zinc-700 text-[10px] font-bold uppercase tracking-widest text-zinc-400 hover:text-[#06402B] dark:hover:text-emerald-400 hover:border-[#06402B]/40 dark:hover:border-emerald-500/40 transition-all flex items-center justify-center gap-1.5 active:scale-95"
-                    >
-                      <FaPlus size={9} /> Open Tracker
-                    </button>
-                  </div>
-
-                  {/* ── Col 2: GRADES ── */}
-                  <div className="bg-white/60 dark:bg-[#121214]/80 backdrop-blur-xl rounded-[1.5rem] border border-zinc-200 dark:border-zinc-800/80 p-4 sm:p-5 shadow-sm flex flex-col gap-4">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-xs font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                        <FaChartBar className="text-[#06402B] dark:text-emerald-400" /> Grades
-                      </h3>
-                      <button
-                        onClick={() => { setActiveView("academics"); setAcademicTab("grades"); }}
-                        className="text-[9px] font-bold uppercase tracking-widest text-[#06402B] dark:text-emerald-400 hover:underline"
-                      >
-                        Full →
-                      </button>
-                    </div>
-                    <div className="flex-1 flex flex-col gap-3 overflow-y-auto max-h-48 lg:max-h-56 pr-0.5 custom-scrollbar">
-                      {computedCourseGrades.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-6 text-zinc-400 opacity-50 gap-2">
-                          <FaBook size={20} />
-                          <p className="text-[10px] font-bold uppercase tracking-widest text-center">Add courses in Tracker</p>
-                        </div>
-                      ) : (
-                        computedCourseGrades.map((cg) => {
-                          const avg = cg.average ? parseFloat(cg.average) : null;
-                          const pct = avg ? Math.min(avg, 100) : 0;
-                          const barColor =
-                            avg === null ? "bg-zinc-300 dark:bg-zinc-700"
-                            : avg >= 90 ? "bg-emerald-500"
-                            : avg >= 75 ? "bg-blue-500"
-                            : avg >= 60 ? "bg-orange-500"
-                            : "bg-red-500";
-                          return (
-                            <div key={cg.courseId} className="space-y-1">
-                              <div className="flex items-center justify-between gap-2">
-                                <p className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300 truncate flex-1">{cg.title}</p>
-                                <span className={`text-[11px] font-black shrink-0 ${avg === null ? "text-zinc-400" : avg >= 75 ? "text-emerald-600 dark:text-emerald-400" : "text-red-500"}`}>
-                                  {avg !== null ? `${avg}%` : "—"}
-                                </span>
-                              </div>
-                              <div className="h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
-                                <motion.div
-                                  initial={{ width: 0 }}
-                                  animate={{ width: `${pct}%` }}
-                                  transition={{ duration: 0.7, ease: "easeOut" }}
-                                  className={`h-full rounded-full ${barColor}`}
-                                />
-                              </div>
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                    <div className="pt-3 border-t border-zinc-100 dark:border-zinc-800">
-                      <div className="flex items-center justify-between mb-2">
-                        <p className="text-[9px] font-bold uppercase tracking-widest text-zinc-400">Activity — last 5 weeks</p>
-                        <div className="flex items-center gap-1">
-                          <span className="text-[8px] text-zinc-400 font-bold">Less</span>
-                          {[0, 0.3, 0.6, 1.0].map((v, i) => (
-                            <div key={i} className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: v === 0 ? 'rgba(0,0,0,0.07)' : `rgba(6,64,43,${v})` }} />
-                          ))}
-                          <span className="text-[8px] text-zinc-400 font-bold">More</span>
-                        </div>
-                      </div>
-                      <div className="flex gap-0.5">
-                        <div className="flex flex-col gap-0.5 mr-1">
-                          {['M','W','F'].map((d, i) => (
-                            <div key={d} className="text-[7px] font-bold text-zinc-400 uppercase h-3 flex items-center" style={{ marginTop: i === 0 ? 0 : '4px' }}>{d}</div>
-                          ))}
-                        </div>
-                        {(() => {
-                          const today = new Date();
-                          today.setHours(0, 0, 0, 0);
-                          const weeks: number[][] = [];
-                          for (let w = 4; w >= 0; w--) {
-                            const week: number[] = [];
-                            for (let d = 6; d >= 0; d--) {
-                              const dayIndex = w * 7 + d;
-                              week.unshift(heatmapData[heatmapData.length - 1 - dayIndex] ?? 0);
-                            }
-                            weeks.push(week);
-                          }
-                          return weeks.map((week, wi) => (
-                            <div key={wi} className="flex flex-col gap-0.5">
-                              {week.map((intensity, di) => {
-                                const daysAgo = (4 - wi) * 7 + (6 - di);
-                                const date = new Date(today);
-                                date.setDate(today.getDate() - daysAgo);
-                                const label = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                                const isFuture = daysAgo < 0;
-                                return (
-                                  <div
-                                    key={di}
-                                    title={isFuture ? '' : `${label}: ${intensity > 0 ? 'active' : 'no activity'}`}
-                                    className="w-3.5 h-3.5 rounded-sm transition-all hover:ring-1 hover:ring-emerald-400/50 cursor-default"
-                                    style={{ backgroundColor: isFuture ? 'transparent' : intensity === 0 ? 'rgba(0,0,0,0.07)' : `rgba(6,64,43,${intensity})` }}
-                                  />
-                                );
-                              })}
-                            </div>
-                          ));
-                        })()}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* ── Col 3: CAMPUS BULLETIN ── */}
-                  <div className="bg-white/60 dark:bg-[#121214]/80 backdrop-blur-xl rounded-[1.5rem] border border-zinc-200 dark:border-zinc-800/80 p-4 sm:p-5 shadow-sm overflow-hidden flex flex-col">
-                    <div className="flex-1 overflow-y-auto lg:max-h-[480px] custom-scrollbar">
-                      <CampusBulletin />
-                    </div>
-                  </div>
-
-                </div>
-              </motion.div>
+      {/* ── Col 1: UP NEXT ── */}
+      <div className="bg-white/60 dark:bg-[#121214]/80 backdrop-blur-xl rounded-[1.5rem] border border-zinc-200 dark:border-zinc-800/80 p-4 sm:p-5 shadow-sm flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xs font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+            <FaFire className="text-orange-500" /> Up Next
+          </h3>
+          <div className="flex items-center gap-2">
+            {/* Overdue count badge */}
+            {mergedActiveTasks.filter(t => t.deadline && new Date(t.deadline) < new Date() && t.status !== 'completed' && t.status !== 'Graded').length > 0 && (
+              <span className="text-[9px] font-black text-red-500 bg-red-500/10 px-2 py-0.5 rounded-full border border-red-500/20">
+                {mergedActiveTasks.filter(t => t.deadline && new Date(t.deadline) < new Date() && t.status !== 'completed' && t.status !== 'Graded').length} overdue
+              </span>
             )}
+            <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest bg-zinc-100 dark:bg-zinc-800 px-2 py-1 rounded-lg">48 hrs</span>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          {urgentTasks.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-6 text-zinc-400 opacity-50 gap-2">
+              <FaCheckCircle size={24} />
+              <p className="text-[10px] font-bold uppercase tracking-widest">All clear!</p>
+            </div>
+          ) : (
+            urgentTasks.map((task) => {
+              const ms = new Date(task.deadline).getTime() - Date.now();
+              const daysLeft = Math.ceil(ms / (1000 * 60 * 60 * 24));
+              return (
+                <div
+                  key={task.id}
+                  onClick={() => setActiveView("tracker")}
+                  className="group p-3 rounded-xl border border-red-500/20 bg-red-500/5 dark:bg-red-500/10 flex items-start justify-between gap-2 cursor-pointer hover:border-red-500/40 active:scale-[0.98] transition-all"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-zinc-900 dark:text-white leading-snug line-clamp-2">{task.title}</p>
+                    <p className="text-[10px] font-mono text-red-500 dark:text-red-400 font-bold mt-0.5">{task.deadline}</p>
+                  </div>
+                  <span className={`shrink-0 text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-full ${daysLeft <= 1 ? "bg-red-500 text-white" : "bg-orange-500/20 text-orange-600 dark:text-orange-400"}`}>
+                    {daysLeft <= 0 ? "Today" : daysLeft === 1 ? "Tmrw" : `${daysLeft}d`}
+                  </span>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Quick task shortcuts */}
+        <div className="flex flex-col gap-2 pt-1 border-t border-zinc-100 dark:border-zinc-800 mt-auto">
+          <p className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">Quick Nav</p>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { label: "Tracker", icon: <FaFolderOpen size={10} />, view: "tracker" },
+              { label: "Calendar", icon: <FaCalendarDay size={10} />, view: "calendar" },
+              { label: "Academics", icon: <FaBook size={10} />, view: "academics" },
+              { label: "Study Hub", icon: <FaBrain size={10} />, view: "studyhub" },
+            ].map(nav => (
+              <button
+                key={nav.label}
+                onClick={() => setActiveView(nav.view)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-[10px] font-bold text-zinc-600 dark:text-zinc-400 hover:text-[#06402B] dark:hover:text-emerald-400 hover:border-[#06402B]/30 transition-all active:scale-95"
+              >
+                <span className="text-[#06402B] dark:text-emerald-400">{nav.icon}</span>
+                {nav.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Col 2: GRADES ── */}
+      <div className="bg-white/60 dark:bg-[#121214]/80 backdrop-blur-xl rounded-[1.5rem] border border-zinc-200 dark:border-zinc-800/80 p-4 sm:p-5 shadow-sm flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xs font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+            <FaChartBar className="text-[#06402B] dark:text-emerald-400" /> Grades
+          </h3>
+          <button
+            onClick={() => { setActiveView("academics"); setAcademicTab("grades"); }}
+            className="text-[9px] font-bold uppercase tracking-widest text-[#06402B] dark:text-emerald-400 hover:underline flex items-center gap-1"
+          >
+            Full <FaChevronRight size={7} />
+          </button>
+        </div>
+
+        <div className="flex-1 flex flex-col gap-3 overflow-y-auto max-h-48 lg:max-h-56 pr-0.5 custom-scrollbar">
+          {computedCourseGrades.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-6 text-zinc-400 opacity-50 gap-2">
+              <FaBook size={20} />
+              <p className="text-[10px] font-bold uppercase tracking-widest text-center">Add courses in Tracker</p>
+            </div>
+          ) : (
+            computedCourseGrades.map((cg) => {
+              const avg = cg.average ? parseFloat(cg.average) : null;
+              const pct = avg ? Math.min(avg, 100) : 0;
+              const barColor =
+                avg === null ? "bg-zinc-300 dark:bg-zinc-700"
+                : avg >= 90 ? "bg-emerald-500"
+                : avg >= 75 ? "bg-blue-500"
+                : avg >= 60 ? "bg-orange-500"
+                : "bg-red-500";
+              return (
+                <button
+                  key={cg.courseId}
+                  onClick={() => setActiveView("tracker")}
+                  className="space-y-1 text-left group hover:opacity-80 transition-opacity"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300 truncate flex-1 group-hover:text-[#06402B] dark:group-hover:text-emerald-400 transition-colors">{cg.title}</p>
+                    <span className={`text-[11px] font-black shrink-0 ${avg === null ? "text-zinc-400" : avg >= 75 ? "text-emerald-600 dark:text-emerald-400" : "text-red-500"}`}>
+                      {avg !== null ? `${avg}%` : "—"}
+                    </span>
+                  </div>
+                  <div className="h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${pct}%` }}
+                      transition={{ duration: 0.7, ease: "easeOut" }}
+                      className={`h-full rounded-full ${barColor}`}
+                    />
+                  </div>
+                </button>
+              );
+            })
+          )}
+        </div>
+
+        {/* Activity heatmap */}
+        <div className="pt-3 border-t border-zinc-100 dark:border-zinc-800">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[9px] font-bold uppercase tracking-widest text-zinc-400">Activity — last 5 weeks</p>
+            <div className="flex items-center gap-1">
+              <span className="text-[8px] text-zinc-400 font-bold">Less</span>
+              {[0, 0.3, 0.6, 1.0].map((v, i) => (
+                <div key={i} className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: v === 0 ? 'rgba(0,0,0,0.07)' : `rgba(6,64,43,${v})` }} />
+              ))}
+              <span className="text-[8px] text-zinc-400 font-bold">More</span>
+            </div>
+          </div>
+          <div className="flex gap-0.5">
+            <div className="flex flex-col gap-0.5 mr-1">
+              {['M','W','F'].map((d, i) => (
+                <div key={d} className="text-[7px] font-bold text-zinc-400 uppercase h-3 flex items-center" style={{ marginTop: i === 0 ? 0 : '4px' }}>{d}</div>
+              ))}
+            </div>
+            {(() => {
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+              const weeks: number[][] = [];
+              for (let w = 4; w >= 0; w--) {
+                const week: number[] = [];
+                for (let d = 6; d >= 0; d--) {
+                  const dayIndex = w * 7 + d;
+                  week.unshift(heatmapData[heatmapData.length - 1 - dayIndex] ?? 0);
+                }
+                weeks.push(week);
+              }
+              return weeks.map((week, wi) => (
+                <div key={wi} className="flex flex-col gap-0.5">
+                  {week.map((intensity, di) => {
+                    const daysAgo = (4 - wi) * 7 + (6 - di);
+                    const date = new Date(today);
+                    date.setDate(today.getDate() - daysAgo);
+                    const label = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                    const isFuture = daysAgo < 0;
+                    return (
+                      <div
+                        key={di}
+                        title={isFuture ? '' : `${label}: ${intensity > 0 ? 'active' : 'no activity'}`}
+                        className="w-3.5 h-3.5 rounded-sm transition-all hover:ring-1 hover:ring-emerald-400/50 cursor-default"
+                        style={{ backgroundColor: isFuture ? 'transparent' : intensity === 0 ? 'rgba(0,0,0,0.07)' : `rgba(6,64,43,${intensity})` }}
+                      />
+                    );
+                  })}
+                </div>
+              ));
+            })()}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Col 3: FRIENDS ONLINE + BULLETIN ── */}
+      <div className="flex flex-col gap-4">
+
+        {/* Friends online strip — only if there are online friends */}
+        {friendsList.filter(f => f.isOnline).length > 0 && (
+          <div
+            onClick={() => { setActiveView("studyhub"); setStudyTab("lounge"); }}
+            className="bg-white/60 dark:bg-[#121214]/80 backdrop-blur-xl rounded-[1.5rem] border border-zinc-200 dark:border-zinc-800/80 p-4 shadow-sm cursor-pointer hover:border-emerald-500/30 transition-all group"
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-xs font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                Online Now
+              </h3>
+              <span className="text-[9px] font-bold text-emerald-500 group-hover:underline">
+                {friendsList.filter(f => f.isOnline).length} online →
+              </span>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              {friendsList.filter(f => f.isOnline).slice(0, 5).map(friend => (
+                <div key={friend.uid} className="relative" title={friend.fullName}>
+                  <div className="w-8 h-8 rounded-full overflow-hidden bg-zinc-200 dark:bg-zinc-800 border-2 border-white dark:border-zinc-900 flex items-center justify-center text-xs font-bold text-zinc-500 shadow-sm">
+                    {friend.avatarUrl
+                      ? <img src={friend.avatarUrl} alt={friend.fullName} className="w-full h-full object-cover" />
+                      : friend.fullName?.charAt(0) || "?"
+                    }
+                  </div>
+                  <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-white dark:border-zinc-900" />
+                </div>
+              ))}
+              {friendsList.filter(f => f.isOnline).length > 5 && (
+                <div className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 border-2 border-white dark:border-zinc-900 flex items-center justify-center text-[10px] font-black text-zinc-500">
+                  +{friendsList.filter(f => f.isOnline).length - 5}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Campus bulletin */}
+        <div className="bg-white/60 dark:bg-[#121214]/80 backdrop-blur-xl rounded-[1.5rem] border border-zinc-200 dark:border-zinc-800/80 p-4 sm:p-5 shadow-sm overflow-hidden flex flex-col flex-1">
+          <div className="flex-1 overflow-y-auto lg:max-h-[380px] custom-scrollbar">
+            <CampusBulletin />
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </motion.div>
+)}
 
             {/* === 2. TRACKER === */}
-            {activeView === 'tracker' && (
-              <motion.div key="tracker" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="w-full max-w-7xl mx-auto">
-                <ErrorBoundary fallbackTitle="Tracker Error">
-                  <UniversityTracker />
-                </ErrorBoundary>
-              </motion.div>
-            )}
+{activeView === 'tracker' && (
+  <motion.div key="tracker" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="w-full max-w-7xl mx-auto">
+    <ErrorBoundary fallbackTitle="Tracker Error">
+      <UniversityTracker
+        defaultCourseId={defaultCourseId}
+        onCourseSelected={() => setDefaultCourseId(null)}
+      />
+    </ErrorBoundary>
+  </motion.div>
+)}
 
             {/* === 3. ACADEMICS HUB === */}
             {activeView === 'academics' && (
@@ -1075,16 +1192,23 @@ function DashboardInner() {
       </nav>
 
       {/* COMMAND CENTER */}
-      <CommandCenter
-        isOpen={isQueueOpen}
-        onClose={() => setIsQueueOpen(false)}
-        activeTasks={mergedActiveTasks}
-        friends={friendsList}
-        onAddTask={handleAddGeneralTask}
-        onToggleTask={toggleTaskStatus}
-        onDeleteTask={deleteTask}
-        onNavigate={(view) => setActiveView(view)}
-      />
+<CommandCenter
+  isOpen={isQueueOpen}
+  onClose={() => setIsQueueOpen(false)}
+  activeTasks={mergedActiveTasks}
+  courses={courses}
+  friends={friendsList}
+  onAddTask={handleAddGeneralTask}
+  onToggleTask={toggleTaskStatus}
+  onDeleteTask={deleteTask}
+  onNavigate={(view) => setActiveView(view)}
+  courseTasks={courseTasks}
+  onNavigateToCourse={(courseId) => {
+    setDefaultCourseId(courseId);
+    setActiveView('tracker');
+  }}
+  userProfile={userProfile}
+/>
 
     </div>
   );

@@ -5,15 +5,109 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   FaTimes, FaLayerGroup, FaArrowUp, FaGraduationCap,
   FaBuilding, FaCalendarAlt, FaUserPlus, FaCheck,
-  FaUserFriends, FaChevronDown
+  FaUserFriends, FaChevronDown, FaShieldAlt, FaCrown,
+  FaMedal, FaStar
 } from "react-icons/fa";
-import { collection, query, where, getDocs, doc, getDoc, addDoc, serverTimestamp } from "firebase/firestore";
+import {
+  collection, query, where, getDocs, doc, getDoc,
+  addDoc, serverTimestamp
+} from "firebase/firestore";
 import { auth, db } from "@/lib/db";
 
 interface UserProfileModalProps {
   userId: string;
   onClose: () => void;
 }
+
+// ─── Presence helpers (matching StudyLounge) ──────────────────────────────────
+
+function isUserOnline(user: any): boolean {
+  if (user?.isOnline === true) {
+    // If they have a lastSeen, verify it's recent (within 5 min as safety net)
+    if (user?.lastSeen) {
+      const lastSeenMs = user.lastSeen?.toMillis?.() ?? new Date(user.lastSeen).getTime();
+      return Date.now() - lastSeenMs < 5 * 60 * 1000;
+    }
+    return true;
+  }
+  return false;
+}
+
+function getLastSeen(user: any): string {
+  if (!user?.lastSeen) return "Offline";
+  const lastSeenMs = user.lastSeen?.toMillis?.() ?? new Date(user.lastSeen).getTime();
+  const diff = Date.now() - lastSeenMs;
+  const mins = Math.floor(diff / 60_000);
+  const hrs  = Math.floor(diff / 3_600_000);
+  const days = Math.floor(diff / 86_400_000);
+  if (mins < 2)  return "Just now";
+  if (mins < 60) return `${mins}m ago`;
+  if (hrs < 24)  return `${hrs}h ago`;
+  if (days < 7)  return `${days}d ago`;
+  return "A while ago";
+}
+
+// ─── Title system ─────────────────────────────────────────────────────────────
+
+interface TitleDef {
+  id: string;
+  label: string;
+  icon: React.ReactNode;
+  color: string;
+  bg: string;
+  border: string;
+  description: string;
+  check: (profile: any, deckCount: number, upvotes: number) => boolean;
+}
+
+const TITLES: TitleDef[] = [
+  {
+    id: "admin",
+    label: "Admin",
+    icon: <FaShieldAlt size={10}/>,
+    color: "text-purple-600 dark:text-purple-400",
+    bg: "bg-purple-500/10",
+    border: "border-purple-500/20",
+    description: "JPCS DLSAU Administrator",
+    check: (profile) => profile?.role === "admin",
+  },
+  {
+    id: "contributor",
+    label: "Top Contributor",
+    icon: <FaCrown size={10}/>,
+    color: "text-amber-600 dark:text-amber-400",
+    bg: "bg-amber-500/10",
+    border: "border-amber-500/20",
+    description: "Published 5+ reviewers",
+    check: (_p, deckCount) => deckCount >= 5,
+  },
+  {
+    id: "popular",
+    label: "Popular",
+    icon: <FaStar size={10}/>,
+    color: "text-rose-600 dark:text-rose-400",
+    bg: "bg-rose-500/10",
+    border: "border-rose-500/20",
+    description: "Earned 20+ upvotes",
+    check: (_p, _d, upvotes) => upvotes >= 20,
+  },
+  {
+    id: "networker",
+    label: "Well Connected",
+    icon: <FaMedal size={10}/>,
+    color: "text-blue-600 dark:text-blue-400",
+    bg: "bg-blue-500/10",
+    border: "border-blue-500/20",
+    description: "Has 10+ connections",
+    check: (profile) => (profile?.friends?.length || 0) >= 10,
+  },
+];
+
+function getEarnedTitles(profile: any, deckCount: number, upvotes: number): TitleDef[] {
+  return TITLES.filter(t => t.check(profile, deckCount, upvotes));
+}
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
 function StatPill({ label, value }: { label: string; value: number }) {
   return (
@@ -33,36 +127,59 @@ function Chip({ icon, label }: { icon: React.ReactNode; label: string }) {
   );
 }
 
+function TitleBadge({ title }: { title: TitleDef }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      title={title.description}
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-[10px] font-black uppercase tracking-widest ${title.color} ${title.bg} ${title.border}`}
+    >
+      {title.icon}
+      {title.label}
+    </motion.div>
+  );
+}
+
 function ProfileSkeleton() {
   return (
     <div className="animate-pulse space-y-5 pt-2">
       <div className="flex justify-end">
-        <div className="h-8 w-24 rounded-xl bg-zinc-200 dark:bg-zinc-800" />
+        <div className="h-8 w-24 rounded-xl bg-zinc-200 dark:bg-zinc-800"/>
       </div>
       <div className="space-y-2">
-        <div className="h-6 w-36 rounded-lg bg-zinc-200 dark:bg-zinc-800" />
-        <div className="h-3 w-20 rounded bg-zinc-200 dark:bg-zinc-800" />
+        <div className="h-6 w-36 rounded-lg bg-zinc-200 dark:bg-zinc-800"/>
+        <div className="h-3 w-20 rounded bg-zinc-200 dark:bg-zinc-800"/>
       </div>
-      <div className="h-10 w-full rounded-xl bg-zinc-100 dark:bg-zinc-800" />
+      <div className="h-10 w-full rounded-xl bg-zinc-100 dark:bg-zinc-800"/>
       <div className="flex gap-2">
-        {[1, 2, 3].map(i => <div key={i} className="flex-1 h-16 rounded-2xl bg-zinc-100 dark:bg-zinc-800" />)}
+        {[1,2,3].map(i => <div key={i} className="flex-1 h-16 rounded-2xl bg-zinc-100 dark:bg-zinc-800"/>)}
       </div>
       <div className="space-y-2">
-        {[1, 2].map(i => <div key={i} className="h-14 rounded-xl bg-zinc-100 dark:bg-zinc-800" />)}
+        {[1,2].map(i => <div key={i} className="h-14 rounded-xl bg-zinc-100 dark:bg-zinc-800"/>)}
       </div>
     </div>
   );
 }
 
+// ─── Main Component ───────────────────────────────────────────────────────────
+
 export default function UserProfileModal({ userId, onClose }: UserProfileModalProps) {
-  const [profile, setProfile] = useState<any>(null);
-  const [publicDecks, setPublicDecks] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [requestSent, setRequestSent] = useState(false);
-  const [isFriend, setIsFriend] = useState(false);
-  const [isSelf, setIsSelf] = useState(false);
+  const [profile, setProfile]           = useState<any>(null);
+  const [publicDecks, setPublicDecks]   = useState<any[]>([]);
+  const [loading, setLoading]           = useState(true);
+  const [requestSent, setRequestSent]   = useState(false);
+  const [isFriend, setIsFriend]         = useState(false);
+  const [isSelf, setIsSelf]             = useState(false);
   const [decksExpanded, setDecksExpanded] = useState(false);
-  const [sending, setSending] = useState(false);
+  const [sending, setSending]           = useState(false);
+
+  // Tick to keep presence fresh without extra Firestore reads
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => t + 1), 30_000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -134,8 +251,10 @@ export default function UserProfileModal({ userId, onClose }: UserProfileModalPr
     if (e.target === e.currentTarget) onClose();
   }, [onClose]);
 
-  const totalUpvotes = publicDecks.reduce((acc, d) => acc + (d.upvotes || 0), 0);
-  const visibleDecks = decksExpanded ? publicDecks : publicDecks.slice(0, 3);
+  const totalUpvotes  = publicDecks.reduce((acc, d) => acc + (d.upvotes || 0), 0);
+  const earnedTitles  = profile ? getEarnedTitles(profile, publicDecks.length, totalUpvotes) : [];
+  const visibleDecks  = decksExpanded ? publicDecks : publicDecks.slice(0, 3);
+  const online        = profile ? isUserOnline(profile) : false;
 
   return (
     <AnimatePresence>
@@ -158,26 +277,31 @@ export default function UserProfileModal({ userId, onClose }: UserProfileModalPr
         >
           {/* Drag handle — mobile only */}
           <div className="flex justify-center pt-3 pb-1 sm:hidden shrink-0">
-            <div className="w-10 h-1 rounded-full bg-zinc-300 dark:bg-zinc-700" />
+            <div className="w-10 h-1 rounded-full bg-zinc-300 dark:bg-zinc-700"/>
           </div>
 
-          {/* Banner + Avatar as one relative block */}
+          {/* Banner + Avatar */}
           <div className="relative shrink-0">
-            {/* Green banner */}
-            <div className="h-28 sm:h-32 bg-gradient-to-br from-[#06402B] via-[#085c38] to-[#042d1f] overflow-hidden rounded-t-[2.5rem] sm:rounded-t-[2.5rem] relative">
-              <div className="absolute -top-6 -left-6 w-32 h-32 rounded-full bg-white/5 blur-2xl" />
-              <div className="absolute -bottom-4 right-8 w-24 h-24 rounded-full bg-white/5 blur-xl" />
-              <div className="absolute top-3 left-5 w-2 h-2 rounded-full bg-white/20" />
-              <div className="absolute top-8 left-12 w-1 h-1 rounded-full bg-white/30" />
-              <div className="absolute bottom-5 left-1/3 w-1.5 h-1.5 rounded-full bg-white/20" />
+            <div className="h-28 sm:h-32 bg-gradient-to-br from-[#06402B] via-[#085c38] to-[#042d1f] overflow-hidden rounded-t-[2.5rem] relative">
+              {/* Decorative blobs */}
+              <div className="absolute -top-6 -left-6 w-32 h-32 rounded-full bg-white/5 blur-2xl"/>
+              <div className="absolute -bottom-4 right-8 w-24 h-24 rounded-full bg-white/5 blur-xl"/>
+              <div className="absolute top-3 left-5 w-2 h-2 rounded-full bg-white/20"/>
+              <div className="absolute top-8 left-12 w-1 h-1 rounded-full bg-white/30"/>
+              <div className="absolute bottom-5 left-1/3 w-1.5 h-1.5 rounded-full bg-white/20"/>
+
+              {/* Admin banner stripe */}
+              {profile?.role === "admin" && (
+                <div className="absolute top-0 left-0 right-0 flex items-center justify-center gap-1.5 py-1.5 bg-purple-600/40 backdrop-blur-sm border-b border-purple-400/20">
+                  <FaShieldAlt size={9} className="text-purple-300"/>
+                  <span className="text-[9px] font-black text-purple-200 uppercase tracking-[0.2em]">JPCS DLSAU Administrator</span>
+                </div>
+              )}
 
               {/* Close button */}
-              <button
-                onClick={onClose}
-                aria-label="Close profile"
-                className="absolute top-4 right-4 w-9 h-9 bg-white/10 hover:bg-white/25 active:bg-white/30 text-white rounded-full flex items-center justify-center transition-all touch-manipulation z-10"
-              >
-                <FaTimes size={13} />
+              <button onClick={onClose} aria-label="Close profile"
+                className="absolute top-4 right-4 w-9 h-9 bg-white/10 hover:bg-white/25 active:bg-white/30 text-white rounded-full flex items-center justify-center transition-all touch-manipulation z-10">
+                <FaTimes size={13}/>
               </button>
 
               {/* Username in banner */}
@@ -190,54 +314,49 @@ export default function UserProfileModal({ userId, onClose }: UserProfileModalPr
               )}
             </div>
 
-            {/* Avatar — absolutely positioned over the banner bottom edge */}
+            {/* Avatar */}
             <div className="absolute -bottom-9 left-5 z-10">
               <div className="relative">
-                <div className="w-[68px] h-[68px] sm:w-[76px] sm:h-[76px] rounded-2xl border-4 border-zinc-50 dark:border-zinc-950 bg-zinc-200 dark:bg-zinc-800 overflow-hidden shadow-xl">
+                <div className={`w-[68px] h-[68px] sm:w-[76px] sm:h-[76px] rounded-2xl border-4 border-zinc-50 dark:border-zinc-950 bg-zinc-200 dark:bg-zinc-800 overflow-hidden shadow-xl ${profile?.role === "admin" ? "ring-2 ring-purple-500 ring-offset-2 ring-offset-zinc-50 dark:ring-offset-zinc-950" : ""}`}>
                   {loading ? (
-                    <div className="w-full h-full animate-pulse bg-zinc-300 dark:bg-zinc-700" />
+                    <div className="w-full h-full animate-pulse bg-zinc-300 dark:bg-zinc-700"/>
                   ) : profile?.avatarUrl ? (
-                    <img src={profile.avatarUrl} alt={profile?.fullName} className="w-full h-full object-cover" />
+                    <img src={profile.avatarUrl} alt={profile?.fullName} className="w-full h-full object-cover"/>
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-2xl font-black text-zinc-500 bg-gradient-to-br from-zinc-200 to-zinc-300 dark:from-zinc-700 dark:to-zinc-800">
                       {profile?.fullName?.charAt(0) || "?"}
                     </div>
                   )}
                 </div>
-                {profile?.isOnline && (
-                  <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full border-2 border-zinc-50 dark:border-zinc-950 shadow" />
-                )}
+                {/* Online/offline indicator */}
+                <span className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-zinc-50 dark:border-zinc-950 shadow ${online ? "bg-emerald-500" : "bg-zinc-400 dark:bg-zinc-600"}`}/>
               </div>
             </div>
           </div>
 
           {/* Scrollable content */}
           <div className="overflow-y-auto overscroll-contain flex-1 px-5 pb-8 pt-14">
-
             {loading ? (
-              <ProfileSkeleton />
+              <ProfileSkeleton/>
             ) : !profile ? (
               <div className="py-16 text-center text-zinc-500 font-bold">User not found.</div>
             ) : (
               <>
-                {/* CTA button */}
+                {/* CTA */}
                 {!isSelf && (
                   <div className="flex justify-end mb-4">
                     {isFriend ? (
                       <div className="flex items-center gap-1.5 px-4 py-2.5 bg-[#06402B]/10 text-[#06402B] dark:bg-[#06402B]/20 dark:text-emerald-400 rounded-xl text-[10px] font-black uppercase tracking-widest">
-                        <FaUserFriends size={11} /> Connected
+                        <FaUserFriends size={11}/> Connected
                       </div>
                     ) : requestSent ? (
                       <div className="flex items-center gap-1.5 px-4 py-2.5 bg-green-500/10 text-green-600 rounded-xl text-[10px] font-black uppercase tracking-widest">
-                        <FaCheck size={11} /> Sent!
+                        <FaCheck size={11}/> Sent!
                       </div>
                     ) : (
-                      <button
-                        onClick={handleSendFriendRequest}
-                        disabled={sending}
-                        className="flex items-center gap-1.5 px-4 py-2.5 bg-[#06402B] text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#052f1f] active:scale-95 transition-all shadow-md touch-manipulation disabled:opacity-60"
-                      >
-                        <FaUserPlus size={11} />
+                      <button onClick={handleSendFriendRequest} disabled={sending}
+                        className="flex items-center gap-1.5 px-4 py-2.5 bg-[#06402B] text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#052f1f] active:scale-95 transition-all shadow-md touch-manipulation disabled:opacity-60">
+                        <FaUserPlus size={11}/>
                         {sending ? "Sending..." : "Connect"}
                       </button>
                     )}
@@ -248,13 +367,22 @@ export default function UserProfileModal({ userId, onClose }: UserProfileModalPr
                 <h2 className="text-xl font-black text-zinc-900 dark:text-white leading-tight">
                   {profile.fullName || "Lasallian"}
                 </h2>
-                {profile.isOnline !== undefined && (
-                  <p className="text-[10px] font-bold mt-0.5 mb-3">
-                    {profile.isOnline
-                      ? <span className="text-emerald-500">● Online</span>
-                      : <span className="text-zinc-400">● Offline</span>
-                    }
-                  </p>
+
+                {/* Presence */}
+                <p className="text-[10px] font-bold mt-0.5 mb-3">
+                  {online
+                    ? <span className="text-emerald-500">● Online now</span>
+                    : <span className="text-zinc-400">● Last seen {getLastSeen(profile)}</span>
+                  }
+                </p>
+
+                {/* ── Titles / Badges ── */}
+                {earnedTitles.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    {earnedTitles.map(title => (
+                      <TitleBadge key={title.id} title={title}/>
+                    ))}
+                  </div>
                 )}
 
                 {/* Bio */}
@@ -266,29 +394,26 @@ export default function UserProfileModal({ userId, onClose }: UserProfileModalPr
 
                 {/* Info chips */}
                 {(profile.program || profile.college || profile.yearLevel) && (
-                  <div className="flex gap-2 mb-5 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none">
-                    {profile.program && <Chip icon={<FaGraduationCap />} label={profile.program} />}
-                    {profile.college && <Chip icon={<FaBuilding />} label={profile.college} />}
-                    {profile.yearLevel && <Chip icon={<FaCalendarAlt />} label={profile.yearLevel} />}
+                  <div className="flex gap-2 mb-5 overflow-x-auto pb-1 -mx-1 px-1" style={{ scrollbarWidth: "none" }}>
+                    {profile.program    && <Chip icon={<FaGraduationCap/>} label={profile.program}/>}
+                    {profile.college    && <Chip icon={<FaBuilding/>}      label={profile.college}/>}
+                    {profile.yearLevel  && <Chip icon={<FaCalendarAlt/>}   label={profile.yearLevel}/>}
                   </div>
                 )}
 
                 {/* Stats */}
                 <div className="flex gap-2.5 mb-6">
-                  <StatPill label="Reviewers" value={publicDecks.length} />
-                  <StatPill label="Network" value={profile.friends?.length || 0} />
-                  <StatPill label="Upvotes" value={totalUpvotes} />
+                  <StatPill label="Reviewers" value={publicDecks.length}/>
+                  <StatPill label="Network"   value={profile.friends?.length || 0}/>
+                  <StatPill label="Upvotes"   value={totalUpvotes}/>
                 </div>
 
-                {/* Divider */}
-                <div className="h-px bg-zinc-200 dark:bg-zinc-800 mb-5" />
+                <div className="h-px bg-zinc-200 dark:bg-zinc-800 mb-5"/>
 
                 {/* Public Decks */}
                 <div>
                   <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
-                      Published Reviewers
-                    </h3>
+                    <h3 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Published Reviewers</h3>
                     {publicDecks.length > 0 && (
                       <span className="text-[10px] font-bold text-zinc-400 bg-zinc-100 dark:bg-zinc-900 px-2 py-0.5 rounded-full border border-zinc-200 dark:border-zinc-800">
                         {publicDecks.length}
@@ -304,25 +429,19 @@ export default function UserProfileModal({ userId, onClose }: UserProfileModalPr
                     <>
                       <div className="space-y-2">
                         {visibleDecks.map((deck, i) => (
-                          <motion.div
-                            key={deck.id}
-                            initial={{ opacity: 0, y: 8 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: i * 0.04 }}
+                          <motion.div key={deck.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}
                             className="flex items-center justify-between p-3.5 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 hover:border-[#06402B]/30 transition-colors group"
                           >
                             <div className="min-w-0 flex-1">
-                              <p className="text-xs font-black text-zinc-800 dark:text-white truncate group-hover:text-[#06402B] transition-colors">
-                                {deck.title}
-                              </p>
+                              <p className="text-xs font-black text-zinc-800 dark:text-white truncate group-hover:text-[#06402B] transition-colors">{deck.title}</p>
                               <p className="text-[10px] font-mono text-zinc-400 uppercase mt-0.5">{deck.subject}</p>
                             </div>
                             <div className="flex items-center gap-3 shrink-0 ml-3">
                               <span className="flex items-center gap-1 text-[10px] font-bold text-zinc-400">
-                                <FaLayerGroup size={9} /> {deck.cards?.length || 0}
+                                <FaLayerGroup size={9}/> {deck.cards?.length || 0}
                               </span>
                               <span className="flex items-center gap-1 text-[10px] font-bold text-zinc-400">
-                                <FaArrowUp size={9} /> {deck.upvotes || 0}
+                                <FaArrowUp size={9}/> {deck.upvotes || 0}
                               </span>
                             </div>
                           </motion.div>
@@ -330,15 +449,11 @@ export default function UserProfileModal({ userId, onClose }: UserProfileModalPr
                       </div>
 
                       {publicDecks.length > 3 && (
-                        <button
-                          onClick={() => setDecksExpanded(v => !v)}
+                        <button onClick={() => setDecksExpanded(v => !v)}
                           className="mt-3 w-full py-2.5 rounded-2xl border border-zinc-200 dark:border-zinc-800 text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:border-[#06402B]/40 hover:text-[#06402B] transition-all flex items-center justify-center gap-2 touch-manipulation"
                         >
-                          <motion.span
-                            animate={{ rotate: decksExpanded ? 180 : 0 }}
-                            transition={{ duration: 0.2 }}
-                          >
-                            <FaChevronDown size={10} />
+                          <motion.span animate={{ rotate: decksExpanded ? 180 : 0 }} transition={{ duration: 0.2 }}>
+                            <FaChevronDown size={10}/>
                           </motion.span>
                           {decksExpanded ? "Show Less" : `Show ${publicDecks.length - 3} More`}
                         </button>
