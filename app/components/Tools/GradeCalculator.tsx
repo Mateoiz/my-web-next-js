@@ -417,12 +417,12 @@ const calculateGrade = useCallback(() => {
     // FIX: Removed overflow-hidden from wrapper so dropdowns inside can escape
     // the container boundary. overflow-hidden was the root cause of clipping.
     <motion.div
-      initial={{ opacity: 0, scale: 0.97 }}
-      animate={{ opacity: 1, scale: 1 }}
-      className="max-w-4xl mx-auto bg-white/80 dark:bg-[#18181b]/80 backdrop-blur-md border border-zinc-200 dark:border-[#06402B]/30 rounded-[2rem] shadow-sm relative p-6 md:p-8 w-full"
-    >
+  initial={{ opacity: 0, scale: 0.97 }}
+  animate={{ opacity: 1, scale: 1 }}
+  className="max-w-4xl mx-auto bg-white/80 dark:bg-[#18181b]/80 backdrop-blur-md border border-zinc-200 dark:border-[#06402B]/30 rounded-[2rem] shadow-sm relative p-6 md:p-8 w-full [clip-path:inset(0_round_2rem)]"
+>
       {/* Top accent bar — use a pseudo element via a child div instead of relying on overflow:hidden on parent */}
-      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#06402B] to-emerald-400 dark:from-emerald-600 dark:to-emerald-400 rounded-t-[2rem]" />
+<div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#06402B] to-emerald-400 dark:from-emerald-600 dark:to-emerald-400 rounded-tl-[2rem] rounded-tr-[2rem]" />
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="flex flex-col md:flex-row items-start justify-between mb-8 gap-5">
