@@ -5,14 +5,14 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   FaChevronLeft, FaChevronRight, FaCalendarDay,
   FaExclamationCircle, FaPlus, FaTimes, FaShieldAlt,
-  FaGraduationCap, FaUmbrellaBeach, FaClipboardList, FaTrash
+  FaGraduationCap, FaUmbrellaBeach, FaClipboardList, FaTrash, FaClock
 } from "react-icons/fa";
 import { doc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "@/lib/db";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-type EventType = "academic" | "holiday" | "exam" | "admin";
+type EventType = "academic" | "holiday" | "exam" | "admin" | "schedule";
 
 interface CalendarEvent {
   title: string;
@@ -65,6 +65,7 @@ const eventStyles: Record<EventType, string> = {
   holiday:  "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20",
   academic: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20",
   admin:    "bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20",
+  schedule: "bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/20",
 };
 
 const eventIcons: Record<EventType, React.ReactNode> = {
@@ -72,6 +73,7 @@ const eventIcons: Record<EventType, React.ReactNode> = {
   holiday:  <FaUmbrellaBeach size={9} />,
   academic: <FaGraduationCap size={9} />,
   admin:    <FaShieldAlt size={9} />,
+  schedule: <FaClock size={9} />,
 };
 
 // ── Legend pill ───────────────────────────────────────────────────────────────
@@ -209,12 +211,12 @@ if (isDesktop && anchorRect) {
   return (
     <motion.div
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50 backdrop-blur-sm"      onClick={onClose}
+  className="fixed inset-0 z-60 flex items-end justify-center bg-black/50 backdrop-blur-sm"      onClick={onClose}
     >
       <motion.div
         initial={{ y: 80 }} animate={{ y: 0 }} exit={{ y: 80 }}
         transition={{ type: "spring", stiffness: 340, damping: 30 }}
-className="w-full max-w-lg bg-white dark:bg-zinc-950 rounded-t-[2rem] p-6 pb-28 border-t border-zinc-200 dark:border-zinc-800 shadow-2xl"        onClick={e => e.stopPropagation()}
+  className="w-full max-w-lg bg-white dark:bg-zinc-950 rounded-t-4xl p-6 pb-28 border-t border-zinc-200 dark:border-zinc-800 shadow-2xl"        onClick={e => e.stopPropagation()}
       >
         <div className="w-10 h-1 bg-zinc-300 dark:bg-zinc-700 rounded-full mx-auto mb-5" />
         <p className="text-[10px] font-mono font-bold text-zinc-400 uppercase tracking-widest mb-1">{label}</p>
@@ -270,7 +272,7 @@ function AdminEventModal({
       <motion.div
         initial={{ scale: 0.93, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.93, y: 20 }}
         transition={{ type: "spring", stiffness: 340, damping: 28 }}
-        className="bg-white dark:bg-zinc-900 rounded-[2rem] p-6 w-full max-w-sm shadow-2xl border border-zinc-200 dark:border-zinc-800"
+        className="bg-white dark:bg-zinc-900 rounded-4xl p-6 w-full max-w-sm shadow-2xl border border-zinc-200 dark:border-zinc-800"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-5">
@@ -346,8 +348,18 @@ function AdminEventModal({
 }
 
 // ── Main Component ────────────────────────────────────────────────────────────
-export default function AcademicCalendar({ userTasks }: { userTasks: any[] }) {
-  const [currentDate, setCurrentDate] = useState(new Date());
+interface ScheduleClass {
+  id: string;
+  code: string;
+  name: string;
+  room: string;
+  days: string[];
+  startTime: string;
+  endTime: string;
+  color: string;
+}
+
+export default function AcademicCalendar({ userTasks, scheduleClasses = [] }: { userTasks: any[]; scheduleClasses?: ScheduleClass[] }) {  const [currentDate, setCurrentDate] = useState(new Date());
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminEvents, setAdminEvents] = useState<Record<string, CalendarEvent[]>>({});
   const [showAddModal, setShowAddModal] = useState(false);
@@ -409,9 +421,26 @@ useEffect(() => {
     });
   });
 
+const DAY_MAP: Record<string, number> = { M: 1, T: 2, W: 3, Th: 4, F: 5, S: 6 };
+
+  const getScheduleEventsForDate = (dateStr: string): CalendarEvent[] => {
+    const date = new Date(dateStr + "T00:00:00");
+    const dow = date.getDay(); // 0=Sun,1=Mon,...,6=Sat
+    return scheduleClasses
+      .filter(cls => cls.days.some((d: string) => DAY_MAP[d] === dow))
+      .map(cls => ({
+        title: `${cls.code}${cls.room ? ` · ${cls.room}` : ""}`,
+        type: "schedule" as EventType,
+      }));
+  };
+
   const getEventsForDate = (dateStr: string): CalendarEvent[] => {
     const base = SCHOOL_EVENTS[dateStr] ? [SCHOOL_EVENTS[dateStr]] : [];
-    return [...base, ...(expandedAdminEvents[dateStr] || [])];
+    return [
+      ...base,
+      ...(expandedAdminEvents[dateStr] || []),
+      ...getScheduleEventsForDate(dateStr),
+    ];
   };
 
   // ── Admin: save new event ──────────────────────────────────────────────────
@@ -480,7 +509,7 @@ useEffect(() => {
 )}
       </AnimatePresence>
 
-      <div className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl rounded-[2rem] border border-zinc-200 dark:border-zinc-800 p-4 md:p-8 shadow-xl animate-in fade-in slide-in-from-bottom-4 w-full">
+      <div className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl rounded-4xl border border-zinc-200 dark:border-zinc-800 p-4 md:p-8 shadow-xl animate-in fade-in slide-in-from-bottom-4 w-full">
 
         {/* ── Header ── */}
         <div className="flex flex-col gap-4 mb-6">
@@ -551,6 +580,7 @@ useEffect(() => {
             <LegendPill type="holiday" label="Holiday" />
             <LegendPill type="academic" label="Academic" />
             {isAdmin && <LegendPill type="admin" label="College Event" />}
+            {scheduleClasses.length > 0 && <LegendPill type="schedule" label="Class Schedule" />}
           </div>
         </div>
 
@@ -568,7 +598,7 @@ useEffect(() => {
 
               {/* Empty cells */}
               {Array.from({ length: firstDay }).map((_, i) => (
-                <div key={`e-${i}`} className="bg-white dark:bg-zinc-950 min-h-[60px] md:min-h-[100px]" />
+                <div key={`e-${i}`} className="bg-white dark:bg-zinc-950 min-h-15 md:min-h-25" />
               ))}
 
               {/* Day cells */}
@@ -588,7 +618,7 @@ useEffect(() => {
                       setSelectedDay({ dateStr, rect });
                     }}
                     className={`
-                      bg-white dark:bg-zinc-950 min-h-[60px] md:min-h-[100px]
+                      bg-white dark:bg-zinc-950 min-h-15 md:min-h-25
                       flex flex-col p-1.5 md:p-2 text-left w-full
                       transition-colors touch-manipulation
                       hover:bg-zinc-50 dark:hover:bg-zinc-900

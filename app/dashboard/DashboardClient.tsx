@@ -19,6 +19,7 @@ import { doc, getDoc, collection, query, where, orderBy, onSnapshot, addDoc, upd
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"; 
 import { auth, db, storage } from "@/lib/db"; 
 
+
 import FloatingCubes from "../components/FloatingCubes"; 
 import CommandCenter from "../components/Layout/CommandCenter";
 import ErrorBoundary from "../components/ErrorBoundary";
@@ -138,7 +139,19 @@ function DashboardInner() {
   const [editAvatarUrl, setEditAvatarUrl] = useState("");
   const [avatarFile, setAvatarFile] = useState<File | null>(null); 
   const [isSavingProfile, setIsSavingProfile] = useState(false);
-  const [defaultCourseId, setDefaultCourseId] = useState<string | null>(null);
+const [defaultCourseId, setDefaultCourseId] = useState<string | null>(null);
+  const [authReady, setAuthReady] = useState(false);
+  const [scheduleClasses, setScheduleClasses] = useState<any[]>([]);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('jpcs_schedule_v1');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        setScheduleClasses(parsed.classes || []);
+      }
+    } catch { /* ignore */ }
+  }, []);
   const router = useRouter();
   const confirmSignOut = () => showConfirm("Log Out", "Are you sure you want to log out?", () => signOut(auth), "Log Out", false);
 
@@ -313,13 +326,89 @@ if (userDoc.exists()) {
       } catch (err) {}
 
       const unsubTasks = onSnapshot(query(collection(db, "tasks"), where("userId", "==", user.uid), orderBy("createdAt", "desc")), snap => setGeneralTasks(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-      const unsubCourseTasks = onSnapshot(query(collection(db, "course_tasks"), where("userId", "==", user.uid)), snap => {
-        setCourseTasks(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-        setIsLoading(false);
-      });
+useEffect(() => {
+  const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
+    if (!user) return router.push("/Workspace");
+    setAuthUser(user);
+
+    let unsubFriends = () => {};
+
+    try {
+      // ✅ Set loading true at the start of each auth change
+      setIsLoading(true);
+
+      const userDoc = await getDoc(doc(db, "users", user.uid));
+      if (userDoc.exists()) {
+        const data = userDoc.data();
+
+        // ✅ Wipe broken blob URLs
+        if (data.avatarUrl?.startsWith("blob:")) {
+          await updateDoc(doc(db, "users", user.uid), { avatarUrl: "" });
+          data.avatarUrl = "";
+        }
+
+        setUserProfile(data);
+        setEditBio(data.bio || "");
+        setEditYearLevel(data.yearLevel || "1st Year");
+        setEditAvatarUrl(data.avatarUrl || "");
+        setEditCollege(data.college || "");
+
+        if (!data.hasSeenOnboarding || data.onboardingVersion !== "1.0") {
+          setShowOnboarding(true);
+        }
+
+        if (data.friends && data.friends.length > 0) {
+          const friendsQuery = query(
+            collection(db, "users"),
+            where(documentId(), "in", data.friends.slice(0, 10))
+          );
+          unsubFriends = onSnapshot(friendsQuery, (snap) =>
+            setFriendsList(snap.docs.map(d => ({ uid: d.id, ...d.data() })))
+          );
+        }
+      } else {
+        // ✅ User exists in Auth but not Firestore — handle gracefully
+        console.warn("User document not found in Firestore for uid:", user.uid);
+        setUserProfile({ fullName: user.displayName || "Scholar" });
+      }
+    } catch (err) {
+      // ✅ Don't leave the user stuck on the spinner if Firestore fails
+      console.error("Failed to load user profile:", err);
+      setUserProfile({ fullName: user.displayName || "Scholar" });
+    }
+
+    // ✅ Set up listeners AFTER profile is loaded
+    const unsubTasks = onSnapshot(
+      query(collection(db, "tasks"), where("userId", "==", user.uid), orderBy("createdAt", "desc")),
+      snap => setGeneralTasks(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    );
+
+    const unsubCourseTasks = onSnapshot(
+      query(collection(db, "course_tasks"), where("userId", "==", user.uid)),
+      snap => setCourseTasks(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    );
+
+    const unsubCourses = onSnapshot(
+      query(collection(db, "courses"), where("userId", "==", user.uid), orderBy("createdAt", "asc")),
+      snap => setCourses(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    );
+
+    // ✅ Loading is done after profile fetch — not dependent on snapshot timing
+    setIsLoading(false);
+
+    return () => {
+      unsubTasks();
+      unsubCourseTasks();
+      unsubCourses();
+      unsubFriends();
+    };
+  });
+
+  return () => unsubscribeAuth();
+}, [router]);
       const unsubCourses = onSnapshot(query(collection(db, "courses"), where("userId", "==", user.uid), orderBy("createdAt", "asc")), snap => setCourses(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
 
-      return () => { unsubTasks(); unsubCourseTasks(); unsubCourses(); unsubFriends(); };
+      return () => { unsubTasks(); unsubCourses(); unsubFriends(); };
     });
     return () => unsubscribeAuth();
   }, [router]);
@@ -443,8 +532,14 @@ const handleSaveProfile = async () => {
 
   const computedCourseGrades = useCourseAverages(courses, courseTasks);
 
-  if (isLoading) return <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-[#09090b]"><span className="w-12 h-12 rounded-full border-4 border-[#06402B]/30 border-t-[#06402B] animate-spin" /></div>;
-  const formattedDate = currentTime.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+  if (!authReady || isLoading) return (
+    <div className="fixed inset-0 flex flex-col items-center justify-center bg-zinc-50 dark:bg-[#09090b] gap-4">
+      <span className="w-12 h-12 rounded-full border-4 border-[#06402B]/30 border-t-[#06402B] animate-spin" />
+      <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
+        {!authReady ? "Restoring session…" : "Loading workspace…"}
+      </p>
+    </div>
+  );  const formattedDate = currentTime.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
   return (
     <div className="flex h-screen bg-zinc-50 dark:bg-[#09090b] font-sans text-zinc-900 dark:text-zinc-100 overflow-hidden relative transition-colors duration-300">
@@ -990,7 +1085,7 @@ const handleSaveProfile = async () => {
             {activeView === 'calendar' && (
               <motion.div key="cal" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="w-full max-w-7xl mx-auto">
                 <ErrorBoundary fallbackTitle="Calendar Error">
-                  <AcademicCalendar userTasks={allCalendarTasks} />
+                  <AcademicCalendar userTasks={allCalendarTasks} scheduleClasses={scheduleClasses} />
                 </ErrorBoundary>
               </motion.div>
             )}
@@ -1259,9 +1354,8 @@ const handleSaveProfile = async () => {
 />
 
     </div>
-  );
+   );
 }
-
 export default function DashboardClient() {
   return (
     <ModalProvider>
