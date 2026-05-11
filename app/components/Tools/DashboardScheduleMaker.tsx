@@ -450,8 +450,8 @@ function PasteScheduleModal({
             onClick={onClose} className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
           <motion.div initial={{ opacity: 0, scale: 0.95, y: 8 }} animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 8 }} transition={{ type: "spring", stiffness: 400, damping: 30 }}
-            className="relative w-full max-w-lg bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800 rounded-3xl p-5 sm:p-7 shadow-2xl z-10 flex flex-col gap-4 max-h-[85dvh] overflow-hidden">
-            {/* Header */}
+className="relative w-full max-w-lg bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800 rounded-[2rem] p-6 shadow-2xl z-10 flex flex-col gap-5 max-h-[85dvh] overflow-hidden"
+          >
             <div className="flex items-start justify-between gap-3 shrink-0">
               <div className="flex items-center gap-3">
                 <div className="w-11 h-11 rounded-2xl bg-[#06402B]/10 text-[#06402B] dark:text-emerald-400 flex items-center justify-center shrink-0">
@@ -488,7 +488,8 @@ function PasteScheduleModal({
                 />
               ) : (
                 /* Compact re-paste strip when preview is visible */
-                <div className="flex items-center gap-2 px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shrink-0">
+                <div className="flex items-center gap-2 px-4 py-2.5 bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-2xl shrink-0"
+>
                   <FaCalendarAlt size={10} className="text-zinc-400 shrink-0"/>
                   <p className="text-[10px] font-bold text-zinc-500 flex-1 truncate">
                     {text.length} chars pasted · {preview.length} classes found
@@ -512,11 +513,14 @@ function PasteScheduleModal({
 
               {/* Preview list — scrollable, fills remaining space */}
               {preview.length > 0 && (
-                <div className="flex-1 overflow-y-auto min-h-0 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50">
+                <div className="flex-1 overflow-y-auto min-h-0 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900"
+>
                   {/* Sticky header */}
-                  <div className="sticky top-0 flex items-center justify-between px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 z-10">
-                    <p className="text-[10px] font-black text-[#06402B] dark:text-emerald-400 uppercase tracking-widest">
-                      {preview.length} classes detected
+                  <div className="sticky top-0 flex items-center justify-between px-4 py-3 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm border-b border-zinc-100 dark:border-zinc-800 z-10 rounded-t-2xl"
+                  >
+                    <p className="text-[11px] font-black text-[#06402B] dark:text-emerald-400 uppercase tracking-widest flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#06402B] dark:bg-emerald-400 animate-pulse" />
+{preview.length} classes detected
                     </p>
                     <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest">Review before adding</span>
                   </div>
@@ -524,32 +528,33 @@ function PasteScheduleModal({
                     {preview.map((cls, i) => (
                       <div key={i} className="flex items-center gap-3 p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-[#06402B]/30 transition-colors">
                         {/* Color swatch */}
-                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-[9px] font-black shrink-0 border ${cls.color}`}>
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-[10px] font-black shrink-0 border-2 shadow-sm ${cls.color}`}
+                        >
                           {cls.code.slice(0,2)}
                         </div>
                         {/* Info */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 min-w-0">
-                            <p className="text-xs font-black text-zinc-800 dark:text-zinc-200 truncate">{cls.code}</p>
-                            {cls.days.length > 0 && (
-                              <span className="shrink-0 text-[9px] font-black text-zinc-500 bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded-md font-mono">
-                                {formatDays(cls.days)}
-                              </span>
-                            )}
+<p className="text-sm font-black text-zinc-900 dark:text-white leading-none">{cls.code}</p>
+{cls.days.length > 0 && (
+  <span className="shrink-0 text-[9px] font-black text-[#06402B] dark:text-emerald-400 bg-[#06402B]/8 dark:bg-emerald-500/10 px-2 py-0.5 rounded-lg font-mono tracking-wider border border-[#06402B]/10 dark:border-emerald-500/20">
+    {formatDays(cls.days)}
+  </span>
+)}
                           </div>
-                          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                            <span className="text-[10px] font-medium text-zinc-400 truncate">{cls.name}</span>
-                            {cls.startTime && (
-                              <span className="text-[9px] font-mono text-zinc-400 shrink-0">
-                                {fmt12(cls.startTime)}–{fmt12(cls.endTime)}
-                              </span>
-                            )}
-                            {cls.room && (
-                              <span className="text-[9px] font-mono text-zinc-400 flex items-center gap-0.5 shrink-0">
-                                <FaDoorOpen size={7}/>{cls.room}
-                              </span>
-                            )}
-                          </div>
+                          <span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 truncate">{cls.name}</span>
+<div className="flex items-center gap-2 flex-wrap mt-0.5">
+  {cls.startTime && (
+    <span className="text-[10px] font-mono font-bold text-zinc-400 dark:text-zinc-500">
+      {fmt12(cls.startTime)} — {fmt12(cls.endTime)}
+    </span>
+  )}
+  {cls.room && (
+    <span className="text-[10px] font-mono text-zinc-400 dark:text-zinc-500 flex items-center gap-1">
+      <FaDoorOpen size={8} className="opacity-60"/>{cls.room}
+    </span>
+  )}
+</div>
                         </div>
                       </div>
                     ))}
@@ -558,9 +563,9 @@ function PasteScheduleModal({
               )}
             </div>
 {/* Footer buttons */}
-            <div className="flex gap-2.5 shrink-0">
+            <div className="flex gap-3 shrink-0 pt-1">
               <button onClick={onClose}
-                className="flex-1 py-3 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">
+               className="flex-1 py-3.5 bg-zinc-100 dark:bg-zinc-800/80 text-zinc-600 dark:text-zinc-300 rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all active:scale-95">
                 Cancel
               </button>
               {preview.length === 0 ? (
@@ -570,7 +575,8 @@ function PasteScheduleModal({
                 </button>
               ) : (
                 <button onClick={() => { onImport(preview); onClose(); }}
-                  className="flex-1 py-3 bg-[#06402B] dark:bg-emerald-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-[#0a5a38] dark:hover:bg-emerald-500 shadow-md transition-all flex items-center justify-center gap-2">
+                  className="flex-1 py-3.5 bg-[#06402B] dark:bg-emerald-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-[#0a5a38] dark:hover:bg-emerald-500 shadow-lg shadow-[#06402B]/20 transition-all active:scale-95 flex items-center justify-center gap-2"
+>
                   <FaCheckCircle size={12}/> Add {preview.length} Class{preview.length !== 1 ? "es" : ""}
                 </button>
               )}
