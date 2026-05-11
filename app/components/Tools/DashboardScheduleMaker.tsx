@@ -372,6 +372,215 @@ function SaveIndicator({ savedAt }: { savedAt: number | null }) {
   );
 }
 
+function PasteScheduleModal({
+  isOpen, onClose, onImport,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onImport: (classes: ClassSession[]) => void;
+}) {
+  const [text, setText] = useState("");
+  const [preview, setPreview] = useState<ClassSession[]>([]);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!isOpen) { setText(""); setPreview([]); setError(""); }
+  }, [isOpen]);
+
+  const DAY_MAP: Record<string, Day[]> = {
+    'M':['M'],'T':['T'],'W':['W'],'TH':['Th'],'F':['F'],'S':['S'],
+    'MT':['M','T'],'MW':['M','W'],'MF':['M','F'],
+    'TTH':['T','Th'],'TF':['T','F'],'WF':['W','F'],
+    'MWF':['M','W','F'],'MTWTHF':['M','T','W','Th','F'],
+  };
+
+  const toTime = (t: string) => `${t.slice(0,2)}:${t.slice(2,4)}`;
+
+  const parse = (raw: string): ClassSession[] => {
+    const results: ClassSession[] = [];
+    const seen = new Set<string>();
+    const blockRegex = /([A-Z]{2,}\d{2,}[A-Z]?)\s*\n\s*([^\n]+)\s*\n\s*([^\n]*?)\s*-\s*([A-Z]{1,6})(\d{4})-(\d{4})/gm;
+    let match;
+    while ((match = blockRegex.exec(raw)) !== null) {
+      const code = match[1].trim();
+      const section = match[2].trim();
+      const roomPart = match[3].replace(/^-\s*/, '').trim();
+      const dayStr = match[4].toUpperCase();
+      const startTime = toTime(match[5]);
+      const endTime = toTime(match[6]);
+      const key = `${code}-${dayStr}-${startTime}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const days: Day[] = DAY_MAP[dayStr] || [];
+      results.push({
+        id: `paste-${Date.now()}-${results.length}`,
+        code, name: section,
+        room: roomPart === '-' || roomPart === '' ? '' : roomPart,
+        days, startTime, endTime,
+        color: PASTEL_COLORS[results.length % PASTEL_COLORS.length],
+      });
+    }
+    return results;
+  };
+
+  const handleParse = () => {
+    setError("");
+    const parsed = parse(text);
+    if (parsed.length === 0) {
+      setError("No classes detected. Make sure you copied the full schedule table including course codes, sections, and time patterns like MW0730-0930.");
+      setPreview([]);
+    } else {
+      setPreview(parsed);
+    }
+  };
+
+  const formatDays = (days: Day[]) => days.join('·');
+  const fmt12 = (t: string) => {
+    if (!t) return '';
+    const [h, m] = t.split(':').map(Number);
+    return `${h % 12 || 12}:${m.toString().padStart(2,'0')} ${h >= 12 ? 'PM' : 'AM'}`;
+  };
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onClick={onClose} className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <motion.div initial={{ opacity: 0, scale: 0.95, y: 8 }} animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 8 }} transition={{ type: "spring", stiffness: 400, damping: 30 }}
+            className="relative w-full max-w-lg bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800 rounded-3xl p-5 sm:p-7 shadow-2xl z-10 flex flex-col gap-4 max-h-[85dvh] overflow-hidden">
+            {/* Header */}
+            <div className="flex items-start justify-between gap-3 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-[#06402B]/10 text-[#06402B] dark:text-emerald-400 flex items-center justify-center shrink-0">
+                  <FaCalendarAlt size={17} />
+                </div>
+                <div>
+                  <h3 className="text-base font-black uppercase tracking-tight text-zinc-900 dark:text-white leading-none">Paste Schedule</h3>
+                  <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mt-0.5">Auto-parse from your enrollment sheet</p>
+                </div>
+              </div>
+              <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors p-1"><FaTimes size={14} /></button>
+            </div>
+
+{/* Two-panel layout: paste area OR preview */}
+            <div className="flex-1 min-h-0 flex flex-col gap-3 overflow-hidden">
+
+              {/* Instructions — hidden once preview is showing to save space */}
+              {preview.length === 0 && (
+                <div className="bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 shrink-0">
+                  <p className="text-[11px] text-zinc-500 dark:text-zinc-400 font-semibold leading-relaxed">
+                    Copy your <span className="font-black text-zinc-700 dark:text-zinc-200">Weekly Schedule</span> from your enrollment system and paste below. Course codes, rooms, days and times will be extracted automatically.
+                  </p>
+                </div>
+              )}
+
+              {/* Textarea — shrinks when preview is shown */}
+              {preview.length === 0 ? (
+                <textarea
+                  value={text}
+                  onChange={e => { setText(e.target.value); setPreview([]); setError(""); }}
+                  placeholder={"Paste your schedule here...\n\nExample:\nCORE104\nBSCS2A\nRM506 - MW0730-0930"}
+                  rows={7}
+                  className="flex-1 w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 text-xs font-mono text-zinc-700 dark:text-zinc-300 outline-none focus:border-[#06402B] dark:focus:border-emerald-500 resize-none"
+                />
+              ) : (
+                /* Compact re-paste strip when preview is visible */
+                <div className="flex items-center gap-2 px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shrink-0">
+                  <FaCalendarAlt size={10} className="text-zinc-400 shrink-0"/>
+                  <p className="text-[10px] font-bold text-zinc-500 flex-1 truncate">
+                    {text.length} chars pasted · {preview.length} classes found
+                  </p>
+                  <button
+                    onClick={() => { setPreview([]); setError(""); }}
+                    className="text-[9px] font-black text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300 uppercase tracking-widest shrink-0 transition-colors"
+                  >
+                    Re-paste
+                  </button>
+                </div>
+              )}
+
+              {/* Error */}
+              {error && (
+                <div className="flex items-start gap-2 px-3 py-2.5 bg-red-500/10 border border-red-500/20 rounded-xl shrink-0">
+                  <FaExclamationTriangle size={11} className="text-red-500 mt-0.5 shrink-0"/>
+                  <p className="text-[11px] font-bold text-red-500 leading-relaxed">{error}</p>
+                </div>
+              )}
+
+              {/* Preview list — scrollable, fills remaining space */}
+              {preview.length > 0 && (
+                <div className="flex-1 overflow-y-auto min-h-0 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50">
+                  {/* Sticky header */}
+                  <div className="sticky top-0 flex items-center justify-between px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 z-10">
+                    <p className="text-[10px] font-black text-[#06402B] dark:text-emerald-400 uppercase tracking-widest">
+                      {preview.length} classes detected
+                    </p>
+                    <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest">Review before adding</span>
+                  </div>
+                  <div className="p-2 space-y-1.5">
+                    {preview.map((cls, i) => (
+                      <div key={i} className="flex items-center gap-3 p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-[#06402B]/30 transition-colors">
+                        {/* Color swatch */}
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-[9px] font-black shrink-0 border ${cls.color}`}>
+                          {cls.code.slice(0,2)}
+                        </div>
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <p className="text-xs font-black text-zinc-800 dark:text-zinc-200 truncate">{cls.code}</p>
+                            {cls.days.length > 0 && (
+                              <span className="shrink-0 text-[9px] font-black text-zinc-500 bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded-md font-mono">
+                                {formatDays(cls.days)}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                            <span className="text-[10px] font-medium text-zinc-400 truncate">{cls.name}</span>
+                            {cls.startTime && (
+                              <span className="text-[9px] font-mono text-zinc-400 shrink-0">
+                                {fmt12(cls.startTime)}–{fmt12(cls.endTime)}
+                              </span>
+                            )}
+                            {cls.room && (
+                              <span className="text-[9px] font-mono text-zinc-400 flex items-center gap-0.5 shrink-0">
+                                <FaDoorOpen size={7}/>{cls.room}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+{/* Footer buttons */}
+            <div className="flex gap-2.5 shrink-0">
+              <button onClick={onClose}
+                className="flex-1 py-3 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">
+                Cancel
+              </button>
+              {preview.length === 0 ? (
+                <button onClick={handleParse} disabled={!text.trim()}
+                  className="flex-1 py-3 bg-[#06402B] dark:bg-emerald-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest disabled:opacity-40 hover:bg-[#0a5a38] dark:hover:bg-emerald-500 shadow-md transition-all">
+                  Parse Schedule
+                </button>
+              ) : (
+                <button onClick={() => { onImport(preview); onClose(); }}
+                  className="flex-1 py-3 bg-[#06402B] dark:bg-emerald-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-[#0a5a38] dark:hover:bg-emerald-500 shadow-md transition-all flex items-center justify-center gap-2">
+                  <FaCheckCircle size={12}/> Add {preview.length} Class{preview.length !== 1 ? "es" : ""}
+                </button>
+              )}
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
+  );
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function DashboardScheduleMaker({ trackerCourses = [], onCoursesExported }: DashboardScheduleMakerProps) {
   const { showAlert, showConfirm } = useModal();
@@ -395,6 +604,10 @@ export default function DashboardScheduleMaker({ trackerCourses = [], onCoursesE
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [showPasteModal, setShowPasteModal] = useState(false);
+const [pasteText, setPasteText] = useState("");
+const [parsePreview, setParsePreview] = useState<ClassSession[]>([]);
+const [parsError, setParsError] = useState("");
 
   // ── Hydrate ──────────────────────────────────────────────
   useEffect(() => {
@@ -634,6 +847,67 @@ export default function DashboardScheduleMaker({ trackerCourses = [], onCoursesE
     </div>
   );
 
+  const parseScheduleText = (text: string): ClassSession[] => {
+  const results: ClassSession[] = [];
+  const seen = new Set<string>();
+
+  // Pattern: COURSECODE\nSECTION\nRM... - DAYS TIME-TIME  or  - - DAYS TIME-TIME
+  const blockRegex = /([A-Z]{2,}\d{2,}[A-Z]?)\s*\n\s*([A-Z0-9]+)\s*\n\s*(.+?)\s*-\s*([A-Z]{1,6})(\d{4})-(\d{4})/gm;
+
+  const DAY_MAP: Record<string, Day[]> = {
+    'M':   ['M'],
+    'T':   ['T'],
+    'W':   ['W'],
+    'TH':  ['Th'],
+    'F':   ['F'],
+    'S':   ['S'],
+    'MT':  ['M','T'],
+    'MW':  ['M','W'],
+    'MF':  ['M','F'],
+    'TTH': ['T','Th'],
+    'TF':  ['T','F'],
+    'WF':  ['W','F'],
+    'MWF': ['M','W','F'],
+    'MTWTHF': ['M','T','W','Th','F'],
+  };
+
+  const toTime = (t: string) => {
+    const h = t.slice(0, 2);
+    const m = t.slice(2, 4);
+    return `${h}:${m}`;
+  };
+
+  let match;
+  while ((match = blockRegex.exec(text)) !== null) {
+    const code = match[1].trim();
+    const section = match[2].trim();
+    const roomPart = match[3].trim();
+    const dayStr = match[4].toUpperCase();
+    const startTime = toTime(match[5]);
+    const endTime = toTime(match[6]);
+
+    const key = `${code}-${dayStr}-${startTime}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    const days: Day[] = DAY_MAP[dayStr] || [];
+    const room = roomPart.replace(/^-\s*/, '').trim();
+
+    results.push({
+      id: `paste-${Date.now()}-${results.length}`,
+      code,
+      name: section,
+      room: room === '-' ? '' : room,
+      days,
+      startTime,
+      endTime,
+      color: PASTEL_COLORS[results.length % PASTEL_COLORS.length],
+    });
+  }
+
+  return results;
+};
+
   // ==========================================
   // VIEW: EDITOR
   // ==========================================
@@ -654,6 +928,12 @@ export default function DashboardScheduleMaker({ trackerCourses = [], onCoursesE
           existingTitles={trackerCourses.map(c => c.title)}
           onExport={handleExportToTracker}
         />
+        {/* In the editor JSX, alongside ImportTrackerModal */}
+<PasteScheduleModal
+  isOpen={showPasteModal}
+  onClose={() => setShowPasteModal(false)}
+  onImport={(parsed) => setClasses(prev => [...prev, ...parsed])}
+/>
 
         {/* Header Block */}
         <div className="bg-white/40 dark:bg-zinc-900/40 backdrop-blur-xl border border-zinc-200 dark:border-zinc-800 rounded-[2rem] p-5 sm:p-6 md:p-8 shadow-xl flex flex-col lg:flex-row justify-between gap-6 relative overflow-hidden transition-colors duration-300">
@@ -674,7 +954,13 @@ export default function DashboardScheduleMaker({ trackerCourses = [], onCoursesE
                   className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 bg-[#06402B]/10 dark:bg-emerald-500/10 border border-[#06402B]/20 dark:border-emerald-500/20 rounded-xl text-[10px] sm:text-xs font-bold uppercase tracking-widest text-[#06402B] dark:text-emerald-400 hover:bg-[#06402B]/20 dark:hover:bg-emerald-500/20 transition-colors">
                   <FaBook size={10} /> Import from Tracker ({trackerCourses.length})
                 </button>
+                
               )}
+              {/* Button in the header, alongside Import from Tracker */}
+<button onClick={() => setShowPasteModal(true)}
+  className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-[10px] sm:text-xs font-bold uppercase tracking-widest text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">
+  <FaCalendarAlt size={10} /> Paste Schedule
+</button>
               {/* ← NEW: Export to Tracker button */}
               {classes.length > 0 && (
                 <button onClick={() => setShowExportModal(true)}

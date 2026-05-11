@@ -291,9 +291,23 @@ useEffect(() => {
     // DO NOT call setOffline() here — React 18 strict mode fires cleanup constantly
   };
 }, [authUser]);
-  useEffect(() => {
+useEffect(() => {
+    let unsubFriends = () => {};
+    let unsubTasks = () => {};
+    let unsubCourseTasks = () => {};
+    let unsubCourses = () => {};
+
+    const safetyTimer = setTimeout(() => {
+      setIsLoading(false);
+      setAuthReady(true);
+    }, 8000);
+
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
-      if (!user) return router.push("/Workspace");
+      if (!user) { clearTimeout(safetyTimer); }
+      if (!user) {
+        setAuthReady(true); // ← unblock the loading screen even when redirecting
+        return router.push("/Workspace");
+      }
       setAuthUser(user);
       
       let unsubFriends = () => {}; 
@@ -323,96 +337,42 @@ if (userDoc.exists()) {
             unsubFriends = onSnapshot(friendsQuery, (snap) => setFriendsList(snap.docs.map(d => ({ uid: d.id, ...d.data() }))));
           }
         }
-      } catch (err) {}
-
-      const unsubTasks = onSnapshot(query(collection(db, "tasks"), where("userId", "==", user.uid), orderBy("createdAt", "desc")), snap => setGeneralTasks(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-useEffect(() => {
-  const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
-    if (!user) return router.push("/Workspace");
-    setAuthUser(user);
-
-    let unsubFriends = () => {};
-
-    try {
-      // ✅ Set loading true at the start of each auth change
-      setIsLoading(true);
-
-      const userDoc = await getDoc(doc(db, "users", user.uid));
-      if (userDoc.exists()) {
-        const data = userDoc.data();
-
-        // ✅ Wipe broken blob URLs
-        if (data.avatarUrl?.startsWith("blob:")) {
-          await updateDoc(doc(db, "users", user.uid), { avatarUrl: "" });
-          data.avatarUrl = "";
-        }
-
-        setUserProfile(data);
-        setEditBio(data.bio || "");
-        setEditYearLevel(data.yearLevel || "1st Year");
-        setEditAvatarUrl(data.avatarUrl || "");
-        setEditCollege(data.college || "");
-
-        if (!data.hasSeenOnboarding || data.onboardingVersion !== "1.0") {
-          setShowOnboarding(true);
-        }
-
-        if (data.friends && data.friends.length > 0) {
-          const friendsQuery = query(
-            collection(db, "users"),
-            where(documentId(), "in", data.friends.slice(0, 10))
-          );
-          unsubFriends = onSnapshot(friendsQuery, (snap) =>
-            setFriendsList(snap.docs.map(d => ({ uid: d.id, ...d.data() })))
-          );
-        }
-      } else {
-        // ✅ User exists in Auth but not Firestore — handle gracefully
-        console.warn("User document not found in Firestore for uid:", user.uid);
+        } catch (err) {
+        console.error("Failed to load user profile:", err);
         setUserProfile({ fullName: user.displayName || "Scholar" });
+} finally {
+        clearTimeout(safetyTimer);
+        setIsLoading(false);
+        setAuthReady(true);
       }
-    } catch (err) {
-      // ✅ Don't leave the user stuck on the spinner if Firestore fails
-      console.error("Failed to load user profile:", err);
-      setUserProfile({ fullName: user.displayName || "Scholar" });
-    }
 
-    // ✅ Set up listeners AFTER profile is loaded
-    const unsubTasks = onSnapshot(
-      query(collection(db, "tasks"), where("userId", "==", user.uid), orderBy("createdAt", "desc")),
-      snap => setGeneralTasks(snap.docs.map(d => ({ id: d.id, ...d.data() })))
-    );
+unsubTasks = onSnapshot(
+        query(collection(db, "tasks"), where("userId", "==", user.uid), orderBy("createdAt", "desc")),
+        snap => setGeneralTasks(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+        err => console.error("tasks error:", err)
+      );
 
-    const unsubCourseTasks = onSnapshot(
-      query(collection(db, "course_tasks"), where("userId", "==", user.uid)),
-      snap => setCourseTasks(snap.docs.map(d => ({ id: d.id, ...d.data() })))
-    );
+      unsubCourseTasks = onSnapshot(
+        query(collection(db, "course_tasks"), where("userId", "==", user.uid)),
+        snap => setCourseTasks(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+        err => console.error("course_tasks error:", err)
+      );
 
-    const unsubCourses = onSnapshot(
-      query(collection(db, "courses"), where("userId", "==", user.uid), orderBy("createdAt", "asc")),
-      snap => setCourses(snap.docs.map(d => ({ id: d.id, ...d.data() })))
-    );
-
-    // ✅ Loading is done after profile fetch — not dependent on snapshot timing
-    setIsLoading(false);
-
-    return () => {
+      unsubCourses = onSnapshot(
+        query(collection(db, "courses"), where("userId", "==", user.uid), orderBy("createdAt", "asc")),
+        snap => setCourses(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+        err => console.error("courses error:", err)
+      );
+    });
+return () => {
+      clearTimeout(safetyTimer);
+      unsubscribeAuth();
+      unsubFriends();
       unsubTasks();
       unsubCourseTasks();
       unsubCourses();
-      unsubFriends();
     };
-  });
-
-  return () => unsubscribeAuth();
-}, [router]);
-      const unsubCourses = onSnapshot(query(collection(db, "courses"), where("userId", "==", user.uid), orderBy("createdAt", "asc")), snap => setCourses(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-
-      return () => { unsubTasks(); unsubCourses(); unsubFriends(); };
-    });
-    return () => unsubscribeAuth();
   }, [router]);
-
   const handleAddGeneralTask = async (title: string, deadline: string) => {
     if (!authUser) return;
     await addDoc(collection(db, "tasks"), { userId: authUser.uid, title, status: "pending", deadline, createdAt: serverTimestamp() });
@@ -532,14 +492,12 @@ const handleSaveProfile = async () => {
 
   const computedCourseGrades = useCourseAverages(courses, courseTasks);
 
-  if (!authReady || isLoading) return (
+ if (isLoading) return (
     <div className="fixed inset-0 flex flex-col items-center justify-center bg-zinc-50 dark:bg-[#09090b] gap-4">
       <span className="w-12 h-12 rounded-full border-4 border-[#06402B]/30 border-t-[#06402B] animate-spin" />
-      <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
-        {!authReady ? "Restoring session…" : "Loading workspace…"}
-      </p>
+      <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Loading workspace…</p>
     </div>
-  );  const formattedDate = currentTime.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+  ); const formattedDate = currentTime.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
   return (
     <div className="flex h-screen bg-zinc-50 dark:bg-[#09090b] font-sans text-zinc-900 dark:text-zinc-100 overflow-hidden relative transition-colors duration-300">
