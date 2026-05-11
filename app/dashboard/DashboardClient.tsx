@@ -142,6 +142,7 @@ function DashboardInner() {
 const [defaultCourseId, setDefaultCourseId] = useState<string | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [scheduleClasses, setScheduleClasses] = useState<any[]>([]);
+  const [networkBlocked, setNetworkBlocked] = useState(false);
 
   useEffect(() => {
     try {
@@ -300,6 +301,10 @@ useEffect(() => {
     const safetyTimer = setTimeout(() => {
       setIsLoading(false);
       setAuthReady(true);
+      // Show network warning if still not logged in after 8s
+      if (!authUser) {
+        setNetworkBlocked(true);
+      }
     }, 8000);
 
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
@@ -492,12 +497,49 @@ const handleSaveProfile = async () => {
 
   const computedCourseGrades = useCourseAverages(courses, courseTasks);
 
- if (isLoading) return (
-    <div className="fixed inset-0 flex flex-col items-center justify-center bg-zinc-50 dark:bg-[#09090b] gap-4">
-      <span className="w-12 h-12 rounded-full border-4 border-[#06402B]/30 border-t-[#06402B] animate-spin" />
-      <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Loading workspace…</p>
+  if (isLoading) return (
+    <div className="fixed inset-0 flex flex-col items-center justify-center bg-zinc-50 dark:bg-[#09090b] gap-4 px-6">
+      {!networkBlocked ? (
+        <>
+          <span className="w-12 h-12 rounded-full border-4 border-[#06402B]/30 border-t-[#06402B] animate-spin"/>
+          <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Loading workspace…</p>
+        </>
+      ) : (
+        <div className="max-w-sm w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8 shadow-2xl flex flex-col items-center gap-4 text-center">
+          <div className="w-14 h-14 bg-amber-500/10 rounded-2xl flex items-center justify-center">
+            <span className="text-2xl">🔒</span>
+          </div>
+          <div>
+            <h2 className="text-base font-black text-zinc-900 dark:text-white uppercase tracking-tight">Network Restricted</h2>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-2 leading-relaxed">
+              Your current network is blocking Google services. Try one of these:
+            </p>
+          </div>
+          <div className="w-full space-y-2 text-left">
+            {[
+              { icon: "📱", label: "Switch to mobile data", sub: "Most reliable fix" },
+              { icon: "🔄", label: "Use Cloudflare WARP", sub: "Free app — 1.1.1.1" },
+              { icon: "🌐", label: "Try a VPN browser extension", sub: "Windscribe or ProtonVPN" },
+            ].map(item => (
+              <div key={item.label} className="flex items-start gap-3 p-3 bg-zinc-50 dark:bg-zinc-800 rounded-xl">
+                <span className="text-lg shrink-0">{item.icon}</span>
+                <div>
+                  <p className="text-xs font-black text-zinc-800 dark:text-zinc-200">{item.label}</p>
+                  <p className="text-[10px] text-zinc-400 font-medium">{item.sub}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+          <button
+            onClick={() => { setNetworkBlocked(false); setIsLoading(true); window.location.reload(); }}
+            className="w-full py-3 bg-[#06402B] text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-[#042d1f] transition-colors"
+          >
+            Try Again
+          </button>
+        </div>
+      )}
     </div>
-  ); const formattedDate = currentTime.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+  );const formattedDate = currentTime.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
   return (
     <div className="flex h-screen bg-zinc-50 dark:bg-[#09090b] font-sans text-zinc-900 dark:text-zinc-100 overflow-hidden relative transition-colors duration-300">

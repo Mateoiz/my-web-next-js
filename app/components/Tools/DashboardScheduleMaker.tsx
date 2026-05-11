@@ -10,8 +10,9 @@ import {
 } from "react-icons/fa";
 import { useModal } from "../../context/ModalContext";
 import {
-  collection, addDoc, serverTimestamp, getDocs, query, where
+  collection, addDoc, serverTimestamp, getDocs, query, where, doc, setDoc, getDoc
 } from "firebase/firestore";
+
 import { auth, db } from "@/lib/db";
 
 type Day = 'M' | 'T' | 'W' | 'Th' | 'F' | 'S';
@@ -610,35 +611,102 @@ const [parsePreview, setParsePreview] = useState<ClassSession[]>([]);
 const [parsError, setParsError] = useState("");
 
   // ── Hydrate ──────────────────────────────────────────────
+// ── Hydrate — Firestore first, localStorage fallback ─────
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed: PersistedState = JSON.parse(raw);
-        setClassesRaw((parsed.classes || []).map(c => ({ ...c, room: '' })));
-        setTermNameRaw(parsed.termName || "2nd Term, A.Y. 2025-2026");
-        setActiveTheme(parsed.activeTheme || 'light');
-        setFormat(parsed.format || 'desktop');
-        setSavedAt(parsed.savedAt || null);
-      } else {
+    const load = async () => {
+      let loaded = false;
+
+      // 1. Try Firestore first (works across devices)
+      try {
+        const uid = auth.currentUser?.uid;
+        if (uid) {
+          const snap = await getDoc(doc(db, "schedules", uid));
+          if (snap.exists()) {
+            const data = snap.data();
+            // Use Firestore data if it's newer than localStorage
+            const localRaw = localStorage.getItem(STORAGE_KEY);
+            const localSavedAt = localRaw ? (JSON.parse(localRaw).savedAt || 0) : 0;
+            const remoteSavedAt = data.savedAt || 0;
+
+            if (remoteSavedAt >= localSavedAt) {
+setClassesRaw((data.classes || []).map((c: ClassSession) => ({ ...c, room: c.room ?? '' })));
+              setTermNameRaw(data.termName || "2nd Term, A.Y. 2025-2026");
+              setActiveTheme(data.activeTheme || 'light');
+              setFormat(data.format || 'desktop');
+              setSavedAt(data.savedAt || null);
+              // Sync localStorage with Firestore data
+              try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...data })); } catch { /* ignore */ }
+              loaded = true;
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("Firestore schedule load failed, falling back to localStorage:", err);
+      }
+
+      // 2. Fall back to localStorage if Firestore had nothing or failed
+      if (!loaded) {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (raw) {
+            const parsed: PersistedState = JSON.parse(raw);
+            setClassesRaw((parsed.classes || []).map(c => ({ ...c, room: c.room ?? '' })));
+            setTermNameRaw(parsed.termName || "2nd Term, A.Y. 2025-2026");
+            setActiveTheme(parsed.activeTheme || 'light');
+            setFormat(parsed.format || 'desktop');
+            setSavedAt(parsed.savedAt || null);
+            loaded = true;
+          }
+        } catch { /* ignore */ }
+      }
+
+      // 3. Neither had data — show defaults
+      if (!loaded) {
         setClassesRaw([
           { id: '1', code: 'CS101', name: 'Intro to Computing', room: 'GK-101', days: ['M', 'W'], startTime: '08:00', endTime: '09:30', color: PASTEL_COLORS[3] },
           { id: '2', code: 'MATH20', name: 'Discrete Mathematics', room: 'AGN-301', days: ['T', 'Th'], startTime: '10:00', endTime: '12:00', color: PASTEL_COLORS[6] }
         ]);
       }
-    } catch { /* ignore */ }
-    setHydrated(true);
+
+      setHydrated(true);
+    };
+
+    // Wait for auth to be ready before loading
+    const unsub = auth.onAuthStateChanged(() => {
+      load();
+      unsub(); // only run once
+    });
   }, []);
 
   // ── Persist ──────────────────────────────────────────────
-  const persist = useCallback((cls: ClassSession[], name: string, theme: ThemeMode, fmt: FormatMode) => {
+const persist = useCallback((cls: ClassSession[], name: string, theme: ThemeMode, fmt: FormatMode) => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(() => {
+    saveTimerRef.current = setTimeout(async () => {
+      const now = Date.now();
+      const state: PersistedState = { classes: cls, termName: name, activeTheme: theme, format: fmt, savedAt: now };
+
+      // Always save to localStorage as fast local cache
       try {
-        const state: PersistedState = { classes: cls, termName: name, activeTheme: theme, format: fmt, savedAt: Date.now() };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-        setSavedAt(state.savedAt);
+        setSavedAt(now);
       } catch { /* quota */ }
+
+      // Also save to Firestore if logged in
+      try {
+        const uid = auth.currentUser?.uid;
+        if (uid) {
+          await setDoc(doc(db, "schedules", uid), {
+            classes: cls,
+            termName: name,
+            activeTheme: theme,
+            format: fmt,
+            savedAt: now,
+            updatedAt: serverTimestamp(),
+          });
+        }
+      } catch (err) {
+        console.warn("Firestore schedule save failed:", err);
+      }
     }, 800);
   }, []);
 

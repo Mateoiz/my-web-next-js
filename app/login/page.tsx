@@ -4,6 +4,7 @@ import { useState, Suspense, useRef } from "react";
 import { signInWithEmailAndPassword, signInWithPopup, EmailAuthProvider, linkWithCredential } from "firebase/auth";
 import { collection, query, where, getDocs, doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { auth, db, googleProvider } from "@/lib/db";
+import { smartSignIn } from "@/lib/authWithFallback";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
@@ -151,7 +152,7 @@ function AuthForm() {
   };
 
   // ── Login ──────────────────────────────────────────────────────────────────
-  const handleLogin = async (e: React.FormEvent) => {
+const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
@@ -159,7 +160,9 @@ function AuthForm() {
       const q = query(collection(db, "users"), where("username", "==", username.trim().toLowerCase()));
       const snap = await getDocs(q);
       if (snap.empty) throw new Error("Username not found.");
-      await signInWithEmailAndPassword(auth, snap.docs[0].data().email, password);
+      const email = snap.docs[0].data().email;
+      const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY!;
+      await smartSignIn(auth, email, password, apiKey);
       router.push(redirectTo);
     } catch (err: any) {
       setError(err.message === "Username not found." ? err.message : "Invalid credentials. Access denied.");
