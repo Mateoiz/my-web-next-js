@@ -23,7 +23,6 @@ import { auth, db, storage } from "@/lib/db";
 import FloatingCubes from "../components/FloatingCubes"; 
 import CommandCenter from "../components/Layout/CommandCenter";
 import ErrorBoundary from "../components/ErrorBoundary";
-import PatchNotes from "../components/PatchNotes";
 
 // --- SAFE DYNAMIC IMPORTS ---
 const DashboardScheduleMaker = dynamic(() => import('../components/Tools/DashboardScheduleMaker'), { ssr: false });
@@ -55,6 +54,30 @@ const NAV_ITEMS = [
   { id: 'settings', icon: <FaCog size={20} />, label: "Settings" },
    
 ];
+function isUserOnline(user: any): boolean {
+  if (user?.isOnline === true) {
+    if (user?.lastSeen) {
+      const lastSeenMs = user.lastSeen?.toMillis?.() ?? new Date(user.lastSeen).getTime();
+      return Date.now() - lastSeenMs < 5 * 60 * 1000;
+    }
+    return true;
+  }
+  return false;
+}
+
+function getLastSeen(user: any): string {
+  if (!user?.lastSeen) return "Offline";
+  const lastSeenMs = user.lastSeen?.toMillis?.() ?? new Date(user.lastSeen).getTime();
+  const diff = Date.now() - lastSeenMs;
+  const mins = Math.floor(diff / 60_000);
+  const hrs  = Math.floor(diff / 3_600_000);
+  const days = Math.floor(diff / 86_400_000);
+  if (mins < 2)  return "Just now";
+  if (mins < 60) return `${mins}m ago`;
+  if (hrs < 24)  return `${hrs}h ago`;
+  if (days < 7)  return `${days}d ago`;
+  return "A while ago";
+}
 
 // ==========================================
 // THE ACADEMIC ENGINE HOOK
@@ -122,6 +145,12 @@ function DashboardInner() {
   
   const [isQueueOpen, setIsQueueOpen] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [, setPresenceTick] = useState(0);
+
+  useEffect(() => {
+    const id = setInterval(() => setPresenceTick(t => t + 1), 30_000);
+    return () => clearInterval(id);
+  }, []);
 
   const [generalTasks, setGeneralTasks] = useState<any[]>([]);
   const [courseTasks, setCourseTasks] = useState<any[]>([]);
@@ -608,8 +637,6 @@ const handleSaveProfile = async () => {
           />
         )}
       </AnimatePresence>
-
-    <PatchNotes />
       <div className="absolute inset-0 z-0 pointer-events-none">
         <div className="absolute inset-0 opacity-30 sm:opacity-60"><FloatingCubes /></div>
         <div className="absolute top-[10%] left-[20%] w-[300px] md:w-[500px] h-[300px] md:h-[500px] bg-[#06402B]/10 dark:bg-emerald-500/5 rounded-full blur-[100px] md:blur-[150px]" />
@@ -719,7 +746,7 @@ const handleSaveProfile = async () => {
     {userProfile?.avatarUrl
       ? <Image src={userProfile.avatarUrl} alt="Avatar" fill sizes="40px" className="object-cover" />
       : <span className="font-bold text-sm">{userProfile?.fullName?.charAt(0) || "U"}</span>}
-    <div className="absolute top-0 right-0 w-2 h-2 md:w-2.5 md:h-2.5 bg-green-500 rounded-full border-2 border-white dark:border-[#09090b] z-10" />
+        <div className={`absolute top-0 right-0 w-2 h-2 md:w-2.5 md:h-2.5 rounded-full border-2 border-white dark:border-[#09090b] z-10 ${isUserOnline(userProfile) ? "bg-emerald-500" : "bg-zinc-400 dark:bg-zinc-600"}`} />
   </div>
 {userProfile?.college && COLLEGE_LOGOS[userProfile.college] && (
   <motion.div
@@ -1015,7 +1042,8 @@ const handleSaveProfile = async () => {
       <div className="flex flex-col gap-4">
 
         {/* Friends online strip — only if there are online friends */}
-        {friendsList.filter(f => f.isOnline).length > 0 && (
+                {friendsList.filter(f => isUserOnline(f)).length > 0 && (
+
           <div
             onClick={() => { setActiveView("studyhub"); setStudyTab("lounge"); }}
             className="bg-white/60 dark:bg-[#121214]/80 backdrop-blur-xl rounded-[1.5rem] border border-zinc-200 dark:border-zinc-800/80 p-4 shadow-sm cursor-pointer hover:border-emerald-500/30 transition-all group"
@@ -1026,11 +1054,11 @@ const handleSaveProfile = async () => {
                 Online Now
               </h3>
               <span className="text-[9px] font-bold text-emerald-500 group-hover:underline">
-                {friendsList.filter(f => f.isOnline).length} online →
+                {friendsList.filter(f => isUserOnline(f)).length} online →
               </span>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
-              {friendsList.filter(f => f.isOnline).slice(0, 5).map(friend => (
+              {friendsList.filter(f => isUserOnline(f)).slice(0, 5).map(friend => (
                 <div key={friend.uid} className="relative" title={friend.fullName}>
                   <div className="w-8 h-8 rounded-full overflow-hidden bg-zinc-200 dark:bg-zinc-800 border-2 border-white dark:border-zinc-900 flex items-center justify-center text-xs font-bold text-zinc-500 shadow-sm">
                     {friend.avatarUrl
@@ -1041,9 +1069,9 @@ const handleSaveProfile = async () => {
                   <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-white dark:border-zinc-900" />
                 </div>
               ))}
-              {friendsList.filter(f => f.isOnline).length > 5 && (
+              {friendsList.filter(f => isUserOnline(f)).length > 5 && (
                 <div className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 border-2 border-white dark:border-zinc-900 flex items-center justify-center text-[10px] font-black text-zinc-500">
-                  +{friendsList.filter(f => f.isOnline).length - 5}
+                  +{friendsList.filter(f => isUserOnline(f)).length - 5}
                 </div>
               )}
             </div>
@@ -1202,30 +1230,65 @@ const handleSaveProfile = async () => {
         </div>
         <div>
           <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1 mb-1 block">Year Level</label>
-          <select value={editYearLevel} onChange={e => setEditYearLevel(e.target.value)} className="w-full bg-white dark:bg-[#121214] border border-zinc-200 dark:border-zinc-800/80 rounded-xl px-4 py-3 text-sm font-bold text-zinc-800 dark:text-zinc-200 outline-none focus:border-[#06402B] dark:focus:border-emerald-500 shadow-sm">
-            <option value="1st Year">1st Year</option>
-            <option value="2nd Year">2nd Year</option>
-            <option value="3rd Year">3rd Year</option>
-            <option value="4th Year">4th Year</option>
-            <option value="5th Year">5th Year</option>
-            <option value="6th Year">6th Year</option>
-            <option value="Irregular">Irregular</option>
-          </select>
+          <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5">
+            {["1st Year","2nd Year","3rd Year","4th Year","5th Year","6th Year","Irregular"].map(yr => (
+              <button
+                key={yr}
+                type="button"
+                onClick={() => setEditYearLevel(yr)}
+                className={`py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all active:scale-95 touch-manipulation ${
+                  editYearLevel === yr
+                    ? "bg-[#06402B] dark:bg-emerald-600 text-white border-[#06402B] dark:border-emerald-600 shadow-sm"
+                    : "bg-zinc-50 dark:bg-zinc-900 text-zinc-500 dark:text-zinc-400 border-zinc-200 dark:border-zinc-800"
+                } ${yr === "Irregular" ? "col-span-3 sm:col-span-2" : ""}`}
+              >
+                {yr === "Irregular" ? "Irregular" : yr.replace(" Year", "")}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
                         {/* ── College ── */}
-                        <div>
-                          <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1 mb-1 block">College</label>
-                          <select value={editCollege} onChange={e => setEditCollege(e.target.value)} className="w-full bg-white dark:bg-[#121214] border border-zinc-200 dark:border-zinc-800/80 rounded-xl px-4 py-3 text-sm font-bold text-zinc-800 dark:text-zinc-200 outline-none focus:border-[#06402B] dark:focus:border-emerald-500 shadow-sm">
-                            <option value="">— Select your college —</option>
-                            <option value="CAST">CAST — College of Arts, Sciences & Technology</option>
-                            <option value="CBMA">CBMA — College of Business Management & Accountancy</option>
-                            <option value="COED">COED — College of Education</option>
-                            <option value="CVMAS">CVMAS — College of Veterinary Medicine & Animal Science</option>
-                          </select>
-                        </div>
-
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {[
+                              { value: "CAST",  label: "CAST",  sub: "Arts, Sciences & Technology" },
+                              { value: "CBMA",  label: "CBMA",  sub: "Business Management & Accountancy" },
+                              { value: "COED",  label: "COED",  sub: "Education" },
+                              { value: "CVMAS", label: "CVMAS", sub: "Veterinary Medicine & Animal Science" },
+                            ].map(col => (
+                              <button
+                                key={col.value}
+                                type="button"
+                                onClick={() => setEditCollege(col.value)}
+                                className={`flex items-center gap-3 px-4 py-3 rounded-2xl border text-left transition-all active:scale-95 touch-manipulation ${
+                                  editCollege === col.value
+                                    ? "bg-[#06402B]/10 dark:bg-emerald-500/10 border-[#06402B]/40 dark:border-emerald-500/40 shadow-sm"
+                                    : "bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800"
+                                }`}
+                              >
+                                {/* Color dot */}
+                                <div className={`w-2 h-2 rounded-full shrink-0 transition-colors ${
+                                  editCollege === col.value
+                                    ? "bg-[#06402B] dark:bg-emerald-400"
+                                    : "bg-zinc-300 dark:bg-zinc-700"
+                                }`}/>
+                                <div className="min-w-0">
+                                  <p className={`text-xs font-black uppercase tracking-widest leading-none ${
+                                    editCollege === col.value
+                                      ? "text-[#06402B] dark:text-emerald-400"
+                                      : "text-zinc-800 dark:text-zinc-200"
+                                  }`}>
+                                    {col.label}
+                                  </p>
+                                  <p className="text-[9px] font-medium text-zinc-400 leading-tight mt-0.5 truncate">{col.sub}</p>
+                                </div>
+                                {editCollege === col.value && (
+                                  <FaCheckCircle size={12} className="text-[#06402B] dark:text-emerald-400 ml-auto shrink-0"/>
+                                )}
+                              </button>
+                            ))}
+                          </div>
                         {/* ── Bio ── */}
                         <div>
                           <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1 mb-1 block">Short Bio</label>
@@ -1397,7 +1460,7 @@ const handleSaveProfile = async () => {
   onClose={() => setIsQueueOpen(false)}
   activeTasks={mergedActiveTasks}
   courses={courses}
-  friends={friendsList}
+  friends={friendsList.map(f => ({ ...f, isOnline: isUserOnline(f) }))}
   onAddTask={handleAddGeneralTask}
   onToggleTask={toggleTaskStatus}
   onDeleteTask={deleteTask}
