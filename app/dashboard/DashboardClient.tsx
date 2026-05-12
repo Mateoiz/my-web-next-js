@@ -1255,7 +1255,7 @@ const handleSaveProfile = async () => {
                               { value: "CAST",  label: "CAST",  sub: "Arts, Sciences & Technology" },
                               { value: "CBMA",  label: "CBMA",  sub: "Business Management & Accountancy" },
                               { value: "COED",  label: "COED",  sub: "Education" },
-                              { value: "CVMAS", label: "CVMAS", sub: "Veterinary Medicine & Animal Science" },
+                              { value: "CVMAS", label: "CVMAS", sub: "Veterinary Medicine & Agricultural Science" },
                             ].map(col => (
                               <button
                                 key={col.value}
