@@ -15,7 +15,7 @@ import { FaBrain } from "react-icons/fa6";
 import { ModalProvider, useModal } from "../context/ModalContext";
 
 import { onAuthStateChanged, signOut, User } from "firebase/auth";
-import { doc, getDoc, collection, query, where, orderBy, onSnapshot, addDoc, updateDoc, deleteDoc, serverTimestamp, documentId } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, orderBy, onSnapshot, addDoc, updateDoc, deleteDoc, serverTimestamp, documentId, getDocs } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"; 
 import { auth, db, storage } from "@/lib/db"; 
 
@@ -350,26 +350,82 @@ if (userDoc.exists()) {
         setIsLoading(false);
         setAuthReady(true);
       }
+      const tryRealtime = (
+        q: any,
+        setter: (data: any[]) => void,
+        onFirstResult?: () => void
+      ): Promise<() => void> => {
+        return new Promise((resolve) => {
+          let settled = false;
 
-unsubTasks = onSnapshot(
-        query(collection(db, "tasks"), where("userId", "==", user.uid), orderBy("createdAt", "desc")),
-        snap => setGeneralTasks(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
-        err => console.error("tasks error:", err)
-      );
+          const fallbackTimer = setTimeout(async () => {
+            if (settled) return;
+            settled = true;
+            try {
+              const snap = await getDocs(q);
+              setter(snap.docs.map((d: any) => ({ id: d.id, ...d.data() })));
+            } catch (err) {
+              console.error("Fallback getDocs failed:", err);
+            }
+            onFirstResult?.();
+            resolve(() => {});
+          }, 4000);
 
-      unsubCourseTasks = onSnapshot(
-        query(collection(db, "course_tasks"), where("userId", "==", user.uid)),
-        snap => setCourseTasks(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
-        err => console.error("course_tasks error:", err)
-      );
+          const unsub = onSnapshot(
+            q,
+            (snap: any) => {
+              if (!settled) {
+                settled = true;
+                clearTimeout(fallbackTimer);
+              }
+              setter(snap.docs.map((d: any) => ({ id: d.id, ...d.data() })));
+              onFirstResult?.();
+              if (!settled) resolve(unsub);
+              else resolve(unsub);
+            },
+            (err: any) => {
+              if (!settled) {
+                settled = true;
+                clearTimeout(fallbackTimer);
+              }
+              console.error("onSnapshot error, falling back:", err);
+              getDocs(q)
+                .then(snap => setter(snap.docs.map((d: any) => ({ id: d.id, ...d.data() }))))
+                .catch(() => {})
+                .finally(() => { onFirstResult?.(); });
+              resolve(() => {});
+            }
+          );
+        });
+      };
 
-      unsubCourses = onSnapshot(
-        query(collection(db, "courses"), where("userId", "==", user.uid), orderBy("createdAt", "asc")),
-        snap => setCourses(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
-        err => console.error("courses error:", err)
-      );
+      // onFirstResult on course_tasks is what unblocks the loading screen
+      Promise.all([
+        tryRealtime(
+          query(collection(db, "tasks"), where("userId", "==", user.uid), orderBy("createdAt", "desc")),
+          setGeneralTasks
+        ),
+        tryRealtime(
+          query(collection(db, "course_tasks"), where("userId", "==", user.uid)),
+          setCourseTasks,
+          () => {
+            clearTimeout(safetyTimer);
+            setIsLoading(false);
+            setAuthReady(true);
+          }
+        ),
+        tryRealtime(
+          query(collection(db, "courses"), where("userId", "==", user.uid), orderBy("createdAt", "asc")),
+          setCourses
+        ),
+      ]).then(([u1, u2, u3]) => {
+        unsubTasks = u1;
+        unsubCourseTasks = u2;
+        unsubCourses = u3;
+      });
     });
-return () => {
+
+    return () => {
       clearTimeout(safetyTimer);
       unsubscribeAuth();
       unsubFriends();
