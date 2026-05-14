@@ -1426,10 +1426,12 @@ const taskSnap = await getDocs(
 
                               <div className="flex-1 min-w-0">
                                 <InlineEdit value={task.name} onSave={v => updateTask(task.id, "name", v)} placeholder="Untitled deliverable…"/>
-                                <div className="flex items-center gap-2 mt-2 flex-wrap px-2.5">
-                                  <span className={`px-2 py-0.5 rounded-lg border text-[9px] font-bold uppercase tracking-wider ${typeMeta.color}`}>{task.type}</span>
-                                  <UrgencyBadge deadline={task.deadline} status={task.status}/>
-                                </div>
+<div className="flex items-center gap-2 mt-2 flex-wrap px-2.5">
+  <div className={`px-2 py-0.5 rounded-lg border text-[9px] font-bold uppercase tracking-wider ${typeMeta.color}`}>
+    <TypePicker value={safeType(task.type)} onChange={v => updateTask(task.id, "type", v)} />
+  </div>
+  <UrgencyBadge deadline={task.deadline} status={task.status}/>
+</div>
                               </div>
 
                               <div className="flex items-center gap-1 shrink-0">
