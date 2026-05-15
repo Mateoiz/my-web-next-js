@@ -9,7 +9,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {  FaCalculator, FaLayerGroup, FaTasks, FaSignOutAlt, FaPlus, FaCheckCircle, 
   FaTachometerAlt, FaGlobe, FaClock, FaUserFriends, FaChevronRight, 
   FaCog, FaSun, FaMoon, FaDesktop, FaPalette, FaIdBadge, FaSave, FaCamera, 
-  FaFolderOpen, FaCalendarDay, FaQuoteLeft, FaBook, FaFire, FaChartBar, FaFacebook, FaInstagram, FaExternalLinkAlt, FaHeart, FaExclamationCircle, FaSpinner, FaLightbulb, FaTrashAlt
+  FaFolderOpen, FaCalendarDay, FaQuoteLeft, FaBook, FaFire, FaChartBar, FaListUl, FaFacebook, FaInstagram, FaExternalLinkAlt, FaHeart, FaExclamationCircle, FaSpinner, FaLightbulb, FaTrashAlt
 } from "react-icons/fa";
 import { FaBrain } from "react-icons/fa6";
 import { ModalProvider, useModal } from "../context/ModalContext";
@@ -530,6 +530,86 @@ useEffect(() => {
       console.warn("Presence setOnline failed:", err);
     }
   };
+  useEffect(() => {
+  const handler = (e: KeyboardEvent) => {
+    const tag = (e.target as HTMLElement).tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || isStudying) return;
+
+    // Alt + number to switch views
+    if (e.altKey) {
+      const map: Record<string, string> = {
+        '1': 'dashboard',
+        '2': 'tracker',
+        '3': 'academics',
+        '4': 'studyhub',
+        '5': 'calendar',
+        '6': 'settings',
+      };
+      if (map[e.key]) {
+        e.preventDefault();
+        setActiveView(map[e.key]);
+      }
+    }
+
+    // G shortcuts (like Gmail) — only when no modifier
+    if (!e.altKey && !e.ctrlKey && !e.metaKey) {
+      if (e.key === 'g') {
+        // Wait for next key
+        const next = (e2: KeyboardEvent) => {
+          window.removeEventListener('keydown', next);
+          if (e2.key === 'h') setActiveView('dashboard');
+          if (e2.key === 't') setActiveView('tracker');
+          if (e2.key === 'a') setActiveView('academics');
+          if (e2.key === 's') setActiveView('studyhub');
+          if (e2.key === 'c') setActiveView('calendar');
+        };
+        window.addEventListener('keydown', next, { once: true });
+      }
+    }
+  };
+  window.addEventListener('keydown', handler);
+  return () => window.removeEventListener('keydown', handler);
+}, [isStudying]);
+
+useEffect(() => {
+  if (isStudying) return;
+
+  const views = ['dashboard', 'tracker', 'academics', 'studyhub', 'calendar', 'settings'];
+  let touchStartX = 0;
+  let touchStartY = 0;
+
+  const onTouchStart = (e: TouchEvent) => {
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+  };
+
+  const onTouchEnd = (e: TouchEvent) => {
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    const dy = e.changedTouches[0].clientY - touchStartY;
+
+    // Only trigger if horizontal swipe is dominant and large enough
+    if (Math.abs(dx) < 60 || Math.abs(dy) > Math.abs(dx) * 0.8) return;
+
+    // Only trigger from the edges (first/last 20% of screen width)
+    const screenW = window.innerWidth;
+    const isEdgeSwipe = touchStartX < screenW * 0.2 || touchStartX > screenW * 0.8;
+    if (!isEdgeSwipe) return;
+
+    const currentIdx = views.indexOf(activeView);
+    if (dx < 0 && currentIdx < views.length - 1) {
+      setActiveView(views[currentIdx + 1]);
+    } else if (dx > 0 && currentIdx > 0) {
+      setActiveView(views[currentIdx - 1]);
+    }
+  };
+
+  window.addEventListener('touchstart', onTouchStart, { passive: true });
+  window.addEventListener('touchend', onTouchEnd, { passive: true });
+  return () => {
+    window.removeEventListener('touchstart', onTouchStart);
+    window.removeEventListener('touchend', onTouchEnd);
+  };
+}, [activeView, isStudying]);
 
   const setOffline = async () => {
     isCurrentlyOnline = false;
@@ -965,13 +1045,27 @@ const handleSaveProfile = async () => {
                 <span className={`relative z-10 transition-all duration-200 ${isActive ? 'scale-110' : 'group-hover:scale-110'}`}>
                   {item.icon}
                 </span>
-                <span className="relative z-10 text-[9px] font-mono tracking-widest uppercase">
-                  {item.label}
-                </span>
-                <div className="absolute left-full ml-4 px-3 py-1.5 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-[10px] font-black uppercase tracking-widest rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none translate-x-1 group-hover:translate-x-0 shadow-xl z-50">
-                  {item.label}
-                  <div className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-zinc-900 dark:border-r-zinc-100" />
-                </div>
+
+<span className="relative z-10 text-[9px] font-mono tracking-widest uppercase leading-none">
+  {item.label}
+</span>
+{isActive && activeView === 'academics' && (
+  <span className="relative z-10 text-[8px] font-bold text-emerald-300 dark:text-emerald-500 uppercase tracking-wider leading-none -mt-0.5 truncate max-w-[60px]">
+    {academicTab === 'schedule' ? 'Schedule' : 'Grades'}
+  </span>
+)}
+{isActive && activeView === 'studyhub' && (
+  <span className="relative z-10 text-[8px] font-bold text-emerald-300 dark:text-emerald-500 uppercase tracking-wider leading-none -mt-0.5 truncate max-w-[60px]">
+    {studyTab === 'cards' ? 'Vault' : studyTab === 'exchange' ? 'Exchange' : 'Lounge'}
+  </span>
+)}
+<div className="absolute left-full ml-4 px-3 py-1.5 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-[10px] font-black uppercase tracking-widest rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none translate-x-1 group-hover:translate-x-0 shadow-xl z-50 flex items-center gap-2">
+  {item.label}
+  <span className="text-zinc-400 dark:text-zinc-500 font-mono text-[9px] font-normal">
+    Alt+{NAV_ITEMS.findIndex(n => n.id === item.id) + 1}
+  </span>
+  <div className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-zinc-900 dark:border-r-zinc-100" />
+</div>
               </button>
             );
           })}
@@ -1044,9 +1138,24 @@ const handleSaveProfile = async () => {
 )}
   <div className="w-px h-6 md:h-8 bg-zinc-200 dark:bg-zinc-800 mx-1 md:mx-2 shrink-0" />
 
-  <button onClick={() => setIsQueueOpen(!isQueueOpen)} className={`w-8 h-8 md:w-10 md:h-10 rounded-xl flex items-center justify-center transition-all duration-300 shrink-0 ${isQueueOpen ? 'bg-[#06402B] dark:bg-emerald-600 text-white shadow-[0_0_15px_rgba(6,64,43,0.3)]' : 'bg-zinc-100 dark:bg-[#18181b] text-zinc-500 hover:text-[#06402B] dark:hover:text-emerald-400'}`}>
-    {isQueueOpen ? <FaChevronRight size={12} /> : <FaTasks size={14} />}
-  </button>
+<button
+  onClick={() => setIsQueueOpen(!isQueueOpen)}
+  className={`flex items-center gap-2 px-3 py-2 rounded-xl transition-all duration-300 shrink-0 ${
+    isQueueOpen
+      ? 'bg-[#06402B] dark:bg-emerald-600 text-white shadow-[0_0_15px_rgba(6,64,43,0.3)]'
+      : 'bg-zinc-100 dark:bg-[#18181b] text-zinc-500 hover:text-[#06402B] dark:hover:text-emerald-400'
+  }`}
+>
+  {isQueueOpen ? <FaChevronRight size={12} /> : <FaTasks size={14} />}
+  <span className="hidden lg:block text-[10px] font-black uppercase tracking-widest">
+    {isQueueOpen ? 'Close' : 'Tasks'}
+  </span>
+  {!isQueueOpen && mergedActiveTasks.length > 0 && (
+    <span className="hidden lg:flex w-4 h-4 rounded-full bg-orange-500 text-white text-[8px] font-black items-center justify-center">
+      {mergedActiveTasks.length > 9 ? '9+' : mergedActiveTasks.length}
+    </span>
+  )}
+</button>
 </div>
 
 
@@ -1807,7 +1916,7 @@ const handleSaveProfile = async () => {
 
       {/* Context sub-tabs — shown when inside a section with sub-navigation */}
       <AnimatePresence>
-        {(activeView === 'studyhub' || activeView === 'academics') && (
+        {(activeView === 'studyhub' || activeView === 'academics' || activeView === 'calendar') && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
@@ -1845,6 +1954,21 @@ const handleSaveProfile = async () => {
                   {tab.icon}{tab.label}
                 </button>
               ))}
+              {activeView === 'calendar' && [
+  { id: 'month',    label: 'Month',    icon: <FaCalendarDay size={11}/> },
+  { id: 'list',     label: 'List',     icon: <FaListUl size={11}/> },
+  { id: 'timeline', label: 'Timeline', icon: <FaChartBar size={11}/> },
+].map(tab => (
+  <button key={tab.id}
+    onClick={() => {
+      // You'd need to lift calendar view state up to DashboardClient
+      // For now, navigate and let calendar handle it via prop
+    }}
+    className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+  >
+    {tab.icon}{tab.label}
+  </button>
+))}
             </div>
           </motion.div>
         )}
