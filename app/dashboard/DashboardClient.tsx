@@ -530,86 +530,7 @@ useEffect(() => {
       console.warn("Presence setOnline failed:", err);
     }
   };
-  useEffect(() => {
-  const handler = (e: KeyboardEvent) => {
-    const tag = (e.target as HTMLElement).tagName;
-    if (tag === 'INPUT' || tag === 'TEXTAREA' || isStudying) return;
-
-    // Alt + number to switch views
-    if (e.altKey) {
-      const map: Record<string, string> = {
-        '1': 'dashboard',
-        '2': 'tracker',
-        '3': 'academics',
-        '4': 'studyhub',
-        '5': 'calendar',
-        '6': 'settings',
-      };
-      if (map[e.key]) {
-        e.preventDefault();
-        setActiveView(map[e.key]);
-      }
-    }
-
-    // G shortcuts (like Gmail) — only when no modifier
-    if (!e.altKey && !e.ctrlKey && !e.metaKey) {
-      if (e.key === 'g') {
-        // Wait for next key
-        const next = (e2: KeyboardEvent) => {
-          window.removeEventListener('keydown', next);
-          if (e2.key === 'h') setActiveView('dashboard');
-          if (e2.key === 't') setActiveView('tracker');
-          if (e2.key === 'a') setActiveView('academics');
-          if (e2.key === 's') setActiveView('studyhub');
-          if (e2.key === 'c') setActiveView('calendar');
-        };
-        window.addEventListener('keydown', next, { once: true });
-      }
-    }
-  };
-  window.addEventListener('keydown', handler);
-  return () => window.removeEventListener('keydown', handler);
-}, [isStudying]);
-
-useEffect(() => {
-  if (isStudying) return;
-
-  const views = ['dashboard', 'tracker', 'academics', 'studyhub', 'calendar', 'settings'];
-  let touchStartX = 0;
-  let touchStartY = 0;
-
-  const onTouchStart = (e: TouchEvent) => {
-    touchStartX = e.touches[0].clientX;
-    touchStartY = e.touches[0].clientY;
-  };
-
-  const onTouchEnd = (e: TouchEvent) => {
-    const dx = e.changedTouches[0].clientX - touchStartX;
-    const dy = e.changedTouches[0].clientY - touchStartY;
-
-    // Only trigger if horizontal swipe is dominant and large enough
-    if (Math.abs(dx) < 60 || Math.abs(dy) > Math.abs(dx) * 0.8) return;
-
-    // Only trigger from the edges (first/last 20% of screen width)
-    const screenW = window.innerWidth;
-    const isEdgeSwipe = touchStartX < screenW * 0.2 || touchStartX > screenW * 0.8;
-    if (!isEdgeSwipe) return;
-
-    const currentIdx = views.indexOf(activeView);
-    if (dx < 0 && currentIdx < views.length - 1) {
-      setActiveView(views[currentIdx + 1]);
-    } else if (dx > 0 && currentIdx > 0) {
-      setActiveView(views[currentIdx - 1]);
-    }
-  };
-
-  window.addEventListener('touchstart', onTouchStart, { passive: true });
-  window.addEventListener('touchend', onTouchEnd, { passive: true });
-  return () => {
-    window.removeEventListener('touchstart', onTouchStart);
-    window.removeEventListener('touchend', onTouchEnd);
-  };
-}, [activeView, isStudying]);
+  
 
   const setOffline = async () => {
     isCurrentlyOnline = false;
@@ -818,6 +739,88 @@ if (userDoc.exists()) {
       unsubCourses();
     };
   }, [router]);
+
+  useEffect(() => {
+  const handler = (e: KeyboardEvent) => {
+    const tag = (e.target as HTMLElement).tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || isStudying) return;
+
+    // Alt + number to switch views
+    if (e.altKey) {
+      const map: Record<string, string> = {
+        '1': 'dashboard',
+        '2': 'tracker',
+        '3': 'academics',
+        '4': 'studyhub',
+        '5': 'calendar',
+        '6': 'settings',
+      };
+      if (map[e.key]) {
+        e.preventDefault();
+        setActiveView(map[e.key]);
+      }
+    }
+
+    // G shortcuts (like Gmail) — only when no modifier
+    if (!e.altKey && !e.ctrlKey && !e.metaKey) {
+      if (e.key === 'g') {
+        // Wait for next key
+        const next = (e2: KeyboardEvent) => {
+          window.removeEventListener('keydown', next);
+          if (e2.key === 'h') setActiveView('dashboard');
+          if (e2.key === 't') setActiveView('tracker');
+          if (e2.key === 'a') setActiveView('academics');
+          if (e2.key === 's') setActiveView('studyhub');
+          if (e2.key === 'c') setActiveView('calendar');
+        };
+        window.addEventListener('keydown', next, { once: true });
+      }
+    }
+  };
+  window.addEventListener('keydown', handler);
+  return () => window.removeEventListener('keydown', handler);
+}, [isStudying]);
+
+useEffect(() => {
+  if (isStudying) return;
+
+  const views = ['dashboard', 'tracker', 'academics', 'studyhub', 'calendar', 'settings'];
+  let touchStartX = 0;
+  let touchStartY = 0;
+
+  const onTouchStart = (e: TouchEvent) => {
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+  };
+
+  const onTouchEnd = (e: TouchEvent) => {
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    const dy = e.changedTouches[0].clientY - touchStartY;
+
+    // Only trigger if horizontal swipe is dominant and large enough
+    if (Math.abs(dx) < 60 || Math.abs(dy) > Math.abs(dx) * 0.8) return;
+
+    // Only trigger from the edges (first/last 20% of screen width)
+    const screenW = window.innerWidth;
+    const isEdgeSwipe = touchStartX < screenW * 0.2 || touchStartX > screenW * 0.8;
+    if (!isEdgeSwipe) return;
+
+    const currentIdx = views.indexOf(activeView);
+    if (dx < 0 && currentIdx < views.length - 1) {
+      setActiveView(views[currentIdx + 1]);
+    } else if (dx > 0 && currentIdx > 0) {
+      setActiveView(views[currentIdx - 1]);
+    }
+  };
+
+  window.addEventListener('touchstart', onTouchStart, { passive: true });
+  window.addEventListener('touchend', onTouchEnd, { passive: true });
+  return () => {
+    window.removeEventListener('touchstart', onTouchStart);
+    window.removeEventListener('touchend', onTouchEnd);
+  };
+}, [activeView, isStudying]);
+
   const handleAddGeneralTask = async (title: string, deadline: string) => {
     if (!authUser) return;
     await addDoc(collection(db, "tasks"), { userId: authUser.uid, title, status: "pending", deadline, createdAt: serverTimestamp() });

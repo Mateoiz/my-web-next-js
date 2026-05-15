@@ -270,8 +270,6 @@ const handleAdminDeleteConfirm = async (deck: any, reason: string) => {
     return matchesSearch && matchesCollege && matchesYear;
   });
 
-  const selectClass =
-    "bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl py-3 px-4 outline-none focus:border-[#06402B] transition-all font-bold text-sm shadow-sm";
 
 
   return (
@@ -310,52 +308,101 @@ const handleAdminDeleteConfirm = async (deck: any, reason: string) => {
             </p>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
-            <div className="relative group flex-1 sm:w-64">
-              <FaSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-[#06402B] transition-colors" />
-              <input
-                type="text"
-                placeholder="Search title or subject..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl py-3 pl-12 pr-6 outline-none focus:border-[#06402B] transition-all font-bold text-sm shadow-sm"
-              />
-            </div>
-            <select value={collegeFilter} onChange={(e) => setCollegeFilter(e.target.value)} className={selectClass}>
-              <option value="All">All Colleges</option>
-              <option value="General">General</option>
-              <option value="CAST">CAST</option>
-              <option value="CBMA">CBMA</option>
-              <option value="CVMAS">CVMAS</option>
-              <option value="COED">COED</option>
-            </select>
-            <select value={yearFilter} onChange={(e) => setYearFilter(e.target.value)} className={selectClass}>
-              <option value="All">All Years</option>
-              <option value="1st Year">1st Year</option>
-              <option value="2nd Year">2nd Year</option>
-              <option value="3rd Year">3rd Year</option>
-              <option value="4th Year">4th Year</option>
-              <option value="Irregular">Irregular</option>
-            </select>
-          </div>
-        </div>
+<div className="flex flex-col gap-3 w-full lg:w-auto">
+  {/* Search */}
+  <div className="relative group">
+    <FaSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-[#06402B] dark:group-focus-within:text-emerald-400 transition-colors" size={13} />
+    <input
+      type="text"
+      placeholder="Search title or subject..."
+      value={searchQuery}
+      onChange={(e) => setSearchQuery(e.target.value)}
+      className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl py-3 pl-10 pr-4 outline-none focus:border-[#06402B] dark:focus:border-emerald-500 transition-all font-bold text-sm shadow-sm placeholder:font-normal placeholder:text-zinc-400"
+    />
+    {searchQuery && (
+      <button
+        onClick={() => setSearchQuery("")}
+        className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 transition-colors"
+      >
+        <FaTimes size={11} />
+      </button>
+    )}
+  </div>
+
+  {/* College filter pills */}
+  <div className="flex flex-wrap gap-1.5">
+    {["All", "General", "CAST", "CBMA", "CVMAS", "COED"].map(col => (
+      <button
+        key={col}
+        onClick={() => setCollegeFilter(col)}
+        className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all active:scale-95 touch-manipulation ${
+          collegeFilter === col
+            ? "bg-[#06402B] dark:bg-emerald-600 text-white border-transparent shadow-sm"
+            : "bg-white dark:bg-zinc-900 text-zinc-500 dark:text-zinc-400 border-zinc-200 dark:border-zinc-800 hover:border-[#06402B]/40 dark:hover:border-emerald-500/40"
+        }`}
+      >
+        {col === "All" ? "All Colleges" : col}
+      </button>
+    ))}
+  </div>
+
+  {/* Year filter pills */}
+  <div className="flex flex-wrap gap-1.5">
+    {["All", "1st Year", "2nd Year", "3rd Year", "4th Year", "Irregular"].map(yr => (
+      <button
+        key={yr}
+        onClick={() => setYearFilter(yr)}
+        className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all active:scale-95 touch-manipulation ${
+          yearFilter === yr
+            ? "bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 border-transparent shadow-sm"
+            : "bg-white dark:bg-zinc-900 text-zinc-500 dark:text-zinc-400 border-zinc-200 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-500"
+        }`}
+      >
+        {yr === "All" ? "All Years" : yr.replace(" Year", "")}
+      </button>
+    ))}
+  </div>
+</div>
+
 
         {/* ── Results count ── */}
-        {!loading && (
-          <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest -mt-4">
-            {filteredDecks.length} reviewer{filteredDecks.length !== 1 ? "s" : ""} found
-          </p>
-        )}
+{!loading && (
+  <div className="flex items-center gap-3 -mt-4">
+    <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
+      {filteredDecks.length} reviewer{filteredDecks.length !== 1 ? "s" : ""} found
+    </p>
+    {(searchQuery || collegeFilter !== "All" || yearFilter !== "All") && (
+      <button
+        onClick={() => { setSearchQuery(""); setCollegeFilter("All"); setYearFilter("All"); }}
+        className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 text-[9px] font-black uppercase tracking-widest hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+      >
+        <FaTimes size={8} /> Clear filters
+      </button>
+    )}
+  </div>
+)}
 
         {/* ── Grid ── */}
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
             {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
           </div>
-        ) : filteredDecks.length === 0 ? (
-          <div className="py-20 text-center border-2 border-dashed border-zinc-300 dark:border-zinc-800 rounded-[2rem] text-zinc-500 font-bold uppercase tracking-widest">
-            No reviewers found for these filters.
-          </div>
+) : filteredDecks.length === 0 ? (
+  <div className="py-24 flex flex-col items-center justify-center gap-4 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-[2rem]">
+    <div className="w-14 h-14 rounded-2xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-300 dark:text-zinc-600">
+      <FaLayerGroup size={22} />
+    </div>
+    <div className="text-center">
+      <p className="text-sm font-black text-zinc-400 uppercase tracking-widest">No reviewers found</p>
+      <p className="text-xs text-zinc-400 font-medium mt-1">Try adjusting your filters or search query</p>
+    </div>
+    <button
+      onClick={() => { setSearchQuery(""); setCollegeFilter("All"); setYearFilter("All"); }}
+      className="px-5 py-2.5 bg-[#06402B] dark:bg-emerald-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-[#042d1f] transition-all shadow-md"
+    >
+      Clear All Filters
+    </button>
+  </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
             {filteredDecks.map((deck) => {
@@ -381,31 +428,31 @@ const handleAdminDeleteConfirm = async (deck: any, reason: string) => {
                   )}
 
                   {/* Tags + Upvote */}
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="flex gap-2 flex-wrap">
-                      <span className="px-3 py-1 bg-[#06402B]/10 text-[#06402B] text-[10px] font-mono font-black rounded-lg uppercase">
-                        {deck.subject}
-                      </span>
-                      {deck.college && (
-                        <span className="px-2 py-1 bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 text-[10px] font-mono font-bold rounded-lg uppercase">
-                          {deck.college}
-                        </span>
-                      )}
-                    </div>
-                    <button
-                      onClick={() => handleVote(deck.id)}
-                      disabled={hasUpvoted}
-                      title={hasUpvoted ? "Already upvoted" : "Upvote this reviewer"}
-                      className={`flex items-center gap-2 px-3 py-1 rounded-lg transition-all shrink-0 ${
-                        hasUpvoted
-                          ? "bg-[#06402B] text-white cursor-not-allowed"
-                          : "bg-zinc-100 dark:bg-zinc-800 hover:bg-[#06402B] hover:text-white"
-                      }`}
-                    >
-                      <FaArrowUp size={12} />
-                      <span className="text-xs font-bold">{deck.upvotes || 0}</span>
-                    </button>
-                  </div>
+<div className="flex justify-between items-start mb-4">
+  <div className="flex gap-1.5 flex-wrap">
+    <span className="px-2.5 py-1 bg-[#06402B]/10 dark:bg-emerald-500/10 text-[#06402B] dark:text-emerald-400 text-[10px] font-black rounded-lg uppercase tracking-widest">
+      {deck.subject}
+    </span>
+    {deck.college && deck.college !== "Private" && (
+      <span className="px-2.5 py-1 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 text-[10px] font-bold rounded-lg uppercase tracking-widest">
+        {deck.college}
+      </span>
+    )}
+  </div>
+  <button
+    onClick={() => handleVote(deck.id)}
+    disabled={hasUpvoted}
+    title={hasUpvoted ? "Already upvoted" : "Upvote this reviewer"}
+    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black border transition-all shrink-0 active:scale-95 touch-manipulation ${
+      hasUpvoted
+        ? "bg-[#06402B] dark:bg-emerald-600 text-white border-transparent cursor-not-allowed"
+        : "bg-white dark:bg-zinc-900 text-zinc-500 border-zinc-200 dark:border-zinc-700 hover:border-[#06402B]/40 hover:text-[#06402B] dark:hover:text-emerald-400"
+    }`}
+  >
+    <FaArrowUp size={10} className={hasUpvoted ? "" : "group-hover:scale-110 transition-transform"} />
+    <span className="tabular-nums">{deck.upvotes || 0}</span>
+  </button>
+</div>
 
                   {/* Title */}
                   <h3 className="text-lg font-black mb-3 group-hover:text-[#06402B] transition-colors leading-tight">
@@ -413,55 +460,60 @@ const handleAdminDeleteConfirm = async (deck: any, reason: string) => {
                   </h3>
 
                   {/* Meta row */}
-<div
-  className="flex items-center gap-2 cursor-pointer group/author"
-  onClick={() => deck.userId && setViewingUserId(deck.userId)}
-  title="View profile"
->
-  <FaUserCircle className="text-zinc-400 group-hover/author:text-[#06402B] transition-colors" />
-  <span className="text-[11px] font-bold text-zinc-500 group-hover/author:text-[#06402B] transition-colors underline-offset-2 group-hover/author:underline">
-    @{deck.authorUsername}
-  </span>
+<div className="flex items-center justify-between gap-2 mb-4">
+  <button
+    onClick={() => deck.userId && setViewingUserId(deck.userId)}
+    className="flex items-center gap-2 group/author min-w-0"
+    title="View profile"
+  >
+    <div className="w-6 h-6 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center shrink-0 overflow-hidden group-hover/author:ring-2 group-hover/author:ring-[#06402B]/40 transition-all">
+      <FaUserCircle className="text-zinc-400 group-hover/author:text-[#06402B] dark:group-hover/author:text-emerald-400 transition-colors" size={14} />
+    </div>
+    <span className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 group-hover/author:text-[#06402B] dark:group-hover/author:text-emerald-400 transition-colors truncate">
+      @{deck.authorUsername}
+    </span>
+  </button>
+
+  <div className="flex items-center gap-3 text-[10px] font-bold text-zinc-400 shrink-0">
+    {deck.cards?.length != null && (
+      <span className="flex items-center gap-1">
+        <FaLayerGroup size={9} /> {deck.cards.length}
+      </span>
+    )}
+    {deck.downloads != null && (
+      <span className="flex items-center gap-1">
+        <FaDownload size={9} /> {deck.downloads}
+      </span>
+    )}
+  </div>
 </div>
 
-                  {/* Stats row */}
-                  <div className="flex items-center gap-4 mb-5 text-[10px] font-bold text-zinc-400 uppercase tracking-wide">
-                    {deck.cards?.length != null && (
-                      <span className="flex items-center gap-1">
-                        <FaLayerGroup size={10} /> {deck.cards.length} cards
-                      </span>
-                    )}
-                    {deck.downloads != null && (
-                      <span className="flex items-center gap-1">
-                        <FaDownload size={10} /> {deck.downloads} imports
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Import button */}
-                  <button
-                    onClick={() => handleImport(deck)}
-                    disabled={isImported || isImporting}
-                    className={`w-full py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 transition-all ${
-                      isImported
-                        ? "bg-green-500 text-white"
-                        : "bg-zinc-950 dark:bg-white text-white dark:text-black hover:shadow-lg active:scale-95"
-                    }`}
-                  >
-                    {isImporting ? (
-                      "Syncing..."
-                    ) : isImported ? (
-                      <><FaCheck /> Synced to Vault</>
-                    ) : (
-                      <><FaDownload /> Import Reviewer</>
-                    )}
-                  </button>
+<button
+  onClick={() => handleImport(deck)}
+  disabled={isImported || isImporting}
+  className={`mt-auto w-full py-3.5 rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 transition-all active:scale-95 touch-manipulation ${
+    isImported
+      ? "bg-emerald-500/10 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 cursor-not-allowed"
+      : isImporting
+      ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-500 cursor-wait"
+      : "bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 hover:bg-[#06402B] dark:hover:bg-zinc-100 shadow-sm hover:shadow-md"
+  }`}
+>
+  {isImporting ? (
+    <span className="flex items-center gap-2"><span className="w-3.5 h-3.5 rounded-full border-2 border-zinc-400 border-t-zinc-600 animate-spin" /> Syncing…</span>
+  ) : isImported ? (
+    <span className="flex items-center gap-2"><FaCheck size={11} /> Synced to Vault</span>
+  ) : (
+    <span className="flex items-center gap-2"><FaDownload size={11} /> Import Reviewer</span>
+  )}
+</button>
                 </motion.div>
               );
             })}
           </div>
         )}
-      </div>
-    </>
-  );
-}
+      </div>   {/* closes space-y-8 */}
+    </div>   
+  </>        
+  );        
+}    
