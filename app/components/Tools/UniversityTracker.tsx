@@ -16,7 +16,7 @@ import {
   addDoc, updateDoc, deleteDoc, doc, serverTimestamp, writeBatch, getDocs
 } from "firebase/firestore";
 import {
-  DndContext, closestCenter, KeyboardSensor, PointerSensor,
+  DndContext, closestCenter, KeyboardSensor, PointerSensor, TouchSensor,
   useSensor, useSensors, DragEndEvent, DragOverlay, DragStartEvent
 } from '@dnd-kit/core';
 import {
@@ -886,10 +886,19 @@ export default function UniversityTracker({
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 8 },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 250,        // hold for 250ms before drag activates
+        tolerance: 8,      // allow 8px of finger movement during the hold
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
   );
-  
 
   useEffect(() => {
     const h = (e:MouseEvent) => { if (bulkRef.current&&!bulkRef.current.contains(e.target as Node)) setBulkMenuOpen(false); };
@@ -1414,7 +1423,7 @@ const taskSnap = await getDocs(
                             <div className="flex items-start gap-3 p-4 pb-3">
                               <div className="flex flex-col items-center gap-2 pt-0.5 shrink-0">
                                 {!isDragDisabled ? (
-                                  <button {...dragHandleProps} className="text-zinc-300 dark:text-zinc-600 hover:text-zinc-500 dark:hover:text-zinc-400 cursor-grab active:cursor-grabbing touch-manipulation p-0.5 rounded transition-colors" title="Drag to reorder">
+                                  <button {...dragHandleProps} className="text-zinc-300 dark:text-zinc-600 hover:text-zinc-500 dark:hover:text-zinc-400 cursor-grab active:cursor-grabbing touch-none p-0.5 rounded transition-colors" title="Drag to reorder">
                                     <FaGripVertical size={13}/>
                                   </button>
                                 ) : <div className="w-5 h-5" />}
