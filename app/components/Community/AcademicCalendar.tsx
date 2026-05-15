@@ -88,22 +88,26 @@ function LegendPill({ type, label }: { type: EventType; label: string }) {
 // ── Day Detail Sheet (mobile tap) ─────────────────────────────────────────────
 // ── Day Detail — Popover on desktop, bottom sheet on mobile ──────────────────
 function DaySheet({
-  dateStr, events, tasks, isAdmin, onClose, onAdminDelete, anchorRect,
+  dateStr, events, tasks, courseTasks, isAdmin, onClose, onAdminDelete, anchorRect,
+  getCourseColorPill,
 }: {
   dateStr: string;
   events: CalendarEvent[];
   tasks: any[];
+  courseTasks: CourseTaskWithMeta[];
   isAdmin: boolean;
   onClose: () => void;
   onAdminDelete: (title: string) => void;
   anchorRect?: DOMRect | null;
+  getCourseColorPill: (color?: string) => string;
 }) {
   const date = new Date(dateStr + "T00:00:00");
   const label = date.toLocaleDateString("en-PH", {
     weekday: "long", month: "long", day: "numeric", year: "numeric",
   });
 
-  const isEmpty = events.length === 0 && tasks.length === 0;
+const isEmpty = events.length === 0 && tasks.length === 0 && courseTasks.length === 0;
+
 
   // ── Desktop popover position ────────────────────────────────────────────────
   const popoverStyle = (() => {
@@ -193,12 +197,21 @@ if (isDesktop && anchorRect) {
                   )}
                 </div>
               ))}
-              {tasks.map(task => (
-                <div key={`task-${task.id}`} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
-                  <FaExclamationCircle className="text-[#06402B] shrink-0" size={11} />
-                  <span className="truncate">{task.title || task.name}</span>
-                </div>
-              ))}
+{tasks.map(task => (
+  <div key={`task-${task.id}`} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
+    <FaExclamationCircle className="text-[#06402B] shrink-0" size={11} />
+    <span className="truncate">{task.title || task.name}</span>
+  </div>
+))}
+{/* Course tasks — colored by course */}
+{courseTasks.map(task => (
+  <div key={`ct-${task.id}`} className={`flex items-start gap-2 px-3 py-2 rounded-xl text-[11px] font-bold border ${getCourseColorPill(task.courseColor)}`}>
+    <div className="flex-1 min-w-0">
+      <p className="truncate font-black">{task.name}</p>
+      <p className="text-[10px] font-bold opacity-60 truncate">{task.courseTitle} · {task.type}</p>
+    </div>
+  </div>
+))}
             </>
           )}
         </div>
@@ -359,13 +372,36 @@ interface ScheduleClass {
   color: string;
 }
 
-export default function AcademicCalendar({ userTasks, scheduleClasses = [] }: { userTasks: any[]; scheduleClasses?: ScheduleClass[] }) {  const [currentDate, setCurrentDate] = useState(new Date());
+interface CourseTaskWithMeta {
+  id: string;
+  name: string;
+  type: string;
+  deadline: string;
+  status: string;
+  courseId: string;
+  courseTitle?: string;
+  courseColor?: string;
+}
+
+export default function AcademicCalendar({
+  userTasks,
+  scheduleClasses = [],
+  courses = [],
+  courseTasks = [],
+}: {
+  userTasks: any[];
+  scheduleClasses?: ScheduleClass[];
+  courses?: any[];
+  courseTasks?: any[];
+}) {
+  const [currentDate, setCurrentDate] = useState(new Date());
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminEvents, setAdminEvents] = useState<Record<string, CalendarEvent[]>>({});
   const [showAddModal, setShowAddModal] = useState(false);
 const [selectedDay, setSelectedDay] = useState<{ dateStr: string; rect: DOMRect } | null>(null);
 
-  const [view, setView] = useState<"month" | "list">("month");
+
+ const [view, setView] = useState<"month" | "list" | "timeline">("month");
 
   // ── Auth + Admin check ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -434,6 +470,35 @@ const DAY_MAP: Record<string, number> = { M: 1, T: 2, W: 3, Th: 4, F: 5, S: 6 };
       }));
   };
 
+ const COURSE_COLOR_MAP: Record<string, { dot: string; pill: string }> = {
+  emerald: { dot: "bg-emerald-500", pill: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20" },
+  blue:    { dot: "bg-blue-500",    pill: "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20" },
+  violet:  { dot: "bg-violet-500",  pill: "bg-violet-500/10 text-violet-700 dark:text-violet-400 border-violet-500/20" },
+  amber:   { dot: "bg-amber-500",   pill: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20" },
+  rose:    { dot: "bg-rose-500",    pill: "bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20" },
+  cyan:    { dot: "bg-cyan-500",    pill: "bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 border-cyan-500/20" },
+};
+
+const getCourseColorDot = (colorName?: string) =>
+  COURSE_COLOR_MAP[colorName ?? "emerald"]?.dot ?? "bg-emerald-500";
+const getCourseColorPill = (colorName?: string) =>
+  COURSE_COLOR_MAP[colorName ?? "emerald"]?.pill ?? "bg-emerald-500/10 text-emerald-700 border-emerald-500/20";
+const enrichedCourseTasks: CourseTaskWithMeta[] = courseTasks
+  .filter(t => t.deadline && t.status !== "Graded" && t.status !== "Submitted")
+  .map(t => {
+    const course = courses.find(c => c.id === t.courseId);
+    return {
+      ...t,
+      name: t.name || "Untitled",
+      courseTitle: course?.title ?? "Unknown Course",
+      courseColor: course?.color ?? "emerald",
+    };
+  });
+
+const getCourseTasksForDate = (dateStr: string) =>
+  enrichedCourseTasks.filter(t => t.deadline === dateStr);
+  
+
   const getEventsForDate = (dateStr: string): CalendarEvent[] => {
     const base = SCHOOL_EVENTS[dateStr] ? [SCHOOL_EVENTS[dateStr]] : [];
     return [
@@ -498,6 +563,7 @@ const DAY_MAP: Record<string, number> = { M: 1, T: 2, W: 3, Th: 4, F: 5, S: 6 };
     dateStr={selectedDay.dateStr}
     events={getEventsForDate(selectedDay.dateStr)}
     tasks={userTasks.filter(t => t.deadline === selectedDay.dateStr)}
+    courseTasks={getCourseTasksForDate(selectedDay.dateStr)}
     isAdmin={isAdmin}
     onClose={() => setSelectedDay(null)}
     onAdminDelete={(title) => {
@@ -505,6 +571,7 @@ const DAY_MAP: Record<string, number> = { M: 1, T: 2, W: 3, Th: 4, F: 5, S: 6 };
       setSelectedDay(null);
     }}
     anchorRect={selectedDay.rect}
+    getCourseColorPill={getCourseColorPill}
   />
 )}
       </AnimatePresence>
@@ -562,7 +629,7 @@ const DAY_MAP: Record<string, number> = { M: 1, T: 2, W: 3, Th: 4, F: 5, S: 6 };
 
             {/* View toggle */}
             <div className="flex bg-zinc-100 dark:bg-zinc-800/60 rounded-xl border border-zinc-200 dark:border-zinc-700/50 overflow-hidden shrink-0">
-              {(["month", "list"] as const).map(v => (
+              {(["month", "list", "timeline"] as const).map(v => (
                 <button
                   key={v}
                   onClick={() => setView(v)}
@@ -636,7 +703,7 @@ const DAY_MAP: Record<string, number> = { M: 1, T: 2, W: 3, Th: 4, F: 5, S: 6 };
                     </span>
 
                     {/* Event dots — mobile */}
-                    <div className="flex md:hidden flex-wrap gap-0.5 mt-auto">
+                     <div className="flex md:hidden flex-wrap gap-0.5 mt-auto">
                       {events.slice(0, 3).map((ev, i) => (
                         <span key={i} className={`w-1.5 h-1.5 rounded-full ${
                           ev.type === "exam" ? "bg-red-400" :
@@ -644,10 +711,15 @@ const DAY_MAP: Record<string, number> = { M: 1, T: 2, W: 3, Th: 4, F: 5, S: 6 };
                           ev.type === "admin" ? "bg-purple-400" : "bg-blue-400"
                         }`} />
                       ))}
-                      {tasks.slice(0, 2).map((_, i) => (
-                        <span key={`t-${i}`} className="w-1.5 h-1.5 rounded-full bg-[#06402B]" />
+                      {getCourseTasksForDate(dateStr).slice(0, 3).map((ct, i) => (
+                        <span key={`ct-${i}`} className={`w-1.5 h-1.5 rounded-full ${getCourseColorDot(ct.courseColor)}`} />
                       ))}
-                    </div>
+                      {tasks.slice(0, 1).map((_, i) => (
+                        <span key={`t-${i}`} className="w-1.5 h-1.5 rounded-full bg-zinc-500" />
+                      ))}
+                    </div>  {/* ← this closing tag was missing */}
+
+                    {/* Full event labels — desktop */}
 
                     {/* Full event labels — desktop */}
                     <div className="hidden md:flex flex-col gap-1 flex-1 overflow-hidden">
@@ -657,12 +729,22 @@ const DAY_MAP: Record<string, number> = { M: 1, T: 2, W: 3, Th: 4, F: 5, S: 6 };
                           <span className="truncate">{ev.title}</span>
                         </span>
                       ))}
-                      {tasks.slice(0, 1).map(task => (
-                        <span key={task.id} className="text-[9px] font-bold px-1.5 py-0.5 rounded-md truncate bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700 flex items-center gap-1">
-                          <FaExclamationCircle className="text-[#06402B] shrink-0" size={8} />
-                          <span className="truncate">{task.title || task.name}</span>
-                        </span>
-                      ))}
+{getCourseTasksForDate(dateStr).slice(0, 1).map(ct => (
+  <span key={ct.id} className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md truncate border flex items-center gap-1 ${getCourseColorPill(ct.courseColor)}`}>
+    <span className="truncate">{ct.name}</span>
+  </span>
+))}
+{tasks.slice(0, 1).map(task => (
+  <span key={task.id} className="text-[9px] font-bold px-1.5 py-0.5 rounded-md truncate bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700 flex items-center gap-1">
+    <FaExclamationCircle className="text-[#06402B] shrink-0" size={8} />
+    <span className="truncate">{task.title || task.name}</span>
+  </span>
+))}
+{(events.length + tasks.length + getCourseTasksForDate(dateStr).length) > 3 && (
+  <span className="text-[8px] font-black text-zinc-400 px-1">
+    +{events.length + tasks.length + getCourseTasksForDate(dateStr).length - 3} more
+  </span>
+)}
                       {(events.length + tasks.length) > 3 && (
                         <span className="text-[8px] font-black text-zinc-400 px-1">
                           +{events.length + tasks.length - 3} more
@@ -677,6 +759,106 @@ const DAY_MAP: Record<string, number> = { M: 1, T: 2, W: 3, Th: 4, F: 5, S: 6 };
         )}
 
         {/* ── List View ── */}
+{view === "timeline" && (
+  <div className="overflow-x-auto pb-4">
+    <div className="min-w-[700px] space-y-3">
+      <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-4">
+        Semester Overview — All Deadlines
+      </p>
+
+      {courses.map(course => {
+        const color = getCourseColorDot(course.color);
+        const pill = getCourseColorPill(course.color);
+        const tasks = enrichedCourseTasks
+          .filter(t => t.courseId === course.id)
+          .sort((a, b) => a.deadline.localeCompare(b.deadline));
+
+        if (tasks.length === 0) return null;
+
+        // Find date range for positioning
+        const allDeadlines = enrichedCourseTasks.map(t => t.deadline).sort();
+        const minDate = new Date(allDeadlines[0] + "T00:00:00");
+        const maxDate = new Date(allDeadlines[allDeadlines.length - 1] + "T00:00:00");
+        const totalDays = Math.max(1, (maxDate.getTime() - minDate.getTime()) / 86400000) + 14;
+
+        const getPos = (deadline: string) => {
+          const d = new Date(deadline + "T00:00:00");
+          const dayOffset = (d.getTime() - minDate.getTime()) / 86400000;
+          return Math.max(0, Math.min(98, (dayOffset / totalDays) * 100));
+        };
+
+        return (
+          <div key={course.id} className="flex items-center gap-4">
+            {/* Course label */}
+            <div className="w-32 shrink-0 text-right">
+              <p className="text-[10px] font-black text-zinc-700 dark:text-zinc-300 truncate">{course.title}</p>
+            </div>
+
+            {/* Timeline bar */}
+            <div className="flex-1 relative h-8 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-visible">
+              {/* Today marker */}
+              {(() => {
+                const todayPos = getPos(todayStr);
+                return (
+                  <div
+                    className="absolute top-0 bottom-0 w-0.5 bg-[#06402B] z-10"
+                    style={{ left: `${todayPos}%` }}
+                  >
+                    <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[8px] font-black text-[#06402B] whitespace-nowrap">Today</span>
+                  </div>
+                );
+              })()}
+
+              {/* Task markers */}
+              {tasks.map(task => {
+                const pos = getPos(task.deadline);
+                const isExam = task.type === "Midterm Exam" || task.type === "Final Exam";
+                return (
+                  <div
+                    key={task.id}
+                    className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 group cursor-pointer z-20"
+                    style={{ left: `${pos}%` }}
+                  >
+                    <div className={`${isExam ? "w-4 h-4" : "w-3 h-3"} rounded-full ${color} border-2 border-white dark:border-zinc-950 shadow-md transition-transform group-hover:scale-150`} />
+                    {/* Tooltip */}
+                    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 hidden group-hover:flex flex-col items-center z-30 pointer-events-none">
+                      <div className={`px-2 py-1.5 rounded-xl text-[9px] font-black border whitespace-nowrap shadow-xl ${pill}`}>
+                        <p>{task.name}</p>
+                        <p className="opacity-60 font-normal">{task.deadline}</p>
+                      </div>
+                      <div className={`w-1.5 h-1.5 rotate-45 border-r border-b ${pill.includes("emerald") ? "border-emerald-500/20 bg-emerald-500/10" : "border-zinc-200 bg-white"} -mt-1`} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+
+      {/* Date axis */}
+      <div className="flex items-center gap-4 mt-2">
+        <div className="w-32 shrink-0" />
+        <div className="flex-1 flex justify-between">
+          {[0, 1, 2, 3].map(i => {
+            const allDeadlines = enrichedCourseTasks.map(t => t.deadline).sort();
+            if (allDeadlines.length === 0) return null;
+            const minDate = new Date(allDeadlines[0] + "T00:00:00");
+            const maxDate = new Date(allDeadlines[allDeadlines.length - 1] + "T00:00:00");
+            const totalMs = maxDate.getTime() - minDate.getTime();
+            const d = new Date(minDate.getTime() + (totalMs * i / 3));
+            return (
+              <span key={i} className="text-[9px] font-mono font-bold text-zinc-400">
+                {d.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+              </span>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  </div>
+)}
+
         {view === "list" && (
           <div className="space-y-2">
             {listEvents.length === 0 ? (

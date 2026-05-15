@@ -855,6 +855,59 @@ const handleSaveProfile = async () => {
         </button>
       ))}
     </div>
+    {/* ── Exam Countdown ── */}
+{(() => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const upcoming = courseTasks
+    .filter(t =>
+      (t.type === "Midterm Exam" || t.type === "Final Exam") &&
+      t.status === "OPEN" &&
+      t.deadline
+    )
+    .map(t => {
+      const course = courses.find(c => c.id === t.courseId);
+      const dueDate = new Date(t.deadline + "T00:00:00");
+      const daysLeft = Math.ceil((dueDate.getTime() - today.getTime()) / 86400000);
+      return { ...t, courseTitle: course?.title, courseColor: course?.color, daysLeft };
+    })
+    .filter(t => t.daysLeft >= 0)
+    .sort((a, b) => a.daysLeft - b.daysLeft)[0];
+
+  if (!upcoming) return null;
+
+  const urgency = upcoming.daysLeft <= 3
+    ? "bg-red-500/10 border-red-500/20 text-red-600 dark:text-red-400"
+    : upcoming.daysLeft <= 7
+    ? "bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400"
+    : "bg-[#06402B]/5 border-[#06402B]/20 text-[#06402B] dark:text-emerald-400";
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -8 }}
+      animate={{ opacity: 1, y: 0 }}
+      onClick={() => setActiveView("tracker")}
+      className={`flex items-center gap-4 px-4 py-3 rounded-2xl border cursor-pointer hover:scale-[1.01] active:scale-[0.99] transition-all ${urgency}`}
+    >
+      <div className="text-center shrink-0 w-12">
+        <p className="text-2xl font-black leading-none">{upcoming.daysLeft}</p>
+        <p className="text-[9px] font-black uppercase tracking-widest opacity-70">
+          {upcoming.daysLeft === 1 ? "day" : "days"}
+        </p>
+      </div>
+      <div className="w-px h-8 bg-current opacity-20 shrink-0" />
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-black uppercase tracking-tight truncate">
+          {upcoming.type}
+        </p>
+        <p className="text-[11px] font-bold opacity-70 truncate">
+          {upcoming.courseTitle} · Due {new Date(upcoming.deadline + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+        </p>
+      </div>
+      <FaChevronRight size={10} className="shrink-0 opacity-40" />
+    </motion.div>
+  );
+})()}
 
     {/* ── ROW 3: Main panels ── */}
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5">
@@ -1169,7 +1222,12 @@ const handleSaveProfile = async () => {
             {activeView === 'calendar' && (
               <motion.div key="cal" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="w-full max-w-7xl mx-auto">
                 <ErrorBoundary fallbackTitle="Calendar Error">
-                  <AcademicCalendar userTasks={allCalendarTasks} scheduleClasses={scheduleClasses} />
+                  <AcademicCalendar
+  userTasks={allCalendarTasks}
+  scheduleClasses={scheduleClasses}
+  courses={courses}
+  courseTasks={courseTasks}
+/>
                 </ErrorBoundary>
               </motion.div>
             )}
