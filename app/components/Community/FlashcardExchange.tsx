@@ -364,23 +364,23 @@ const handleAdminDeleteConfirm = async (deck: any, reason: string) => {
   </div>
 </div>
 
-
+        </div>
         {/* ── Results count ── */}
 {!loading && (
-  <div className="flex items-center gap-3 -mt-4">
-    <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
-      {filteredDecks.length} reviewer{filteredDecks.length !== 1 ? "s" : ""} found
-    </p>
-    {(searchQuery || collegeFilter !== "All" || yearFilter !== "All") && (
-      <button
-        onClick={() => { setSearchQuery(""); setCollegeFilter("All"); setYearFilter("All"); }}
-        className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 text-[9px] font-black uppercase tracking-widest hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
-      >
-        <FaTimes size={8} /> Clear filters
-      </button>
-    )}
-  </div>
-)}
+          <div className="flex items-center gap-3">
+            <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
+              {filteredDecks.length} reviewer{filteredDecks.length !== 1 ? "s" : ""} found
+            </p>
+            {(searchQuery || collegeFilter !== "All" || yearFilter !== "All") && (
+              <button
+                onClick={() => { setSearchQuery(""); setCollegeFilter("All"); setYearFilter("All"); }}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 text-[9px] font-black uppercase tracking-widest hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+              >
+                <FaTimes size={8} /> Clear filters
+              </button>
+            )}
+          </div>
+        )}
 
         {/* ── Grid ── */}
         {loading ? (
@@ -500,11 +500,11 @@ const handleAdminDeleteConfirm = async (deck: any, reason: string) => {
   }`}
 >
   {isImporting ? (
-    <span className="flex items-center gap-2"><span className="w-3.5 h-3.5 rounded-full border-2 border-zinc-400 border-t-zinc-600 animate-spin" /> Syncing…</span>
+    <><span className="w-3.5 h-3.5 rounded-full border-2 border-zinc-400 border-t-zinc-600 animate-spin" /> Syncing…</>
   ) : isImported ? (
-    <span className="flex items-center gap-2"><FaCheck size={11} /> Synced to Vault</span>
+    <><FaCheck size={11} /> Synced to Vault</>
   ) : (
-    <span className="flex items-center gap-2"><FaDownload size={11} /> Import Reviewer</span>
+    <><FaDownload size={11} /> Import Reviewer</>
   )}
 </button>
                 </motion.div>
@@ -512,8 +512,7 @@ const handleAdminDeleteConfirm = async (deck: any, reason: string) => {
             })}
           </div>
         )}
-      </div>   {/* closes space-y-8 */}
-    </div>   
-  </>        
-  );        
-}    
+      </div> {/* closes space-y-8 */}
+    </>
+  );
+}
