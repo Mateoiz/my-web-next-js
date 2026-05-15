@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, Suspense, useRef } from "react";
-import { signInWithEmailAndPassword, signInWithPopup, EmailAuthProvider, linkWithCredential } from "firebase/auth";
+import { signInWithPopup, EmailAuthProvider, linkWithCredential } from "firebase/auth";
 import { collection, query, where, getDocs, doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { auth, db, googleProvider } from "@/lib/db";
 import { smartSignIn } from "@/lib/authWithFallback";
@@ -12,6 +12,22 @@ import {
   FaUserAlt, FaLock, FaTerminal, FaGoogle, FaEye, FaEyeSlash,
   FaCheckCircle, FaFileContract, FaTimes, FaUserTag, FaEnvelope
 } from "react-icons/fa";
+
+// ── Password strength helper ─────────────────────────────────────────────────
+const checkPasswordStrength = (pw: string): 0 | 1 | 2 | 3 => {
+  let score = 0;
+  if (pw.length >= 8) score++;
+  if (/[A-Z]/.test(pw) || /[0-9]/.test(pw)) score++;
+  if (/[^A-Za-z0-9]/.test(pw) && pw.length >= 10) score++;
+  return score as 0 | 1 | 2 | 3;
+};
+
+const STRENGTH_META: Record<0 | 1 | 2 | 3, { label: string; color: string }> = {
+  0: { label: "",       color: "" },
+  1: { label: "Weak",   color: "bg-red-500" },
+  2: { label: "Fair",   color: "bg-amber-500" },
+  3: { label: "Strong", color: "bg-emerald-500" },
+};
 
 // ── Terms Modal ──────────────────────────────────────────────────────────────
 function TermsModal({ onAccept, onDecline }: { onAccept: () => void; onDecline: () => void }) {
@@ -113,35 +129,44 @@ function TermsModal({ onAccept, onDecline }: { onAccept: () => void; onDecline: 
 
 // ── Main Form ────────────────────────────────────────────────────────────────
 function AuthForm() {
+  // Lock / attempt state
+  const [loginAttempts, setLoginAttempts]   = useState(0);
+  const [isLocked, setIsLocked]             = useState(false);
+  const [lockTimer, setLockTimer]           = useState(0);
+  const lockRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Registration helpers
+  const [passwordStrength, setPasswordStrength]     = useState<0 | 1 | 2 | 3>(0);
+  const [usernameAvailable, setUsernameAvailable]   = useState<boolean | null>(null);
+  const [checkingUsername, setCheckingUsername]     = useState(false);
 
-  // Login state
+  // Login fields
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
 
-  // Register state
-  const [regStep, setRegStep] = useState<'google' | 'setup'>('google');
-  const [authUser, setAuthUser] = useState<any>(null);
-  const [usernameInput, setUsernameInput] = useState("");
-  const [schoolEmailInput, setSchoolEmailInput] = useState("");
-  const [passwordInput, setPasswordInput] = useState("");
+  // Register fields
+  const [regStep, setRegStep]                         = useState<'google' | 'setup'>('google');
+  const [authUser, setAuthUser]                       = useState<any>(null);
+  const [usernameInput, setUsernameInput]             = useState("");
+  const [schoolEmailInput, setSchoolEmailInput]       = useState("");
+  const [passwordInput, setPasswordInput]             = useState("");
   const [confirmPasswordInput, setConfirmPasswordInput] = useState("");
-  const [showTerms, setShowTerms] = useState(false);
-  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [showTerms, setShowTerms]                     = useState(false);
+  const [termsAccepted, setTermsAccepted]             = useState(false);
 
-  // Shared state
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+  // Shared
+  const [error, setError]                   = useState("");
+  const [loading, setLoading]               = useState(false);
+  const [showPassword, setShowPassword]     = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  const router = useRouter();
+  const router       = useRouter();
   const searchParams = useSearchParams();
-  
-  const redirectTo = searchParams.get("redirect") || "/dashboard";
-    const [mode, setMode] = useState<'login' | 'register'>(
-  searchParams.get('tab') === 'register' ? 'register' : 'login'
-);
+  const redirectTo   = searchParams.get("redirect") || "/dashboard";
+
+  const [mode, setMode] = useState<'login' | 'register'>(
+    searchParams.get('tab') === 'register' ? 'register' : 'login'
+  );
 
   const switchMode = (m: 'login' | 'register') => {
     setMode(m);
@@ -149,23 +174,70 @@ function AuthForm() {
     setRegStep('google');
     setAuthUser(null);
     setTermsAccepted(false);
+    setLoginAttempts(0);
+    setUsernameAvailable(null);
+    setPasswordStrength(0);
+  };
+
+  // ── Username availability check ────────────────────────────────────────────
+  const checkUsernameAvailability = async (uname: string) => {
+    if (uname.length < 3) { setUsernameAvailable(null); return; }
+    if (/[^a-z0-9_]/.test(uname)) { setUsernameAvailable(null); return; }
+    setCheckingUsername(true);
+    try {
+      const snap = await getDocs(query(collection(db, "users"), where("username", "==", uname)));
+      setUsernameAvailable(snap.empty);
+    } catch {
+      setUsernameAvailable(null);
+    } finally {
+      setCheckingUsername(false);
+    }
   };
 
   // ── Login ──────────────────────────────────────────────────────────────────
-const handleLogin = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLocked) return;
     setError("");
     setLoading(true);
     try {
-      const q = query(collection(db, "users"), where("username", "==", username.trim().toLowerCase()));
+      const q    = query(collection(db, "users"), where("username", "==", username.trim().toLowerCase()));
       const snap = await getDocs(q);
       if (snap.empty) throw new Error("Username not found.");
-      const email = snap.docs[0].data().email;
+      const email  = snap.docs[0].data().email;
       const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY!;
       await smartSignIn(auth, email, password, apiKey);
+      setLoginAttempts(0);
       router.push(redirectTo);
     } catch (err: any) {
-      setError(err.message === "Username not found." ? err.message : "Invalid credentials. Access denied.");
+      const attempts = loginAttempts + 1;
+      setLoginAttempts(attempts);
+
+      if (attempts >= 5) {
+        setIsLocked(true);
+        let countdown = 30;
+        setLockTimer(countdown);
+        lockRef.current = setInterval(() => {
+          countdown--;
+          setLockTimer(countdown);
+          if (countdown <= 0) {
+            clearInterval(lockRef.current!);
+            setIsLocked(false);
+            setLoginAttempts(0);
+            setLockTimer(0);
+          }
+        }, 1000);
+      }
+
+      const msg =
+        err.message === "Username not found."
+          ? "Username not found."
+          : err.code === "auth/wrong-password" || err.code === "auth/invalid-credential"
+          ? "Incorrect password."
+          : err.code === "auth/too-many-requests"
+          ? "Too many attempts. Please wait before trying again."
+          : "Sign in failed. Please check your credentials.";
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -176,7 +248,7 @@ const handleLogin = async (e: React.FormEvent) => {
     setLoading(true);
     try {
       googleProvider.setCustomParameters({ prompt: 'select_account' });
-      const result = await signInWithPopup(auth, googleProvider);
+      const result  = await signInWithPopup(auth, googleProvider);
       const userDoc = await getDoc(doc(db, "users", result.user.uid));
       if (userDoc.exists() && userDoc.data().username) {
         router.push(redirectTo);
@@ -197,7 +269,7 @@ const handleLogin = async (e: React.FormEvent) => {
     setLoading(true);
     try {
       googleProvider.setCustomParameters({ prompt: 'select_account' });
-      const result = await signInWithPopup(auth, googleProvider);
+      const result  = await signInWithPopup(auth, googleProvider);
       const userDoc = await getDoc(doc(db, "users", result.user.uid));
       if (userDoc.exists() && userDoc.data().username) {
         await auth.signOut();
@@ -232,12 +304,13 @@ const handleLogin = async (e: React.FormEvent) => {
     if (!termsAccepted) return setError("You must accept the Terms to continue.");
 
     const cleanUsername = usernameInput.trim().toLowerCase();
-    const cleanEmail = schoolEmailInput.trim().toLowerCase();
+    const cleanEmail    = schoolEmailInput.trim().toLowerCase();
 
-    if (cleanUsername.length < 3) return setError("Username must be at least 3 characters.");
+    if (cleanUsername.length < 3)        return setError("Username must be at least 3 characters.");
     if (/[^a-z0-9_]/.test(cleanUsername)) return setError("Only lowercase letters, numbers, and underscores allowed.");
-    if (!cleanEmail.includes('@')) return setError("Please enter a valid school email.");
-    if (passwordInput.length < 6) return setError("Password must be at least 6 characters.");
+    if (!cleanEmail.includes('@'))        return setError("Please enter a valid school email.");
+    if (passwordStrength < 2)            return setError("Password is too weak. Add numbers, symbols, or make it longer.");
+    if (passwordInput.length < 6)        return setError("Password must be at least 6 characters.");
     if (passwordInput !== confirmPasswordInput) return setError("Passwords do not match.");
 
     setLoading(true);
@@ -249,13 +322,13 @@ const handleLogin = async (e: React.FormEvent) => {
       await linkWithCredential(authUser, credential);
 
       await setDoc(doc(db, "users", authUser.uid), {
-        email: authUser.email,
-        schoolEmail: cleanEmail,
-        fullName: authUser.displayName || "Student",
-        username: cleanUsername,
-        role: "student",
-        termsAcceptedAt: serverTimestamp(),
-        createdAt: serverTimestamp(),
+        email:            authUser.email,
+        schoolEmail:      cleanEmail,
+        fullName:         authUser.displayName || "Student",
+        username:         cleanUsername,
+        role:             "student",
+        termsAcceptedAt:  serverTimestamp(),
+        createdAt:        serverTimestamp(),
       });
 
       router.push("/dashboard");
@@ -265,6 +338,7 @@ const handleLogin = async (e: React.FormEvent) => {
     }
   };
 
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <>
       <AnimatePresence>
@@ -274,8 +348,6 @@ const handleLogin = async (e: React.FormEvent) => {
       </AnimatePresence>
 
       <div className="w-full max-w-md">
-
-        {/* Card */}
         <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-[2rem] shadow-xl overflow-hidden">
 
           {/* Top accent */}
@@ -290,9 +362,7 @@ const handleLogin = async (e: React.FormEvent) => {
               {mode === 'login' ? 'Welcome Back' : 'Create Account'}
             </h1>
             <p className="text-zinc-500 text-sm font-medium">
-              {mode === 'login'
-                ? 'Sign in to access your dashboard'
-                : 'Join the Lasallian Terminal'}
+              {mode === 'login' ? 'Sign in to access your dashboard' : 'Join the Lasallian Terminal'}
             </p>
           </div>
 
@@ -316,7 +386,7 @@ const handleLogin = async (e: React.FormEvent) => {
           {/* Body */}
           <div className="px-8 pb-8">
 
-            {/* Error */}
+            {/* Error banner */}
             <AnimatePresence>
               {error && (
                 <motion.div
@@ -342,6 +412,7 @@ const handleLogin = async (e: React.FormEvent) => {
                   className="space-y-4"
                 >
                   <form onSubmit={handleLogin} className="space-y-3">
+                    {/* Username */}
                     <div className="relative group">
                       <FaUserAlt className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-[#06402B] dark:group-focus-within:text-emerald-400 transition-colors" size={13} />
                       <input
@@ -350,10 +421,12 @@ const handleLogin = async (e: React.FormEvent) => {
                         required
                         value={username}
                         onChange={e => setUsername(e.target.value)}
-                        className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl py-3 pl-10 pr-4 text-sm font-bold outline-none focus:border-[#06402B] dark:focus:border-emerald-500 transition-colors placeholder:font-normal placeholder:text-zinc-400"
+                        disabled={isLocked}
+                        className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl py-3 pl-10 pr-4 text-sm font-bold outline-none focus:border-[#06402B] dark:focus:border-emerald-500 transition-colors placeholder:font-normal placeholder:text-zinc-400 disabled:opacity-50 disabled:cursor-not-allowed"
                       />
                     </div>
 
+                    {/* Password */}
                     <div className="relative group">
                       <FaLock className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-[#06402B] dark:group-focus-within:text-emerald-400 transition-colors" size={13} />
                       <input
@@ -362,7 +435,8 @@ const handleLogin = async (e: React.FormEvent) => {
                         required
                         value={password}
                         onChange={e => setPassword(e.target.value)}
-                        className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl py-3 pl-10 pr-12 text-sm font-bold outline-none focus:border-[#06402B] dark:focus:border-emerald-500 transition-colors placeholder:font-normal placeholder:text-zinc-400"
+                        disabled={isLocked}
+                        className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl py-3 pl-10 pr-12 text-sm font-bold outline-none focus:border-[#06402B] dark:focus:border-emerald-500 transition-colors placeholder:font-normal placeholder:text-zinc-400 disabled:opacity-50 disabled:cursor-not-allowed"
                       />
                       <button type="button" onClick={() => setShowPassword(s => !s)} className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 transition-colors">
                         {showPassword ? <FaEyeSlash size={14} /> : <FaEye size={14} />}
@@ -375,13 +449,25 @@ const handleLogin = async (e: React.FormEvent) => {
                       </Link>
                     </div>
 
+                    {/* Submit */}
                     <button
                       type="submit"
-                      disabled={loading}
+                      disabled={loading || isLocked}
                       className="w-full bg-[#06402B] dark:bg-emerald-600 hover:bg-[#042d1f] dark:hover:bg-emerald-500 text-white font-black uppercase tracking-widest py-3.5 rounded-xl transition-all active:scale-95 disabled:opacity-50 shadow-md text-sm"
                     >
-                      {loading ? "Signing in..." : "Sign In"}
+                      {isLocked
+                        ? `Too many attempts — wait ${lockTimer}s`
+                        : loading
+                        ? "Signing in..."
+                        : "Sign In"}
                     </button>
+
+                    {/* Attempt warning */}
+                    {loginAttempts > 0 && loginAttempts < 5 && !isLocked && (
+                      <p className="text-center text-[11px] font-bold text-amber-500">
+                        {5 - loginAttempts} attempt{5 - loginAttempts !== 1 ? "s" : ""} remaining before temporary lockout
+                      </p>
+                    )}
                   </form>
 
                   <div className="flex items-center gap-3">
@@ -392,7 +478,7 @@ const handleLogin = async (e: React.FormEvent) => {
 
                   <button
                     onClick={handleGoogleLogin}
-                    disabled={loading}
+                    disabled={loading || isLocked}
                     className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 font-bold py-3.5 rounded-xl hover:border-zinc-400 dark:hover:border-zinc-500 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3 text-sm"
                   >
                     <FaGoogle /> Continue with Google
@@ -430,11 +516,10 @@ const handleLogin = async (e: React.FormEvent) => {
                     disabled={loading}
                     className="w-full bg-white dark:bg-zinc-800 border-2 border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 font-black py-4 rounded-xl hover:border-[#06402B] dark:hover:border-emerald-500 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3 shadow-sm"
                   >
-                    {loading ? (
-                      <span className="w-5 h-5 rounded-full border-2 border-zinc-300 border-t-zinc-600 animate-spin" />
-                    ) : (
-                      <FaGoogle />
-                    )}
+                    {loading
+                      ? <span className="w-5 h-5 rounded-full border-2 border-zinc-300 border-t-zinc-600 animate-spin" />
+                      : <FaGoogle />
+                    }
                     {loading ? "Verifying..." : "Continue with Google"}
                   </button>
 
@@ -480,10 +565,32 @@ const handleLogin = async (e: React.FormEvent) => {
                       type="text"
                       placeholder="Create @username"
                       value={usernameInput}
-                      onChange={e => setUsernameInput(e.target.value)}
-                      className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl py-3 pl-10 pr-4 text-sm font-bold outline-none focus:border-[#06402B] dark:focus:border-emerald-500 transition-colors placeholder:font-normal placeholder:text-zinc-400"
+                      onChange={e => {
+                        const val = e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "");
+                        setUsernameInput(val);
+                        setUsernameAvailable(null);
+                      }}
+                      onBlur={() => checkUsernameAvailability(usernameInput)}
+                      className={`w-full bg-zinc-50 dark:bg-zinc-800 border rounded-xl py-3 pl-10 pr-10 text-sm font-bold outline-none transition-colors placeholder:font-normal placeholder:text-zinc-400 ${
+                        usernameAvailable === true  ? "border-emerald-500 focus:border-emerald-500" :
+                        usernameAvailable === false ? "border-red-500 focus:border-red-500" :
+                        "border-zinc-200 dark:border-zinc-700 focus:border-[#06402B] dark:focus:border-emerald-500"
+                      }`}
                     />
+                    <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                      {checkingUsername && (
+                        <span className="w-3.5 h-3.5 rounded-full border-2 border-zinc-300 border-t-zinc-600 animate-spin block" />
+                      )}
+                      {!checkingUsername && usernameAvailable === true  && <FaCheckCircle size={13} className="text-emerald-500" />}
+                      {!checkingUsername && usernameAvailable === false && <FaTimes size={13} className="text-red-500" />}
+                    </div>
                   </div>
+                  {usernameAvailable === false && (
+                    <p className="text-[11px] font-bold text-red-500 -mt-1 px-1">Username already taken.</p>
+                  )}
+                  {usernameInput && usernameAvailable === true && (
+                    <p className="text-[11px] font-bold text-emerald-500 -mt-1 px-1">@{usernameInput} is available!</p>
+                  )}
 
                   {/* School email */}
                   <div className="relative group">
@@ -497,20 +604,48 @@ const handleLogin = async (e: React.FormEvent) => {
                     />
                   </div>
 
-                  {/* Password */}
+                  {/* Password + strength meter */}
                   <div className="relative group">
                     <FaLock className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-[#06402B] dark:group-focus-within:text-emerald-400 transition-colors" size={13} />
                     <input
                       type={showPassword ? "text" : "password"}
                       placeholder="Create password"
                       value={passwordInput}
-                      onChange={e => setPasswordInput(e.target.value)}
+                      onChange={e => {
+                        setPasswordInput(e.target.value);
+                        setPasswordStrength(checkPasswordStrength(e.target.value));
+                      }}
                       className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl py-3 pl-10 pr-12 text-sm font-bold outline-none focus:border-[#06402B] dark:focus:border-emerald-500 transition-colors placeholder:font-normal placeholder:text-zinc-400"
                     />
                     <button type="button" onClick={() => setShowPassword(s => !s)} className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 transition-colors">
                       {showPassword ? <FaEyeSlash size={14} /> : <FaEye size={14} />}
                     </button>
                   </div>
+                  {passwordInput && (
+                    <div className="space-y-1 -mt-1">
+                      <div className="flex gap-1">
+                        {[1, 2, 3].map(i => (
+                          <div
+                            key={i}
+                            className={`flex-1 h-1 rounded-full transition-all duration-300 ${
+                              passwordStrength >= i
+                                ? STRENGTH_META[passwordStrength].color
+                                : "bg-zinc-200 dark:bg-zinc-700"
+                            }`}
+                          />
+                        ))}
+                      </div>
+                      {passwordStrength > 0 && (
+                        <p className={`text-[11px] font-bold px-1 ${
+                          passwordStrength === 1 ? "text-red-500" :
+                          passwordStrength === 2 ? "text-amber-500" :
+                          "text-emerald-500"
+                        }`}>
+                          {STRENGTH_META[passwordStrength].label} password
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   {/* Confirm password */}
                   <div className="relative group">
@@ -521,12 +656,24 @@ const handleLogin = async (e: React.FormEvent) => {
                       value={confirmPasswordInput}
                       onChange={e => setConfirmPasswordInput(e.target.value)}
                       onKeyDown={e => e.key === 'Enter' && handleFinalizeSetup()}
-                      className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl py-3 pl-10 pr-12 text-sm font-bold outline-none focus:border-[#06402B] dark:focus:border-emerald-500 transition-colors placeholder:font-normal placeholder:text-zinc-400"
+                      className={`w-full bg-zinc-50 dark:bg-zinc-800 border rounded-xl py-3 pl-10 pr-12 text-sm font-bold outline-none transition-colors placeholder:font-normal placeholder:text-zinc-400 ${
+                        confirmPasswordInput && confirmPasswordInput !== passwordInput
+                          ? "border-red-400 focus:border-red-500"
+                          : confirmPasswordInput && confirmPasswordInput === passwordInput
+                          ? "border-emerald-500 focus:border-emerald-500"
+                          : "border-zinc-200 dark:border-zinc-700 focus:border-[#06402B] dark:focus:border-emerald-500"
+                      }`}
                     />
                     <button type="button" onClick={() => setShowConfirmPassword(s => !s)} className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 transition-colors">
                       {showConfirmPassword ? <FaEyeSlash size={14} /> : <FaEye size={14} />}
                     </button>
                   </div>
+                  {confirmPasswordInput && confirmPasswordInput !== passwordInput && (
+                    <p className="text-[11px] font-bold text-red-500 -mt-1 px-1">Passwords do not match.</p>
+                  )}
+                  {confirmPasswordInput && confirmPasswordInput === passwordInput && (
+                    <p className="text-[11px] font-bold text-emerald-500 -mt-1 px-1">Passwords match.</p>
+                  )}
 
                   <button
                     onClick={handleFinalizeSetup}
@@ -542,14 +689,13 @@ const handleLogin = async (e: React.FormEvent) => {
           </div>
         </div>
 
-        {/* Footer note */}
+        {/* Footer */}
         <p className="text-center text-[11px] text-zinc-400 font-medium mt-4">
           By using this platform you agree to our{" "}
-          <button className="text-[#06402B] dark:text-emerald-400 font-bold hover:underline">
+          <button onClick={() => setShowTerms(true)} className="text-[#06402B] dark:text-emerald-400 font-bold hover:underline">
             Terms of Agreement
           </button>
         </p>
-
       </div>
     </>
   );
