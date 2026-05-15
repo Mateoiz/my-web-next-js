@@ -9,7 +9,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {  FaCalculator, FaLayerGroup, FaTasks, FaSignOutAlt, FaPlus, FaCheckCircle, 
   FaTachometerAlt, FaGlobe, FaClock, FaUserFriends, FaChevronRight, 
   FaCog, FaSun, FaMoon, FaDesktop, FaPalette, FaIdBadge, FaSave, FaCamera, 
-  FaFolderOpen, FaCalendarDay, FaQuoteLeft, FaBook, FaFire, FaChartBar, FaFacebook, FaInstagram, FaExternalLinkAlt, FaHeart, FaExclamationCircle, FaSpinner
+  FaFolderOpen, FaCalendarDay, FaQuoteLeft, FaBook, FaFire, FaChartBar, FaFacebook, FaInstagram, FaExternalLinkAlt, FaHeart, FaExclamationCircle, FaSpinner, FaLightbulb, FaTrashAlt
 } from "react-icons/fa";
 import { FaBrain } from "react-icons/fa6";
 import { ModalProvider, useModal } from "../context/ModalContext";
@@ -34,6 +34,7 @@ const StudyLounge = dynamic(() => import('../components/Community/StudyLounge'),
 const UniversityTracker: any = dynamic(() => import('../components/Tools/UniversityTracker'), { ssr: false });
 const AcademicCalendar = dynamic(() => import('../components/Community/AcademicCalendar').then(mod => mod.default), { ssr: false });
 const CampusBulletin = dynamic(() => import('../components/Community/CampusBulletin'), { ssr: false });
+const Feedback = dynamic(() => import('../components/Community/Feedback'), { ssr: false });
 import OnboardingFlow from "../components/Onboarding/OnboardingFlow";
 
 const COLLEGE_LOGOS: Record<string, string> = {
@@ -52,7 +53,6 @@ const NAV_ITEMS = [
   { id: 'studyhub', icon: <FaBrain size={20} />, label: "Study Hub" },
   { id: 'calendar', icon: <FaCalendarDay size={20} />, label: "Calendar" },
   { id: 'settings', icon: <FaCog size={20} />, label: "Settings" },
-   
 ];
 function isUserOnline(user: any): boolean {
   if (user?.isOnline === true) {
@@ -127,6 +127,281 @@ const useCourseAverages = (courses: any[], tasks: any[]) => {
     });
   }, [courses, tasks]);
 };
+
+// ─── Admin Feedback Inbox ─────────────────────────────────────────────────────
+
+const FEEDBACK_CATEGORY_META: Record<string, { bg: string; text: string; border: string; dot: string }> = {
+  "Feature Request": { bg: "bg-amber-500/10",   text: "text-amber-600 dark:text-amber-400",   border: "border-amber-500/20",   dot: "bg-amber-500"   },
+  "Bug Report":      { bg: "bg-red-500/10",      text: "text-red-600 dark:text-red-400",       border: "border-red-500/20",     dot: "bg-red-500"     },
+  "General Feedback":{ bg: "bg-blue-500/10",     text: "text-blue-600 dark:text-blue-400",     border: "border-blue-500/20",    dot: "bg-blue-500"    },
+  "Content":         { bg: "bg-violet-500/10",   text: "text-violet-600 dark:text-violet-400", border: "border-violet-500/20",  dot: "bg-violet-500"  },
+  "Performance":     { bg: "bg-[#06402B]/10",    text: "text-[#06402B] dark:text-emerald-400", border: "border-[#06402B]/20",   dot: "bg-[#06402B]"   },
+};
+
+const SATISFACTION_META: Record<string, { emoji: string; label: string; color: string }> = {
+  love:    { emoji: "😊", label: "Love it",    color: "text-emerald-600 dark:text-emerald-400" },
+  okay:    { emoji: "😐", label: "It's okay",  color: "text-amber-600 dark:text-amber-400"     },
+  improve: { emoji: "😟", label: "Needs work", color: "text-red-600 dark:text-red-400"         },
+};
+
+function AdminFeedbackInbox() {
+  const [feedbacks, setFeedbacks]           = useState<any[]>([]);
+  const [loading, setLoading]               = useState(true);
+  const [expandedId, setExpandedId]         = useState<string | null>(null);
+  const [filterCat, setFilterCat]           = useState<string>("All");
+  const [filterSat, setFilterSat]           = useState<string>("All");
+  const [isOpen, setIsOpen]                 = useState(true);
+
+  useEffect(() => {
+    const { collection: col, query: q, orderBy: ob, onSnapshot: ons } =
+      { collection, query, orderBy, onSnapshot };
+
+    const unsub = ons(
+      q(col(db, "feedback"), ob("createdAt", "desc")),
+      snap => {
+        setFeedbacks(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        setLoading(false);
+      },
+      err => { console.error(err); setLoading(false); }
+    );
+    return () => unsub();
+  }, []);
+
+  const handleDelete = async (id: string) => {
+    const { deleteDoc: dd, doc: dc } = { deleteDoc, doc };
+    await dd(dc(db, "feedback", id));
+    if (expandedId === id) setExpandedId(null);
+  };
+
+  const cats    = ["All", ...Array.from(new Set(feedbacks.map(f => f.category).filter(Boolean)))];
+  const filtered = feedbacks
+    .filter(f => filterCat === "All" || f.category === filterCat)
+    .filter(f => filterSat === "All" || f.satisfaction === filterSat);
+
+  const unread = feedbacks.length;
+
+  const timeAgo = (ts: any) => {
+    if (!ts) return "";
+    const date = ts.toDate ? ts.toDate() : new Date(ts);
+    const diff = (Date.now() - date.getTime()) / 1000;
+    if (diff < 60)    return "just now";
+    if (diff < 3600)  return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    return `${Math.floor(diff / 86400)}d ago`;
+  };
+
+  return (
+    <div className="bg-white/60 dark:bg-[#121214]/80 backdrop-blur-xl rounded-[2rem] border border-zinc-200 dark:border-zinc-800/80 shadow-xl transition-colors duration-300 w-full overflow-hidden">
+
+      {/* Header — toggleable */}
+      <button
+        onClick={() => setIsOpen(v => !v)}
+        className="w-full flex items-center justify-between p-6 md:p-8 text-left group"
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-[#06402B]/10 text-[#06402B] dark:text-emerald-400 flex items-center justify-center shrink-0">
+            <FaLightbulb size={15} />
+          </div>
+          <div>
+            <h3 className="text-sm font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-100 flex items-center gap-2 leading-none">
+              Feedback Inbox
+              {unread > 0 && (
+                <span className="px-2 py-0.5 bg-[#06402B] dark:bg-emerald-600 text-white text-[9px] font-black rounded-full">
+                  {unread}
+                </span>
+              )}
+            </h3>
+            <p className="text-[10px] text-zinc-400 font-medium mt-0.5">Admin only · All submitted feedback</p>
+          </div>
+        </div>
+        <FaChevronRight
+          size={13}
+          className={`text-zinc-400 transition-transform duration-200 ${isOpen ? "rotate-90" : ""}`}
+        />
+      </button>
+
+      <AnimatePresence initial={false}>
+        {isOpen && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.22 }}
+            className="overflow-hidden"
+          >
+            <div className="px-6 md:px-8 pb-6 md:pb-8 space-y-4 border-t border-zinc-100 dark:border-zinc-800 pt-5">
+
+              {/* Filters */}
+              <div className="flex flex-wrap gap-2 items-center">
+                {/* Category filter */}
+                <div className="flex gap-1.5 flex-wrap">
+                  {cats.map(cat => {
+                    const m = cat !== "All" ? FEEDBACK_CATEGORY_META[cat] : null;
+                    const isActive = filterCat === cat;
+                    return (
+                      <button key={cat} onClick={() => setFilterCat(cat)}
+                        className={`px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all touch-manipulation ${
+                          isActive && m ? `${m.bg} ${m.text} ${m.border}`
+                          : isActive ? "bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 border-transparent"
+                          : "bg-zinc-100 dark:bg-zinc-800 text-zinc-500 border-zinc-200 dark:border-zinc-700"
+                        }`}>
+                        {cat}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="w-px h-5 bg-zinc-200 dark:bg-zinc-700 hidden sm:block" />
+
+                {/* Satisfaction filter */}
+                <div className="flex gap-1.5">
+                  {["All", "love", "okay", "improve"].map(sat => {
+                    const m = sat !== "All" ? SATISFACTION_META[sat] : null;
+                    return (
+                      <button key={sat} onClick={() => setFilterSat(sat)}
+                        className={`px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all touch-manipulation ${
+                          filterSat === sat
+                            ? "bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 border-transparent"
+                            : "bg-zinc-100 dark:bg-zinc-800 text-zinc-500 border-zinc-200 dark:border-zinc-700"
+                        }`}>
+                        {m ? `${m.emoji} ${m.label}` : "All Moods"}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Count */}
+              <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
+                {filtered.length} response{filtered.length !== 1 ? "s" : ""}
+                {(filterCat !== "All" || filterSat !== "All") && " (filtered)"}
+              </p>
+
+              {/* List */}
+              {loading ? (
+                <div className="py-12 flex items-center justify-center">
+                  <span className="w-8 h-8 rounded-full border-4 border-[#06402B]/30 border-t-[#06402B] animate-spin" />
+                </div>
+              ) : filtered.length === 0 ? (
+                <div className="py-12 text-center flex flex-col items-center gap-3 text-zinc-400">
+                  <FaLightbulb size={28} className="opacity-20" />
+                  <p className="text-xs font-bold uppercase tracking-widest opacity-60">No feedback yet</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <AnimatePresence>
+                    {filtered.map(fb => {
+                      const catMeta = FEEDBACK_CATEGORY_META[fb.category] ?? FEEDBACK_CATEGORY_META["General Feedback"];
+                      const satMeta = fb.satisfaction ? SATISFACTION_META[fb.satisfaction] : null;
+                      const isExpanded = expandedId === fb.id;
+
+                      return (
+                        <motion.div
+                          key={fb.id}
+                          initial={{ opacity: 0, y: 6 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, scale: 0.97 }}
+                          className={`rounded-2xl border overflow-hidden transition-all ${
+                            isExpanded
+                              ? "border-[#06402B]/30 dark:border-emerald-500/30 bg-[#06402B]/5 dark:bg-emerald-500/5"
+                              : "border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-zinc-300 dark:hover:border-zinc-700"
+                          }`}
+                        >
+                          {/* Row */}
+                          <button
+                            onClick={() => setExpandedId(prev => prev === fb.id ? null : fb.id)}
+                            className="w-full flex items-start gap-3 p-4 text-left"
+                          >
+                            {/* Left accent dot */}
+                            <div className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${catMeta.dot}`} />
+
+                            <div className="flex-1 min-w-0">
+                              {/* Top row */}
+                              <div className="flex items-center gap-2 flex-wrap mb-1">
+                                <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-lg border ${catMeta.bg} ${catMeta.text} ${catMeta.border}`}>
+                                  {fb.category}
+                                </span>
+                                {satMeta && (
+                                  <span className={`text-[9px] font-bold ${satMeta.color}`}>
+                                    {satMeta.emoji} {satMeta.label}
+                                  </span>
+                                )}
+                                <span className="text-[9px] font-mono text-zinc-400 ml-auto shrink-0">
+                                  {timeAgo(fb.createdAt)}
+                                </span>
+                              </div>
+
+                              {/* Title */}
+                              <p className="text-sm font-black text-zinc-900 dark:text-white leading-snug truncate">
+                                {fb.title || "Untitled"}
+                              </p>
+
+                              {/* Submitter */}
+                              <p className="text-[10px] font-medium text-zinc-400 mt-0.5 truncate">
+                                {fb.anonymous ? "Anonymous" : (fb.displayName || fb.email || "Unknown user")}
+                              </p>
+                            </div>
+
+                            <FaChevronRight
+                              size={10}
+                              className={`shrink-0 text-zinc-400 mt-1 transition-transform duration-200 ${isExpanded ? "rotate-90" : ""}`}
+                            />
+                          </button>
+
+                          {/* Expanded body */}
+                          <AnimatePresence>
+                            {isExpanded && (
+                              <motion.div
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: "auto", opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                transition={{ duration: 0.18 }}
+                                className="overflow-hidden"
+                              >
+                                <div className="px-4 pb-4 pt-1 border-t border-zinc-100 dark:border-zinc-800 space-y-3">
+                                  {/* Message */}
+                                  <p className="text-sm text-zinc-600 dark:text-zinc-300 font-medium leading-relaxed whitespace-pre-wrap">
+                                    {fb.message || <span className="italic text-zinc-400">No message provided.</span>}
+                                  </p>
+
+                                  {/* Meta row */}
+                                  <div className="flex items-center gap-3 flex-wrap pt-1 border-t border-zinc-100 dark:border-zinc-800">
+                                    {fb.email && !fb.anonymous && (
+                                      <a href={`mailto:${fb.email}`}
+                                        className="text-[10px] font-bold text-[#06402B] dark:text-emerald-400 hover:underline"
+                                        onClick={e => e.stopPropagation()}>
+                                        ✉ {fb.email}
+                                      </a>
+                                    )}
+                                    {fb.userId && !fb.anonymous && (
+                                      <span className="text-[10px] font-mono text-zinc-400">
+                                        uid: {fb.userId.slice(0, 8)}…
+                                      </span>
+                                    )}
+                                    <button
+                                      onClick={e => { e.stopPropagation(); handleDelete(fb.id); }}
+                                      className="ml-auto flex items-center gap-1.5 px-3 py-1.5 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-500 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-red-100 dark:hover:bg-red-500/20 transition-colors touch-manipulation"
+                                    >
+                                      <FaTrashAlt size={9} /> Delete
+                                    </button>
+                                  </div>
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </motion.div>
+                      );
+                    })}
+                  </AnimatePresence>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
 
 
 function DashboardInner() {
@@ -677,6 +952,9 @@ const handleSaveProfile = async () => {
                     className="absolute left-0 top-1/4 bottom-1/4 w-1 bg-[#06402B] dark:bg-emerald-500 rounded-r-full shadow-[0_0_10px_rgba(6,64,43,0.8)] dark:shadow-[0_0_10px_rgba(16,185,129,0.5)]"
                   />
                 )}
+                {isActive && (activeView === 'studyhub' || activeView === 'academics') && (
+                  <div className="absolute -top-1 right-1 w-2 h-2 rounded-full bg-amber-400 border-2 border-white dark:border-[#09090b] z-20" title="Has sub-sections" />
+                )}
                 {isActive && (
                   <motion.div
                     layoutId="navBg"
@@ -774,9 +1052,50 @@ const handleSaveProfile = async () => {
 
         </header>
 
-        <div className="flex-1 overflow-x-clip overflow-y-auto p-4 sm:p-6 md:p-8 pb-28 md:pb-8 custom-scrollbar relative z-10 w-full">
-          {/* ✅ FIX 2: All views are inside ONE AnimatePresence */}
-          <AnimatePresence mode="wait">
+<div className="flex-1 overflow-x-clip overflow-y-auto pb-28 md:pb-8 custom-scrollbar relative z-10 w-full flex flex-col">
+
+  {/* ── Breadcrumb ── */}
+  {activeView !== 'dashboard' && (
+    <div className="shrink-0 px-4 sm:px-6 md:px-8 pt-4 pb-0">
+      <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-zinc-400">
+        <button
+          onClick={() => setActiveView('dashboard')}
+          className="hover:text-[#06402B] dark:hover:text-emerald-400 transition-colors touch-manipulation"
+        >
+          Home
+        </button>
+        <FaChevronRight size={7} className="opacity-40" />
+        <span className="text-zinc-700 dark:text-zinc-300">
+          {activeView === 'tracker'   && 'University Tracker'}
+          {activeView === 'academics' && 'Academics'}
+          {activeView === 'studyhub'  && 'Study Hub'}
+          {activeView === 'calendar'  && 'Calendar'}
+          {activeView === 'settings'  && 'Settings'}
+        </span>
+        {activeView === 'academics' && (
+          <>
+            <FaChevronRight size={7} className="opacity-40" />
+            <span className="text-[#06402B] dark:text-emerald-400">
+              {academicTab === 'schedule' ? 'Schedule Canvas' : 'Grade Analytics'}
+            </span>
+          </>
+        )}
+        {activeView === 'studyhub' && (
+          <>
+            <FaChevronRight size={7} className="opacity-40" />
+            <span className="text-[#06402B] dark:text-emerald-400">
+              {studyTab === 'cards' ? 'Flashcard Vault' : studyTab === 'exchange' ? 'Global Exchange' : 'Study Lounge'}
+            </span>
+          </>
+        )}
+      </div>
+    </div>
+  )}
+
+  {/* ── All views ── */}
+  {/* ── All views ── */}
+  <div className="flex-1 p-4 sm:p-6 md:p-8 pt-3">
+    <AnimatePresence mode="wait">
 
             {/* === 1. SMART DASHBOARD === */}
             {activeView === 'dashboard' && (
@@ -1145,7 +1464,7 @@ const handleSaveProfile = async () => {
 
             {/* === 2. TRACKER === */}
 {activeView === 'tracker' && (
-  <motion.div key="tracker" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="w-full max-w-7xl mx-auto">
+  <motion.div key="tracker" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="w-full max-w-7xl mx-auto space-y-6">
     <ErrorBoundary fallbackTitle="Tracker Error">
       <UniversityTracker
         defaultCourseId={defaultCourseId}
@@ -1391,6 +1710,15 @@ const handleSaveProfile = async () => {
                     </div>
                   </div>
 
+                {/* ── Feedback ── */}
+                  <div className="bg-white/60 dark:bg-[#121214]/80 backdrop-blur-xl rounded-[2rem] border border-zinc-200 dark:border-zinc-800/80 p-6 md:p-8 shadow-xl transition-colors duration-300 w-full">
+                    <h3 className="text-sm font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-100 mb-1 flex items-center gap-2">
+                      <FaLightbulb className="text-[#06402B] dark:text-emerald-400" /> Share Feedback
+                    </h3>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 font-medium mb-6">Help us make the Lasallian Terminal better for everyone.</p>
+                    <Feedback />
+                  </div>
+
                   {/* ── About & Socials ── */}
                   <div className="bg-white/60 dark:bg-[#121214]/80 backdrop-blur-xl rounded-[2rem] border border-zinc-200 dark:border-zinc-800/80 p-6 md:p-8 shadow-xl transition-colors duration-300 w-full">
                     <h3 className="text-sm font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-100 mb-6 flex items-center gap-2">
@@ -1441,7 +1769,7 @@ const handleSaveProfile = async () => {
                       <div className="flex flex-wrap justify-center gap-2">
                         {[
                           { label: "JPCS DLSAU", role: "Organization" },
-                          { label: "Dev ", role: "Engineering" },
+                          { label: "Ice Matthew Ramirez ", role: "Developer" },
                         ].map(({ label, role }) => (
                           <div key={label} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800/60">
                             <span className="text-xs font-black text-zinc-800 dark:text-zinc-200">{label}</span>
@@ -1455,19 +1783,74 @@ const handleSaveProfile = async () => {
                     </div>
                   </div>
 
+{/* ── Admin Feedback Inbox ── */}
+                  {userProfile?.role === "admin" && (
+                    <AdminFeedbackInbox />
+                  )}
+
                 </ErrorBoundary>
               </motion.div>
             )}
 
-          </AnimatePresence>{/* ✅ FIX 2: AnimatePresence wraps ALL 6 views */}
-        </div>
-      </main>
+      </AnimatePresence>
+    </div> {/* closes inner padding */}
+
+  </div> {/* closes outer scrollable */}
+
+</main>
 
       {/* MOBILE BOTTOM NAV */}
 {/* MOBILE BOTTOM NAV */}
 {!isStudying && (
   <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
     <div className="mx-3 mb-3 bg-white/90 dark:bg-[#121214]/90 backdrop-blur-2xl border border-zinc-200 dark:border-zinc-800/80 rounded-[2rem] shadow-2xl transition-colors duration-300">
+
+      {/* Context sub-tabs — shown when inside a section with sub-navigation */}
+      <AnimatePresence>
+        {(activeView === 'studyhub' || activeView === 'academics') && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            className="overflow-hidden border-b border-zinc-100 dark:border-zinc-800 px-3 pt-2.5 pb-2"
+          >
+            <div className="flex items-center gap-1">
+              {activeView === 'studyhub' && [
+                { id: 'cards',    label: 'Vault',    icon: <FaLayerGroup size={11}/> },
+                { id: 'exchange', label: 'Exchange', icon: <FaGlobe size={11}/> },
+                { id: 'lounge',   label: 'Lounge',   icon: <FaUserFriends size={11}/> },
+              ].map(tab => (
+                <button key={tab.id}
+                  onClick={() => setStudyTab(tab.id as any)}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${
+                    studyTab === tab.id
+                      ? 'bg-[#06402B]/10 dark:bg-emerald-500/10 text-[#06402B] dark:text-emerald-400'
+                      : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300'
+                  }`}>
+                  {tab.icon}{tab.label}
+                </button>
+              ))}
+              {activeView === 'academics' && [
+                { id: 'schedule', label: 'Schedule', icon: <FaClock size={11}/> },
+                { id: 'grades',   label: 'Grades',   icon: <FaCalculator size={11}/> },
+              ].map(tab => (
+                <button key={tab.id}
+                  onClick={() => setAcademicTab(tab.id as any)}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${
+                    academicTab === tab.id
+                      ? 'bg-[#06402B]/10 dark:bg-emerald-500/10 text-[#06402B] dark:text-emerald-400'
+                      : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300'
+                  }`}>
+                  {tab.icon}{tab.label}
+                </button>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Main nav */}
       <div className="flex items-center justify-between px-2 py-2">
         {NAV_ITEMS.map((item) => {
           const isActive = activeView === item.id;
