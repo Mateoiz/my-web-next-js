@@ -480,12 +480,20 @@ const startStudy = (mode: StudyMode) => {
             />
           )}
         </AnimatePresence>
-
         <div className="flex flex-col sm:flex-row justify-between gap-4 items-start sm:items-center">
           <div>
-            <h2 className="text-2xl font-black tracking-tight uppercase text-zinc-900 dark:text-white">My Vault</h2>
-            <p className="text-zinc-500 text-sm font-medium mt-0.5">
-              {myDecks.length > 0 ? `${myDecks.length} reviewer${myDecks.length !== 1 ? 's' : ''} in your collection` : 'Your personal collection of study materials'}
+            <div className="flex items-center gap-2 mb-1">
+              <h2 className="text-2xl font-black tracking-tight uppercase text-zinc-900 dark:text-white">My Vault</h2>
+              {myDecks.length > 0 && (
+                <span className="px-2.5 py-1 bg-[#06402B]/10 dark:bg-emerald-500/10 text-[#06402B] dark:text-emerald-400 text-[10px] font-black rounded-lg uppercase tracking-widest">
+                  {myDecks.length}
+                </span>
+              )}
+            </div>
+            <p className="text-zinc-500 text-sm font-medium">
+              {myDecks.length > 0
+                ? `${myDecks.reduce((acc, d) => acc + (d.cards?.length || 0), 0)} total terms across ${myDecks.length} reviewer${myDecks.length !== 1 ? 's' : ''}`
+                : 'Your personal collection of study materials'}
             </p>
           </div>
           <button onClick={createNewDeck} className="w-full sm:w-auto py-3 px-6 bg-[#06402B] dark:bg-emerald-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest flex items-center justify-center gap-2 hover:bg-[#042d1f] dark:hover:bg-emerald-500 active:scale-95 transition-all shadow-lg shrink-0">
@@ -542,7 +550,24 @@ const startStudy = (mode: StudyMode) => {
 
                   <div className="flex-1 mb-4">
                     <h3 className="text-base font-black text-zinc-900 dark:text-white leading-tight line-clamp-2 mb-1">{deck.title}</h3>
-                    <p className="text-[11px] text-zinc-400 font-bold">{deck.cards?.length || 0} {deck.cards?.length === 1 ? 'term' : 'terms'}</p>
+                                        <div className="flex items-center gap-2 mt-1">
+                      <p className="text-[11px] text-zinc-400 font-bold">{deck.cards?.length || 0} {deck.cards?.length === 1 ? 'term' : 'terms'}</p>
+                      {starredCount > 0 && (
+                        <span className="text-[9px] text-zinc-400">·</span>
+                      )}
+                      {starredCount > 0 && (
+                        <p className="text-[11px] text-amber-500 font-bold">⭐ {starredCount} starred</p>
+                      )}
+                    </div>
+                    {/* Mini progress bar showing starred ratio */}
+                    {(deck.cards?.length || 0) > 0 && (
+                      <div className="mt-2 h-1 w-full bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-amber-400 rounded-full transition-all"
+                          style={{ width: `${(starredCount / (deck.cards?.length || 1)) * 100}%` }}
+                        />
+                      </div>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-3 gap-1.5">
@@ -628,28 +653,45 @@ const startStudy = (mode: StudyMode) => {
           )}
         </AnimatePresence>
 
-        <button onClick={() => {
-  const isDirty = originalState
-    ? deckTitle !== originalState.title ||
-      deckSubject !== originalState.subject ||
-      JSON.stringify(cards) !== JSON.stringify(originalState.cards)
-    : deckTitle.trim() || deckSubject.trim() || cards.some(c => c.front.trim() || c.back.trim());
+{/* ── Editor breadcrumb + actions bar ── */}
+        <div className="flex items-center justify-between mb-6 gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <button onClick={() => {
+              const isDirty = originalState
+                ? deckTitle !== originalState.title ||
+                  deckSubject !== originalState.subject ||
+                  JSON.stringify(cards) !== JSON.stringify(originalState.cards)
+                : deckTitle.trim() || deckSubject.trim() || cards.some(c => c.front.trim() || c.back.trim());
+              if (isDirty) {
+                showConfirm("Discard Changes", "You have unsaved changes. Are you sure you want to go back?",
+                  () => { setOriginalState(null); setView('library'); }, "Discard", true);
+              } else { setOriginalState(null); setView('library'); }
+            }}
+              className="flex items-center gap-1.5 px-3 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-xl text-xs font-black uppercase tracking-widest text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 transition-all shrink-0 touch-manipulation"
+            >
+              <FaChevronLeft size={10} /> Vault
+            </button>
+            <FaChevronRight size={8} className="text-zinc-300 dark:text-zinc-700 shrink-0" />
+            <span className="text-xs font-black uppercase tracking-widest text-zinc-900 dark:text-white truncate">
+              {currentDeckId ? (deckTitle || 'Edit Reviewer') : 'New Reviewer'}
+            </span>
+          </div>
 
-  if (isDirty) {
-    showConfirm(
-      "Discard Changes",
-      "You have unsaved changes. Are you sure you want to go back without saving?",
-      () => { setOriginalState(null); setView('library'); },
-      "Discard",
-      true
-    );
-  } else {
-    setOriginalState(null);
-    setView('library');
-  }
-}} className="flex items-center gap-2 text-xs font-bold text-zinc-500 hover:text-[#06402B] dark:hover:text-emerald-400 transition-colors mb-6">
-  <FaArrowLeft size={11} /> Back to Vault
-</button>
+          {/* Unsaved dot indicator */}
+          {(() => {
+            const isDirty = originalState
+              ? deckTitle !== originalState.title ||
+                deckSubject !== originalState.subject ||
+                JSON.stringify(cards) !== JSON.stringify(originalState.cards)
+              : deckTitle.trim() || deckSubject.trim() || cards.some(c => c.front.trim() || c.back.trim());
+            return isDirty ? (
+              <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-amber-500/10 border border-amber-500/20 rounded-xl shrink-0">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                <span className="text-[9px] font-black text-amber-500 uppercase tracking-widest">Unsaved</span>
+              </div>
+            ) : null;
+          })()}
+        </div>
 
         <div className="space-y-4">
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-[2rem] p-6 md:p-7">
@@ -814,11 +856,13 @@ const startStudy = (mode: StudyMode) => {
         {/* Study header */}
         <div className="h-16 border-b border-zinc-200 dark:border-zinc-800 px-4 md:px-6 flex items-center justify-between shrink-0 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-xl">
           <div className="flex items-center gap-3 min-w-0">
-            <button onClick={() => { onStudyModeChange?.(false); setView(currentDeckId ? 'library' : 'editor'); }}
-  className="w-8 h-8 rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-500 hover:bg-red-500/10 hover:text-red-500 transition-all shrink-0"
->
-  <FaTimes size={13} />
-</button>
+            <button
+              onClick={() => { onStudyModeChange?.(false); setView(currentDeckId ? 'library' : 'editor'); }}
+              className="flex items-center gap-1.5 px-3 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-xl text-xs font-black uppercase tracking-widest text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 transition-all shrink-0 touch-manipulation"
+            >
+              <FaChevronLeft size={10} />
+              <span className="hidden sm:inline">Exit</span>
+            </button>
             <div className="min-w-0">
               <h3 className="font-black text-sm uppercase tracking-tight text-zinc-900 dark:text-white truncate">{deckTitle || "Review Session"}</h3>
               <div className="flex items-center gap-2 flex-wrap">
@@ -1025,6 +1069,9 @@ const startStudy = (mode: StudyMode) => {
             </div>
           </div>
 
+          {deckTitle && (
+            <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-3 truncate px-2">{deckTitle}</p>
+          )}
           <h2 className="text-2xl font-black uppercase tracking-tight text-zinc-900 dark:text-white mb-1">
             {score >= 80 ? 'Great Job!' : score >= 50 ? 'Keep Going!' : 'Keep Practicing!'}
           </h2>
