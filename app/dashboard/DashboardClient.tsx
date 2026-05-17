@@ -416,6 +416,7 @@ const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [activeView, setActiveView] = useState('dashboard');
   const [academicTab, setAcademicTab] = useState<'schedule' | 'grades'>('schedule');
   const [studyTab, setStudyTab] = useState<'cards' | 'exchange' | 'lounge'>('cards');
+  const [navDirection, setNavDirection] = useState<'forward' | 'back'>('forward');
 
   const [isLoading, setIsLoading] = useState(true);
   const [authUser, setAuthUser] = useState<User | null>(null);
@@ -1014,10 +1015,13 @@ const handleSaveProfile = async () => {
       )}
     </div>
   );const formattedDate = currentTime.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-  const navigateTo = (view: string) => {
+const navigateTo = (view: string) => {
+  const views = ['dashboard', 'tracker', 'academics', 'studyhub', 'calendar', 'settings'];
+  const currentIdx = views.indexOf(activeView);
+  const nextIdx = views.indexOf(view);
+  setNavDirection(nextIdx >= currentIdx ? 'forward' : 'back');
   setActiveView(view as any);
   setNavVisible(true);
-  // Scroll back to top when switching sections
   scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
 };
   return (
@@ -1139,8 +1143,14 @@ const handleSaveProfile = async () => {
               </div>
             </div>
             <div className="w-px h-8 bg-zinc-200 dark:bg-zinc-800 hidden md:block shrink-0" />
-            <div className="hidden md:flex items-center gap-2 px-3 py-1 bg-[#06402B]/5 dark:bg-emerald-500/10 border border-[#06402B]/10 dark:border-emerald-500/20 rounded-full text-[9px] font-mono font-bold text-[#06402B] dark:text-emerald-400 tracking-widest uppercase shrink-0">System Online</div>
-          </div>
+            <div className={`hidden md:flex items-center gap-2 px-3 py-1 rounded-full text-[9px] font-mono font-bold tracking-widest uppercase shrink-0 transition-colors ${
+              isOnline
+                ? 'bg-[#06402B]/5 dark:bg-emerald-500/10 border border-[#06402B]/10 dark:border-emerald-500/20 text-[#06402B] dark:text-emerald-400'
+                : 'bg-red-500/10 border border-red-500/20 text-red-500'
+            }`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-[#06402B] dark:bg-emerald-400 animate-pulse' : 'bg-red-500'}`} />
+              {isOnline ? 'System Online' : 'Offline'}
+            </div>          </div>
           <div className="flex items-center gap-3 md:gap-4 shrink-0">
   <div className="text-right hidden sm:block">
     <p className="text-sm font-bold text-zinc-800 dark:text-zinc-100 leading-none mb-1 truncate max-w-[150px]">{userProfile?.fullName || "Scholar"}</p>
@@ -1152,7 +1162,7 @@ const handleSaveProfile = async () => {
   {/* Avatar */}
   <div
     className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-zinc-200 dark:bg-[#18181b] flex items-center justify-center text-zinc-500 dark:text-zinc-400 border border-zinc-300 dark:border-zinc-700 relative cursor-pointer shrink-0 overflow-hidden shadow-sm"
-    onClick={() => setActiveView('settings')}
+        onClick={() => navigateTo('settings')}
   >
     {userProfile?.avatarUrl
       ? <Image src={userProfile.avatarUrl} alt="Avatar" fill sizes="40px" className="object-cover" />
@@ -1177,24 +1187,45 @@ const handleSaveProfile = async () => {
 )}
   <div className="w-px h-6 md:h-8 bg-zinc-200 dark:bg-zinc-800 mx-1 md:mx-2 shrink-0" />
 
-<button
-  onClick={() => setIsQueueOpen(!isQueueOpen)}
-  className={`flex items-center gap-2 px-3 py-2 rounded-xl transition-all duration-300 shrink-0 ${
-    isQueueOpen
-      ? 'bg-[#06402B] dark:bg-emerald-600 text-white shadow-[0_0_15px_rgba(6,64,43,0.3)]'
-      : 'bg-zinc-100 dark:bg-[#18181b] text-zinc-500 hover:text-[#06402B] dark:hover:text-emerald-400'
-  }`}
->
-  {isQueueOpen ? <FaChevronRight size={12} /> : <FaTasks size={14} />}
-  <span className="hidden lg:block text-[10px] font-black uppercase tracking-widest">
-    {isQueueOpen ? 'Close' : 'Tasks'}
-  </span>
-  {!isQueueOpen && mergedActiveTasks.length > 0 && (
-    <span className="hidden lg:flex w-4 h-4 rounded-full bg-orange-500 text-white text-[8px] font-black items-center justify-center">
-      {mergedActiveTasks.length > 9 ? '9+' : mergedActiveTasks.length}
-    </span>
-  )}
-</button>
+{(() => {
+  const overdueCount = mergedActiveTasks.filter(t =>
+    t.deadline && new Date(t.deadline) < new Date() &&
+    t.status !== 'completed' && t.status !== 'Graded'
+  ).length;
+  const hasOverdue = overdueCount > 0;
+  return (
+    <button
+      onClick={() => setIsQueueOpen(!isQueueOpen)}
+      className={`relative flex items-center gap-2 px-3 py-2 rounded-xl transition-all duration-300 shrink-0 ${
+        isQueueOpen
+          ? 'bg-[#06402B] dark:bg-emerald-600 text-white shadow-[0_0_15px_rgba(6,64,43,0.3)]'
+          : hasOverdue
+          ? 'bg-red-500/10 dark:bg-red-500/10 text-red-500 border border-red-500/20'
+          : 'bg-zinc-100 dark:bg-[#18181b] text-zinc-500 hover:text-[#06402B] dark:hover:text-emerald-400'
+      }`}
+    >
+      {isQueueOpen ? <FaChevronRight size={12} /> : <FaTasks size={14} />}
+      <span className="hidden lg:block text-[10px] font-black uppercase tracking-widest">
+        {isQueueOpen ? 'Close' : 'Tasks'}
+      </span>
+      {!isQueueOpen && mergedActiveTasks.length > 0 && (
+        <span className={`hidden lg:flex w-4 h-4 rounded-full text-white text-[8px] font-black items-center justify-center ${
+          hasOverdue ? 'bg-red-500' : 'bg-orange-500'
+        }`}>
+          {mergedActiveTasks.length > 9 ? '9+' : mergedActiveTasks.length}
+        </span>
+      )}
+      {/* Mobile badge */}
+      {!isQueueOpen && mergedActiveTasks.length > 0 && (
+        <span className={`lg:hidden absolute -top-1 -right-1 w-4 h-4 rounded-full text-white text-[8px] font-black flex items-center justify-center border-2 border-white dark:border-[#09090b] ${
+          hasOverdue ? 'bg-red-500' : 'bg-orange-500'
+        }`}>
+          {mergedActiveTasks.length > 9 ? '9+' : mergedActiveTasks.length}
+        </span>
+      )}
+    </button>
+  );
+})()}
 </div>
 
 
@@ -1211,10 +1242,12 @@ const handleSaveProfile = async () => {
       <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-zinc-400">
         <button
           onClick={() => navigateTo('dashboard')}
-          className="hover:text-[#06402B] dark:hover:text-emerald-400 transition-colors touch-manipulation"
+          className="flex items-center gap-1.5 hover:text-[#06402B] dark:hover:text-emerald-400 transition-colors touch-manipulation group"
         >
+          <FaChevronRight size={7} className="rotate-180 opacity-40 group-hover:opacity-100 transition-opacity" />
           Home
         </button>
+
         <FaChevronRight size={7} className="opacity-40" />
         <span className="text-zinc-700 dark:text-zinc-300">
           {activeView === 'tracker'   && 'University Tracker'}
@@ -1246,15 +1279,17 @@ const handleSaveProfile = async () => {
   {/* ── All views ── */}
   {/* ── All views ── */}
   <div className="flex-1 p-4 sm:p-6 md:p-8 pt-3">
-    <AnimatePresence mode="wait">
+    <AnimatePresence mode="wait" custom={navDirection}>
 
             {/* === 1. SMART DASHBOARD === */}
             {activeView === 'dashboard' && (
   <motion.div
     key="dash"
-    initial={{ opacity: 0, y: 10 }}
-    animate={{ opacity: 1, y: 0 }}
-    exit={{ opacity: 0 }}
+    custom={navDirection}
+    initial={{ opacity: 0, x: navDirection === 'forward' ? 24 : -24 }}
+    animate={{ opacity: 1, x: 0 }}
+    exit={{ opacity: 0, x: navDirection === 'forward' ? -24 : 24 }}
+    transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
     className="space-y-4 max-w-6xl mx-auto w-full"
   >
     {/* ── ROW 1: Greeting + Quote ── */}
@@ -1437,10 +1472,10 @@ const handleSaveProfile = async () => {
               { label: "Calendar", icon: <FaCalendarDay size={10} />, view: "calendar" },
               { label: "Academics", icon: <FaBook size={10} />, view: "academics" },
               { label: "Study Hub", icon: <FaBrain size={10} />, view: "studyhub" },
-            ].map(nav => (
+           ].map(nav => (
               <button
                 key={nav.label}
-                onClick={() => setActiveView(nav.view)}
+                onClick={() => navigateTo(nav.view)}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-[10px] font-bold text-zinc-600 dark:text-zinc-400 hover:text-[#06402B] dark:hover:text-emerald-400 hover:border-[#06402B]/30 transition-all active:scale-95"
               >
                 <span className="text-[#06402B] dark:text-emerald-400">{nav.icon}</span>
@@ -1627,23 +1662,26 @@ const handleSaveProfile = async () => {
 
             {/* === 3. ACADEMICS HUB === */}
             {activeView === 'academics' && (
-              <motion.div key="academics" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="w-full max-w-7xl mx-auto flex flex-col min-h-full space-y-6">
+              <motion.div key="academics" initial={{ opacity: 0, x: navDirection === 'forward' ? 24 : -24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: navDirection === 'forward' ? -24 : 24 }} transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }} className="w-full max-w-7xl mx-auto flex flex-col min-h-full space-y-4">
                 <ErrorBoundary fallbackTitle="Academics Error">
-                  <div className="w-full border-b border-zinc-200 dark:border-zinc-800/80 mb-2 shrink-0 overflow-x-auto" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                    <div className="flex gap-6 md:gap-8 min-w-max px-1">
-                      {[
-                        { id: 'schedule', icon: FaClock, label: 'Schedule Canvas' },
-                        { id: 'grades', icon: FaCalculator, label: 'Grade Analytics' }
-                      ].map(tab => (
-                        <button
-                          key={tab.id} onClick={() => setAcademicTab(tab.id as any)}
-                          className={`pb-4 text-xs font-bold uppercase tracking-widest transition-colors relative flex items-center gap-2 ${academicTab === tab.id ? 'text-[#06402B] dark:text-emerald-400' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'}`}
-                        >
-                          <tab.icon size={14} /> {tab.label}
-                          {academicTab === tab.id && <motion.div layoutId="acadTabIndicator" className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#06402B] dark:bg-emerald-400 rounded-t-full" />}
-                        </button>
-                      ))}
-                    </div>
+                  {/* Tab bar — pill style, flush with content */}
+                  <div className="flex bg-white/60 dark:bg-[#121214]/80 backdrop-blur-xl border border-zinc-200 dark:border-zinc-800/80 rounded-2xl p-1 w-fit shadow-sm">
+                    {[
+                      { id: 'schedule', icon: FaClock, label: 'Schedule Canvas' },
+                      { id: 'grades', icon: FaCalculator, label: 'Grade Analytics' }
+                    ].map(tab => (
+                      <button
+                        key={tab.id}
+                        onClick={() => { setAcademicTab(tab.id as any); scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                        className={`relative flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+                          academicTab === tab.id
+                            ? 'bg-[#06402B] dark:bg-emerald-600 text-white shadow-md'
+                            : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                        }`}
+                      >
+                        <tab.icon size={13} /> {tab.label}
+                      </button>
+                    ))}
                   </div>
                 </ErrorBoundary>
                 <AnimatePresence mode="wait">
@@ -1658,26 +1696,28 @@ const handleSaveProfile = async () => {
               </motion.div>
             )}
 
-            {/* === 4. STUDY HUB === */}
             {activeView === 'studyhub' && (
-              <motion.div key="studyhub" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="w-full max-w-7xl mx-auto flex flex-col min-h-full space-y-6">
+              <motion.div key="studyhub" initial={{ opacity: 0, x: navDirection === 'forward' ? 24 : -24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: navDirection === 'forward' ? -24 : 24 }} transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }} className="w-full max-w-7xl mx-auto flex flex-col min-h-full space-y-4">
                 <ErrorBoundary fallbackTitle="Study Hub Error">
-                  <div className="w-full border-b border-zinc-200 dark:border-zinc-800/80 mb-2 shrink-0 overflow-x-auto" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                    <div className="flex gap-6 md:gap-8 min-w-max px-1">
-                      {[
-                        { id: 'cards', icon: FaLayerGroup, label: 'Flashcard Vault' },
-                        { id: 'exchange', icon: FaGlobe, label: 'Global Exchange' },
-                        { id: 'lounge', icon: FaUserFriends, label: 'Study Lounge' }
-                      ].map(tab => (
-                        <button
-                          key={tab.id} onClick={() => setStudyTab(tab.id as any)}
-                          className={`pb-4 text-xs font-bold uppercase tracking-widest transition-colors relative flex items-center gap-2 ${studyTab === tab.id ? 'text-[#06402B] dark:text-emerald-400' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'}`}
-                        >
-                          <tab.icon size={14} /> {tab.label}
-                          {studyTab === tab.id && <motion.div layoutId="studyTabIndicator" className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#06402B] dark:bg-emerald-400 rounded-t-full" />}
-                        </button>
-                      ))}
-                    </div>
+                  {/* Tab bar — pill style */}
+                  <div className="flex bg-white/60 dark:bg-[#121214]/80 backdrop-blur-xl border border-zinc-200 dark:border-zinc-800/80 rounded-2xl p-1 w-fit shadow-sm overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+                    {[
+                      { id: 'cards', icon: FaLayerGroup, label: 'Flashcard Vault' },
+                      { id: 'exchange', icon: FaGlobe, label: 'Global Exchange' },
+                      { id: 'lounge', icon: FaUserFriends, label: 'Study Lounge' }
+                    ].map(tab => (
+                      <button
+                        key={tab.id}
+                        onClick={() => { setStudyTab(tab.id as any); scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                        className={`relative flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all whitespace-nowrap ${
+                          studyTab === tab.id
+                            ? 'bg-[#06402B] dark:bg-emerald-600 text-white shadow-md'
+                            : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                        }`}
+                      >
+                        <tab.icon size={13} /> {tab.label}
+                      </button>
+                    ))}
                   </div>
                   <AnimatePresence mode="wait">
                     {studyTab === 'cards' && <motion.div key="c" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }}><FlashcardMaker onStudyModeChange={setIsStudying} /></motion.div>}
@@ -1954,108 +1994,138 @@ const handleSaveProfile = async () => {
 {/* MOBILE BOTTOM NAV */}
 {!isStudying && (
   <nav
-    className="md:hidden fixed bottom-0 left-0 right-0 z-40 pb-[env(safe-area-inset-bottom)] pointer-events-none"
-    style={{
-      transform: navVisible ? 'translateY(0)' : 'translateY(calc(100% + 16px))',
-      transition: 'transform 0.35s cubic-bezier(0.32, 0.72, 0, 1)',
-    }}
+    className="md:hidden fixed bottom-0 left-0 right-0 z-40 pointer-events-none"
+    style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
   >
-    <div className="pointer-events-auto">
-<div className="mx-3 mb-2 bg-white/90 dark:bg-[#121214]/90 backdrop-blur-2xl border border-zinc-200 dark:border-zinc-800/80 rounded-[1.75rem] shadow-xl transition-colors duration-300">
+    <div className="pointer-events-auto mx-3 mb-2">
+      <AnimatePresence mode="wait">
 
-      {/* Context sub-tabs — shown when inside a section with sub-navigation */}
-      <AnimatePresence>
-        {(activeView === 'studyhub' || activeView === 'academics' || activeView === 'calendar') && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.18 }}
-className="overflow-hidden border-b border-zinc-100 dark:border-zinc-800 px-2 pt-2 pb-1.5"
+        {/* ── COLLAPSED — single floating pill ── */}
+        {!navVisible && (
+  <motion.div
+    key="collapsed"
+    custom={navDirection}
+    initial={{ opacity: 0, x: navDirection === 'forward' ? 24 : -24 }}
+    animate={{ opacity: 1, x: 0 }}
+    exit={{ opacity: 0, x: navDirection === 'forward' ? -24 : 24 }}
+    transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
+            className="flex justify-center mb-1"
           >
-            <div className="flex items-center gap-1">
-              {activeView === 'studyhub' && [
-                { id: 'cards',    label: 'Vault',    icon: <FaLayerGroup size={11}/> },
-                { id: 'exchange', label: 'Exchange', icon: <FaGlobe size={11}/> },
-                { id: 'lounge',   label: 'Lounge',   icon: <FaUserFriends size={11}/> },
-              ].map(tab => (
-                <button key={tab.id}
-                  onClick={() => setStudyTab(tab.id as any)}
-className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${
-                    studyTab === tab.id
-                      ? 'bg-[#06402B]/10 dark:bg-emerald-500/10 text-[#06402B] dark:text-emerald-400'
-                      : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300'
-                  }`}>
-                  {tab.icon}{tab.label}
-                </button>
-              ))}
-              {activeView === 'academics' && [
-                { id: 'schedule', label: 'Schedule', icon: <FaClock size={11}/> },
-                { id: 'grades',   label: 'Grades',   icon: <FaCalculator size={11}/> },
-              ].map(tab => (
-                <button key={tab.id}
-                  onClick={() => setAcademicTab(tab.id as any)}
-                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${
-                    academicTab === tab.id
-                      ? 'bg-[#06402B]/10 dark:bg-emerald-500/10 text-[#06402B] dark:text-emerald-400'
-                      : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300'
-                  }`}>
-                  {tab.icon}{tab.label}
-                </button>
-              ))}
-              {activeView === 'calendar' && [
-  { id: 'month',    label: 'Month',    icon: <FaCalendarDay size={11}/> },
-  { id: 'list',     label: 'List',     icon: <FaListUl size={11}/> },
-  { id: 'timeline', label: 'Timeline', icon: <FaChartBar size={11}/> },
-].map(tab => (
-  <button key={tab.id}
-    onClick={() => {
-      // You'd need to lift calendar view state up to DashboardClient
-      // For now, navigate and let calendar handle it via prop
-    }}
-    className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
-  >
-    {tab.icon}{tab.label}
-  </button>
-))}
-            </div>
+            <button
+              onClick={() => setNavVisible(true)}
+              className="flex items-center gap-2.5 px-5 py-3 bg-[#06402B] dark:bg-emerald-600 text-white rounded-full shadow-xl shadow-[#06402B]/30 dark:shadow-emerald-600/20 active:scale-95 transition-transform touch-manipulation"
+            >
+              <span>{NAV_ITEMS.find(n => n.id === activeView)?.icon}</span>
+              <span className="text-[10px] font-black uppercase tracking-widest">
+                {NAV_ITEMS.find(n => n.id === activeView)?.label}
+              </span>
+              <span className="flex gap-0.5 ml-1">
+                <span className="w-1 h-1 rounded-full bg-white/50" />
+                <span className="w-1 h-1 rounded-full bg-white/50" />
+                <span className="w-1 h-1 rounded-full bg-white/50" />
+              </span>
+            </button>
           </motion.div>
         )}
-      </AnimatePresence>
 
-      {/* Main nav */}
-<div className="flex items-center justify-between px-2 py-1.5">
-  {NAV_ITEMS.map((item) => {
-    const isActive = activeView === item.id;
-    return (
-      <button
-        key={item.id}
-onClick={() => navigateTo(item.id)}
-className="relative flex flex-col items-center justify-center gap-1 p-2.5 rounded-2xl transition-all duration-200 touch-manipulation min-w-0 flex-1"
-      >
-        {/* Active background pill — only wraps the icon, not the whole button */}
-        {isActive && (
+        {/* ── EXPANDED — full nav ── */}
+        {navVisible && (
           <motion.div
-            layoutId="mobileNavGlow"
-            className="absolute inset-x-1.5 top-1 bottom-3 bg-[#06402B] dark:bg-emerald-600 rounded-xl shadow-[0_0_12px_rgba(6,64,43,0.35)] dark:shadow-[0_0_12px_rgba(16,185,129,0.25)]"
-            transition={{ type: "spring", stiffness: 400, damping: 35 }}
-          />
+            key="expanded"
+            initial={{ opacity: 0, y: 16, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 8, scale: 0.95 }}
+            transition={{ type: "spring", stiffness: 500, damping: 35 }}
+            className="bg-white/95 dark:bg-[#121214]/95 backdrop-blur-2xl border border-zinc-200 dark:border-zinc-800/80 rounded-[1.75rem] shadow-xl shadow-zinc-900/10"
+          >
+
+            {/* Context sub-tabs */}
+            <AnimatePresence>
+              {(activeView === 'studyhub' || activeView === 'academics') && (
+                <motion.div
+    key="dash"
+    custom={navDirection}
+    initial={{ opacity: 0, x: navDirection === 'forward' ? 24 : -24 }}
+    animate={{ opacity: 1, x: 0 }}
+    exit={{ opacity: 0, x: navDirection === 'forward' ? -24 : 24 }}
+    transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
+                  className="overflow-hidden border-b border-zinc-100 dark:border-zinc-800 px-2 pt-2 pb-1.5"
+                >
+                  <div className="flex items-center gap-1">
+                    {activeView === 'studyhub' && [
+                      { id: 'cards',    label: 'Vault',    icon: <FaLayerGroup size={11}/> },
+                      { id: 'exchange', label: 'Exchange', icon: <FaGlobe size={11}/> },
+                      { id: 'lounge',   label: 'Lounge',   icon: <FaUserFriends size={11}/> },
+                    ].map(tab => (
+                      <button key={tab.id}
+                        onClick={() => setStudyTab(tab.id as any)}
+                        className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all touch-manipulation ${
+                          studyTab === tab.id
+                            ? 'bg-[#06402B]/10 dark:bg-emerald-500/10 text-[#06402B] dark:text-emerald-400'
+                            : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300'
+                        }`}>
+                        {tab.icon}{tab.label}
+                      </button>
+                    ))}
+                    {activeView === 'academics' && [
+                      { id: 'schedule', label: 'Schedule', icon: <FaClock size={11}/> },
+                      { id: 'grades',   label: 'Grades',   icon: <FaCalculator size={11}/> },
+                    ].map(tab => (
+                      <button key={tab.id}
+                        onClick={() => setAcademicTab(tab.id as any)}
+                        className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all touch-manipulation ${
+                          academicTab === tab.id
+                            ? 'bg-[#06402B]/10 dark:bg-emerald-500/10 text-[#06402B] dark:text-emerald-400'
+                            : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300'
+                        }`}>
+                        {tab.icon}{tab.label}
+                      </button>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Main nav items */}
+            <div className="flex items-center px-2 py-2 gap-1">
+              {NAV_ITEMS.map((item) => {
+                const isActive = activeView === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => navigateTo(item.id)}
+                    className={`relative flex items-center justify-center touch-manipulation transition-all duration-300 ${
+                      isActive
+                        ? 'flex-[2] gap-2 bg-[#06402B] dark:bg-emerald-600 text-white rounded-2xl py-3 px-4 shadow-lg shadow-[#06402B]/20 dark:shadow-emerald-600/20'
+                        : 'flex-1 text-zinc-400 dark:text-zinc-600 py-3 rounded-2xl hover:bg-zinc-100 dark:hover:bg-zinc-800/60'
+                    }`}
+                  >
+                    <span className={`shrink-0 transition-transform duration-200 ${isActive ? 'scale-110' : 'scale-100'}`}>
+                      {item.icon}
+                    </span>
+                    <AnimatePresence>
+                      {isActive && (
+                        <motion.span
+                          initial={{ opacity: 0, width: 0 }}
+                          animate={{ opacity: 1, width: 'auto' }}
+                          exit={{ opacity: 0, width: 0 }}
+                          transition={{ duration: 0.2 }}
+                          className="text-[10px] font-black uppercase tracking-widest overflow-hidden whitespace-nowrap"
+                        >
+                          {item.label}
+                        </motion.span>
+                      )}
+                    </AnimatePresence>
+                  </button>
+                );
+              })}
+            </div>
+
+          </motion.div>
         )}
-        <span className={`relative z-10 transition-all duration-200 ${
-          isActive ? 'text-white scale-105' : 'text-zinc-400 dark:text-zinc-500'
-        }`}>
-          {item.icon}
-        </span>
-        {/* Active dot indicator */}
-        <span className={`relative z-10 w-1 h-1 rounded-full transition-all duration-200 ${
-          isActive ? 'bg-white/60' : 'bg-transparent'
-        }`} />
-      </button>
-    );
-  })}
-</div>
-    </div>   {/* closes mx-3 mb-2 nav pill */}
-    </div>   {/* closes pointer-events-auto */}
+
+      </AnimatePresence>
+    </div>
   </nav>
 )}
 
