@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import dynamic from 'next/dynamic'; 
 import Image from "next/image";
 import { useTheme } from "next-themes";
@@ -189,7 +189,7 @@ function AdminFeedbackInbox() {
     if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
     return `${Math.floor(diff / 86400)}d ago`;
   };
-
+  
   return (
     <div className="bg-white/60 dark:bg-[#121214]/80 backdrop-blur-xl rounded-[2rem] border border-zinc-200 dark:border-zinc-800/80 shadow-xl transition-colors duration-300 w-full overflow-hidden">
 
@@ -409,6 +409,9 @@ function DashboardInner() {
   const { showAlert, showConfirm } = useModal();
   const [isOnline, setIsOnline] = useState(true);
   const [isStudying, setIsStudying] = useState(false);
+  const [navVisible, setNavVisible] = useState(true);
+const lastScrollY = useRef(0);
+const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const [activeView, setActiveView] = useState('dashboard');
   const [academicTab, setAcademicTab] = useState<'schedule' | 'grades'>('schedule');
@@ -821,6 +824,34 @@ useEffect(() => {
   };
 }, [activeView, isStudying]);
 
+useEffect(() => {
+  const el = scrollContainerRef.current;
+  if (!el) return;
+
+  let ticking = false;
+  const handleScroll = () => {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(() => {
+      const currentY = el.scrollTop;
+      const delta = currentY - lastScrollY.current;
+
+      // Hide when scrolling down more than 8px, show when scrolling up
+      if (delta > 8 && currentY > 60) {
+        setNavVisible(false);
+      } else if (delta < -8) {
+        setNavVisible(true);
+      }
+
+      lastScrollY.current = currentY;
+      ticking = false;
+    });
+  };
+
+  el.addEventListener('scroll', handleScroll, { passive: true });
+  return () => el.removeEventListener('scroll', handleScroll);
+}, []);
+
   const handleAddGeneralTask = async (title: string, deadline: string) => {
     if (!authUser) return;
     await addDoc(collection(db, "tasks"), { userId: authUser.uid, title, status: "pending", deadline, createdAt: serverTimestamp() });
@@ -983,7 +1014,12 @@ const handleSaveProfile = async () => {
       )}
     </div>
   );const formattedDate = currentTime.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-
+  const navigateTo = (view: string) => {
+  setActiveView(view as any);
+  setNavVisible(true);
+  // Scroll back to top when switching sections
+  scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+};
   return (
     <div className="flex h-screen bg-zinc-50 dark:bg-[#09090b] font-sans text-zinc-900 dark:text-zinc-100 overflow-hidden relative transition-colors duration-300">
       <AnimatePresence>
@@ -1021,7 +1057,7 @@ const handleSaveProfile = async () => {
             return (
               <button
                 key={item.id}
-                onClick={() => setActiveView(item.id)}
+                onClick={() => navigateTo(item.id)}
                 className={`w-full flex flex-col items-center gap-1.5 py-3 px-2 transition-all relative group rounded-xl mx-2
                   ${isActive
                     ? 'text-[#06402B] dark:text-emerald-400'
@@ -1164,14 +1200,17 @@ const handleSaveProfile = async () => {
 
         </header>
 
-<div className="flex-1 overflow-x-clip overflow-y-auto pb-28 md:pb-8 custom-scrollbar relative z-10 w-full flex flex-col">
+<div
+  ref={scrollContainerRef}
+  className="flex-1 overflow-x-clip overflow-y-auto pb-28 md:pb-8 custom-scrollbar relative z-10 w-full flex flex-col"
+>
 
   {/* ── Breadcrumb ── */}
   {activeView !== 'dashboard' && (
     <div className="shrink-0 px-4 sm:px-6 md:px-8 pt-4 pb-0">
       <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-zinc-400">
         <button
-          onClick={() => setActiveView('dashboard')}
+          onClick={() => navigateTo('dashboard')}
           className="hover:text-[#06402B] dark:hover:text-emerald-400 transition-colors touch-manipulation"
         >
           Home
@@ -1914,8 +1953,15 @@ const handleSaveProfile = async () => {
       {/* MOBILE BOTTOM NAV */}
 {/* MOBILE BOTTOM NAV */}
 {!isStudying && (
-  <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-    <div className="mx-3 mb-3 bg-white/90 dark:bg-[#121214]/90 backdrop-blur-2xl border border-zinc-200 dark:border-zinc-800/80 rounded-[2rem] shadow-2xl transition-colors duration-300">
+  <nav
+    className="md:hidden fixed bottom-0 left-0 right-0 z-40 pb-[env(safe-area-inset-bottom)] pointer-events-none"
+    style={{
+      transform: navVisible ? 'translateY(0)' : 'translateY(calc(100% + 16px))',
+      transition: 'transform 0.35s cubic-bezier(0.32, 0.72, 0, 1)',
+    }}
+  >
+    <div className="pointer-events-auto">
+<div className="mx-3 mb-2 bg-white/90 dark:bg-[#121214]/90 backdrop-blur-2xl border border-zinc-200 dark:border-zinc-800/80 rounded-[1.75rem] shadow-xl transition-colors duration-300">
 
       {/* Context sub-tabs — shown when inside a section with sub-navigation */}
       <AnimatePresence>
@@ -1925,7 +1971,7 @@ const handleSaveProfile = async () => {
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.18 }}
-            className="overflow-hidden border-b border-zinc-100 dark:border-zinc-800 px-3 pt-2.5 pb-2"
+className="overflow-hidden border-b border-zinc-100 dark:border-zinc-800 px-2 pt-2 pb-1.5"
           >
             <div className="flex items-center gap-1">
               {activeView === 'studyhub' && [
@@ -1935,7 +1981,7 @@ const handleSaveProfile = async () => {
               ].map(tab => (
                 <button key={tab.id}
                   onClick={() => setStudyTab(tab.id as any)}
-                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${
+className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${
                     studyTab === tab.id
                       ? 'bg-[#06402B]/10 dark:bg-emerald-500/10 text-[#06402B] dark:text-emerald-400'
                       : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300'
@@ -1978,47 +2024,38 @@ const handleSaveProfile = async () => {
       </AnimatePresence>
 
       {/* Main nav */}
-      <div className="flex items-center justify-between px-2 py-2">
-        {NAV_ITEMS.map((item) => {
-          const isActive = activeView === item.id;
-          return (
-            <button
-              key={item.id}
-              onClick={() => setActiveView(item.id as any)}
-              className={`relative flex flex-col items-center justify-center transition-all duration-300 ease-out rounded-2xl
-                ${isActive
-                  ? 'bg-[#06402B] dark:bg-emerald-600 text-white px-4 py-3 shadow-md'
-                  : 'text-zinc-400 dark:text-zinc-500 p-3 hover:text-zinc-700 dark:hover:text-zinc-300'
-                }`}
-            >
-              {isActive && (
-                <motion.div
-                  layoutId="mobileNavGlow"
-                  className="absolute inset-0 bg-[#06402B] dark:bg-emerald-600 rounded-2xl shadow-[0_0_20px_rgba(6,64,43,0.4)] dark:shadow-[0_0_20px_rgba(16,185,129,0.3)]"
-                  transition={{ type: "spring", stiffness: 400, damping: 35 }}
-                />
-              )}
-              <span className={`relative z-10 transition-transform duration-200 ${isActive ? 'scale-110' : 'scale-100'}`}>
-                {item.icon}
-              </span>
-              <AnimatePresence>
-                {isActive && (
-                  <motion.span
-                    initial={{ opacity: 0, height: 0, marginTop: 0 }}
-                    animate={{ opacity: 1, height: 'auto', marginTop: 4 }}
-                    exit={{ opacity: 0, height: 0, marginTop: 0 }}
-                    transition={{ duration: 0.2 }}
-                    className="relative z-10 text-[9px] font-black uppercase tracking-widest whitespace-nowrap overflow-hidden"
-                  >
-                    {item.label}
-                  </motion.span>
-                )}
-              </AnimatePresence>
-            </button>
-          );
-        })}
-      </div>
-    </div>
+<div className="flex items-center justify-between px-2 py-1.5">
+  {NAV_ITEMS.map((item) => {
+    const isActive = activeView === item.id;
+    return (
+      <button
+        key={item.id}
+onClick={() => navigateTo(item.id)}
+className="relative flex flex-col items-center justify-center gap-1 p-2.5 rounded-2xl transition-all duration-200 touch-manipulation min-w-0 flex-1"
+      >
+        {/* Active background pill — only wraps the icon, not the whole button */}
+        {isActive && (
+          <motion.div
+            layoutId="mobileNavGlow"
+            className="absolute inset-x-1.5 top-1 bottom-3 bg-[#06402B] dark:bg-emerald-600 rounded-xl shadow-[0_0_12px_rgba(6,64,43,0.35)] dark:shadow-[0_0_12px_rgba(16,185,129,0.25)]"
+            transition={{ type: "spring", stiffness: 400, damping: 35 }}
+          />
+        )}
+        <span className={`relative z-10 transition-all duration-200 ${
+          isActive ? 'text-white scale-105' : 'text-zinc-400 dark:text-zinc-500'
+        }`}>
+          {item.icon}
+        </span>
+        {/* Active dot indicator */}
+        <span className={`relative z-10 w-1 h-1 rounded-full transition-all duration-200 ${
+          isActive ? 'bg-white/60' : 'bg-transparent'
+        }`} />
+      </button>
+    );
+  })}
+</div>
+    </div>   {/* closes mx-3 mb-2 nav pill */}
+    </div>   {/* closes pointer-events-auto */}
   </nav>
 )}
 
