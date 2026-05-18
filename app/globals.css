@@ -36,6 +36,14 @@ html {
   100% { top: 110%; }
 }
 
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%       { transform: translateX(-6px); }
+  40%       { transform: translateX(6px); }
+  60%       { transform: translateX(-4px); }
+  80%       { transform: translateX(4px); }
+}
+
 /* --- SPLASH SCREEN & CHAT MODE LOGIC --- */
 
 /* Hides elements when splash is active OR when in chat mode */

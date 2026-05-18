@@ -225,13 +225,15 @@ export default function GWACalculator({ autoGrades = [] }: GWACalculatorProps) {
       </div>
 
       <div className="pt-2 space-y-3 flex-1 overflow-y-auto pr-2 custom-scrollbar min-h-[250px]">
-        <div className="flex items-center gap-2 text-[10px] md:text-xs font-bold text-zinc-400 uppercase tracking-widest px-1">
-          <span className="w-5 md:w-8 text-center shrink-0">#</span>
-          <span className="flex-1 min-w-[100px]">Subject</span>
-          <span className="w-16 md:w-24 text-center shrink-0">Score</span>
-          <span className="w-12 md:w-16 text-center shrink-0">Units</span>
-          {program !== "Standard" && <span className="w-10 md:w-14 text-center shrink-0" title="Major Subject?">Major</span>}
-          <span className="w-8 md:w-10 text-center shrink-0">Act</span>
+        <div className="flex items-center justify-between px-1 mb-1">
+          <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
+            {subjects.length} subject{subjects.length !== 1 ? "s" : ""} entered
+          </p>
+          {subjects.some(s => s.raw) && (
+            <p className="text-[10px] font-bold text-zinc-400">
+              Est. GWA preview as you type
+            </p>
+          )}
         </div>
         
         <AnimatePresence>
@@ -274,17 +276,55 @@ export default function GWACalculator({ autoGrades = [] }: GWACalculatorProps) {
         )}
         
         {result.gwa !== null && !result.error && (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-6 p-6 bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-[1.5rem] flex flex-col items-center">
-            <span className="text-[10px] md:text-xs font-bold uppercase text-zinc-500 tracking-widest mb-1">Weighted Average (GWA)</span>
-            <div className={`text-6xl md:text-7xl font-black tracking-tighter ${result.gwa >= 3.0 && result.title ? "text-[#06402B] dark:text-emerald-400" : "text-zinc-700 dark:text-white"}`}>{result.gwa.toFixed(4)}</div>
-            
-            {result.title ? (
-              <div className="inline-flex items-center gap-2 px-4 py-2 mt-4 bg-yellow-500/10 border border-yellow-500/30 rounded-full text-yellow-600 dark:text-yellow-400 text-[10px] sm:text-xs md:text-sm font-bold uppercase tracking-wide animate-pulse"><FaAward size={14} /> {result.title}</div>
-            ) : result.gwa >= 3.0 ? (
-               <p className="text-red-500 font-bold uppercase tracking-widest text-[10px] mt-4">Disqualified due to a grade below 2.0</p>
-            ) : (
-               <p className="text-zinc-400 text-xs mt-4 font-medium">Keep pushing next semester!</p>
-            )}
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+            className="mt-6 rounded-[1.5rem] overflow-hidden border border-zinc-200 dark:border-zinc-800"
+          >
+            {/* GWA header */}
+            <div className={`p-6 flex flex-col sm:flex-row items-center gap-5 ${result.title ? "bg-[#06402B]/5 dark:bg-emerald-500/5" : "bg-zinc-50 dark:bg-zinc-900/50"}`}>
+              <div className="text-center sm:text-left">
+                <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-1">GWA</p>
+                <p className={`text-6xl font-black tracking-tighter ${result.gwa >= 3.0 && result.title ? "text-[#06402B] dark:text-emerald-400" : "text-zinc-800 dark:text-white"}`}>
+                  {result.gwa.toFixed(4)}
+                </p>
+                {result.title ? (
+                  <div className="inline-flex items-center gap-2 px-3 py-1.5 mt-3 bg-amber-500/10 border border-amber-500/30 rounded-full text-amber-600 dark:text-amber-400 text-xs font-black uppercase tracking-widest">
+                    <FaAward size={12} /> {result.title}
+                  </div>
+                ) : result.gwa >= 3.0 ? (
+                  <p className="text-red-500 font-bold text-[10px] mt-3 uppercase tracking-widest">A grade below 2.0 disqualifies honors.</p>
+                ) : (
+                  <p className="text-zinc-400 text-xs mt-3 font-medium">Keep pushing — you've got next semester.</p>
+                )}
+              </div>
+            </div>
+
+            {/* Per-subject breakdown */}
+            <div className="bg-white dark:bg-zinc-900 border-t border-zinc-100 dark:border-zinc-800 p-4 space-y-2">
+              <p className="text-[9px] font-black text-zinc-400 uppercase tracking-widest mb-3">Subject Breakdown</p>
+              {subjects.filter(s => s.raw && !isNaN(parseFloat(s.raw))).map(s => {
+                const gpa = getGpaFromScore(parseFloat(s.raw), program, s.isMajor);
+                const pct = (gpa / 4.0) * 100;
+                const color = gpa >= 3.0 ? "bg-[#06402B] dark:bg-emerald-500" : gpa >= 2.0 ? "bg-amber-500" : "bg-red-500";
+                return (
+                  <div key={s.id} className="flex items-center gap-3">
+                    <p className="text-xs font-bold text-zinc-700 dark:text-zinc-300 truncate w-32 shrink-0">
+                      {s.name || `Subject ${subjects.indexOf(s) + 1}`}
+                    </p>
+                    <div className="flex-1 h-2 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${pct}%` }}
+                        transition={{ duration: 0.7, ease: "easeOut" }}
+                        className={`h-full rounded-full ${color}`}
+                      />
+                    </div>
+                    <span className={`text-xs font-black w-8 text-right shrink-0 ${gpa >= 3.0 ? "text-[#06402B] dark:text-emerald-400" : gpa >= 2.0 ? "text-amber-500" : "text-red-500"}`}>
+                      {gpa.toFixed(1)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -293,56 +333,86 @@ export default function GWACalculator({ autoGrades = [] }: GWACalculatorProps) {
 }
 
 const SubjectRow = memo(({ sub, index, program, updateSubject, removeSubject, canRemove, isImported }: any) => {
-  const previewGPA = sub.raw ? getGpaFromScore(parseFloat(sub.raw), program, sub.isMajor).toFixed(1) : "-.-";
+  const raw = parseFloat(sub.raw);
+  const previewGPA = sub.raw && !isNaN(raw) ? getGpaFromScore(raw, program, sub.isMajor) : null;
+  const gpaColor = previewGPA === null ? "" : previewGPA >= 3.0 ? "text-[#06402B] dark:text-emerald-400" : previewGPA >= 1.0 ? "text-amber-500" : "text-red-500";
+
   return (
-    <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }} className="flex items-center gap-2 w-full group">
-      <div className="w-5 md:w-8 text-center text-[10px] md:text-xs font-mono text-zinc-500 shrink-0">#{index + 1}</div>
-      
-      <div className="flex-1 min-w-[100px] flex flex-col gap-1">
-        {isImported && (
-          <span className="w-fit inline-flex items-center gap-1 px-1.5 py-0.5 bg-[#06402B]/10 dark:bg-emerald-500/10 text-[#06402B] dark:text-emerald-400 rounded-md text-[9px] font-black uppercase tracking-widest ml-1 mb-[-2px]">
-            <FaCheckCircle size={7} /> synced
-          </span>
-        )}
-        <input 
-          type="text" placeholder="Subject Name" value={sub.name} 
-          onChange={(e) => updateSubject(sub.id, "name", e.target.value)} 
-          className="w-full bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-3 md:py-2.5 font-bold text-xs md:text-sm text-zinc-900 dark:text-white outline-none focus:border-[#06402B] transition-colors placeholder:font-normal shadow-sm" 
-        />
-      </div>
-      
-      <div className="w-16 md:w-24 relative shrink-0 self-end">
-        <input 
-          type="number" placeholder="0-100" value={sub.raw} 
-          onChange={(e) => updateSubject(sub.id, "raw", e.target.value)} 
-          className="w-full bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-3 md:py-2.5 text-center font-mono font-bold text-sm md:text-base text-[#06402B] dark:text-emerald-400 outline-none focus:border-[#06402B] transition-colors shadow-sm" 
-        />
-        <div className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] md:text-[10px] font-bold text-[#06402B] dark:text-emerald-400 pointer-events-none opacity-0 group-focus-within:opacity-100 transition-opacity hidden md:block">
-          {sub.raw && !isNaN(parseFloat(sub.raw)) ? `≈${previewGPA}` : ""}
+    <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.96 }}
+      className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-3 sm:p-4 group hover:border-[#06402B]/30 dark:hover:border-emerald-500/30 transition-all"
+    >
+      {/* Row header */}
+      <div className="flex items-center justify-between mb-2.5">
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-mono font-bold text-zinc-400">#{index + 1}</span>
+          {isImported && (
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-[#06402B]/10 dark:bg-emerald-500/10 text-[#06402B] dark:text-emerald-400 rounded-md text-[8px] font-black uppercase tracking-widest">
+              <FaCheckCircle size={6} /> synced
+            </span>
+          )}
+          {previewGPA !== null && (
+            <span className={`text-[10px] font-black px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 ${gpaColor}`}>
+              GPA {previewGPA.toFixed(1)}
+            </span>
+          )}
         </div>
-      </div>
-      
-      <div className="w-12 md:w-16 shrink-0 self-end">
-        <input type="number" placeholder="Unit" value={sub.units} onChange={(e) => updateSubject(sub.id, "units", e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-3 md:py-2.5 text-center font-mono text-sm md:text-base outline-none focus:border-[#06402B] transition-colors text-zinc-600 dark:text-zinc-300 shadow-sm" />
-      </div>
-      
-      {program !== "Standard" && (
-        <div className="w-10 md:w-14 shrink-0 self-end">
-          <button 
-            onClick={() => updateSubject(sub.id, "isMajor", !sub.isMajor)} 
-            className={`w-full py-[13px] md:py-3 rounded-lg text-[8px] md:text-[10px] font-black uppercase tracking-widest transition-all ${sub.isMajor ? 'bg-[#06402B] dark:bg-emerald-600 text-white shadow-sm' : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 border border-zinc-200 dark:border-zinc-700'}`}
-          >
-            {sub.isMajor ? 'YES' : 'NO'}
-          </button>
-        </div>
-      )}
-      
-      <div className="w-8 md:w-10 shrink-0 flex justify-center self-end pb-2">
-        <button onClick={() => removeSubject(sub.id)} className="text-zinc-400 hover:text-red-500 transition-colors p-2 rounded-lg" disabled={!canRemove}>
-          <FaTrash size={14} className="md:w-3 md:h-3" />
+        <button onClick={() => removeSubject(sub.id)} disabled={!canRemove}
+          className="w-7 h-7 flex items-center justify-center rounded-lg text-zinc-300 dark:text-zinc-700 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 disabled:opacity-0 transition-all touch-manipulation"
+        >
+          <FaTrash size={11} />
         </button>
+      </div>
+
+      {/* Subject name */}
+      <input
+        type="text" placeholder="Subject name (optional)" value={sub.name}
+        onChange={e => updateSubject(sub.id, "name", e.target.value)}
+        style={{ fontSize: "16px" }}
+        className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2.5 font-bold text-sm text-zinc-900 dark:text-white outline-none focus:border-[#06402B] dark:focus:border-emerald-500 transition-colors placeholder:font-normal placeholder:text-zinc-400 mb-2.5 touch-manipulation"
+      />
+
+      {/* Score + Units + Major row */}
+      <div className="flex items-center gap-2">
+        {/* Score */}
+        <div className="flex-1 space-y-1">
+          <label className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">Score %</label>
+          <input
+            type="number" inputMode="decimal" placeholder="0–100" value={sub.raw}
+            onChange={e => updateSubject(sub.id, "raw", e.target.value)}
+            style={{ fontSize: "16px" }}
+            className="w-full bg-zinc-50 dark:bg-zinc-800 border-2 border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-3 text-center font-mono font-black text-lg text-[#06402B] dark:text-emerald-400 outline-none focus:border-[#06402B] dark:focus:border-emerald-500 transition-colors touch-manipulation"
+          />
+        </div>
+
+        {/* Units */}
+        <div className="w-20 space-y-1">
+          <label className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">Units</label>
+          <input
+            type="number" inputMode="numeric" placeholder="3" value={sub.units}
+            onChange={e => updateSubject(sub.id, "units", e.target.value)}
+            style={{ fontSize: "16px" }}
+            className="w-full bg-zinc-50 dark:bg-zinc-800 border-2 border-zinc-200 dark:border-zinc-700 rounded-xl px-2 py-3 text-center font-mono font-bold text-base text-zinc-700 dark:text-zinc-300 outline-none focus:border-[#06402B] dark:focus:border-emerald-500 transition-colors touch-manipulation"
+          />
+        </div>
+
+        {/* Major toggle — only for non-Standard */}
+        {program !== "Standard" && (
+          <div className="space-y-1">
+            <label className="text-[9px] font-black text-zinc-400 uppercase tracking-widest block text-center">Major</label>
+            <button
+              onClick={() => updateSubject(sub.id, "isMajor", !sub.isMajor)}
+              className={`w-16 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all active:scale-95 touch-manipulation ${
+                sub.isMajor
+                  ? "bg-[#06402B] dark:bg-emerald-600 text-white shadow-sm"
+                  : "bg-zinc-100 dark:bg-zinc-800 text-zinc-400 border border-zinc-200 dark:border-zinc-700"
+              }`}
+            >
+              {sub.isMajor ? "Yes" : "No"}
+            </button>
+          </div>
+        )}
       </div>
     </motion.div>
   );
 });
-SubjectRow.displayName = 'SubjectRow';
+SubjectRow.displayName = "SubjectRow";

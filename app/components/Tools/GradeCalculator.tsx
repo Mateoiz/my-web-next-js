@@ -186,46 +186,53 @@ const GradeRow = memo(({ label, values, setValues, type, imported }: {
   type: "exam" | "direct";
   imported?: boolean;
 }) => (
-  <div className="grid grid-cols-12 gap-2 items-center group/row">
-    <div className="col-span-4 flex items-center gap-2">
-      <span className="text-xs md:text-sm font-bold text-zinc-700 dark:text-zinc-300 truncate">{label}</span>
-      {imported && (
-        <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 bg-[#06402B]/10 dark:bg-emerald-500/10 text-[#06402B] dark:text-emerald-400 rounded-md text-[9px] font-black uppercase tracking-widest">
-          <FaCheckCircle size={7} /> synced
+  <div className="grid grid-cols-12 gap-2 items-center py-1.5 px-3 rounded-2xl hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition-colors group/row">
+    <div className="col-span-4 flex flex-col gap-0.5 min-w-0">
+      <span className="text-xs font-black text-zinc-800 dark:text-zinc-200 truncate leading-tight">{label}</span>
+      {imported ? (
+        <span className="inline-flex items-center gap-1 text-[8px] font-black text-[#06402B] dark:text-emerald-400 uppercase tracking-widest">
+          <FaCheckCircle size={6} /> synced
+        </span>
+      ) : (
+        <span className="text-[9px] text-zinc-400 font-medium">
+          {type === "direct" ? "out of 20" : `${values.weight}% weight`}
         </span>
       )}
     </div>
     <div className="col-span-3">
       <input
         type="number"
+        inputMode="decimal"
         placeholder={type === "direct" ? "0–20" : "0"}
         value={values.raw}
         onChange={e => setValues({ ...values, raw: e.target.value })}
-        className={`w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-3 md:py-2 text-center font-mono font-bold text-sm outline-none focus:border-[#06402B] dark:focus:border-emerald-500 focus:ring-2 focus:ring-[#06402B]/10 dark:focus:ring-emerald-500/10 transition-colors ${type === "direct" ? "text-[#06402B] dark:text-emerald-400" : ""}`}
+        style={{ fontSize: "16px" }}
+        className={`w-full bg-white dark:bg-zinc-900 border-2 border-zinc-200 dark:border-zinc-700 rounded-xl px-2 py-3 text-center font-mono font-black text-base outline-none focus:border-[#06402B] dark:focus:border-emerald-500 transition-colors touch-manipulation ${
+          type === "direct" ? "text-[#06402B] dark:text-emerald-400" : "text-zinc-900 dark:text-white"
+        }`}
       />
     </div>
     <div className="col-span-3">
       {type === "exam" ? (
         <input
           type="number"
-          placeholder="/ 100"
+          inputMode="decimal"
+          placeholder="100"
           value={values.total}
           onChange={e => setValues({ ...values, total: e.target.value })}
-          className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-3 md:py-2 text-center font-mono text-sm outline-none focus:border-[#06402B] dark:focus:border-emerald-500 focus:ring-2 focus:ring-[#06402B]/10 dark:focus:ring-emerald-500/10 transition-colors text-zinc-600 dark:text-zinc-400"
+          style={{ fontSize: "16px" }}
+          className="w-full bg-white dark:bg-zinc-900 border-2 border-zinc-200 dark:border-zinc-700 rounded-xl px-2 py-3 text-center font-mono text-base outline-none focus:border-[#06402B] dark:focus:border-emerald-500 transition-colors text-zinc-500 dark:text-zinc-400 touch-manipulation"
         />
       ) : (
-        <div className="w-full text-center text-[10px] md:text-xs text-zinc-400 font-black tracking-widest py-3 md:py-2.5 bg-zinc-100 dark:bg-zinc-800/50 rounded-lg select-none uppercase">
-          Max 20
+        <div className="w-full text-center text-xs text-zinc-400 font-black tracking-widest py-3 bg-zinc-100 dark:bg-zinc-800 rounded-xl select-none">
+          /20
         </div>
       )}
     </div>
     <div className="col-span-2">
-      <input
-        type="number"
-        value={values.weight}
-        disabled
-        className="w-full bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-1 py-3 md:py-2 text-center font-mono text-xs text-zinc-500 outline-none select-none"
-      />
+      <div className="w-full text-center py-3 bg-[#06402B]/8 dark:bg-emerald-500/10 rounded-xl">
+        <span className="text-xs font-black text-[#06402B] dark:text-emerald-400">{values.weight}%</span>
+      </div>
     </div>
   </div>
 ));
@@ -485,11 +492,11 @@ const calculateGrade = useCallback(() => {
 
       {/* ── Table ──────────────────────────────────────────────────────────── */}
       <div className="space-y-4">
-        <div className="grid grid-cols-12 text-[10px] md:text-xs font-black text-zinc-400 uppercase tracking-widest px-1 gap-2">
-          <span className="col-span-4">Category</span>
+        <div className="grid grid-cols-12 text-[9px] font-black text-zinc-400 uppercase tracking-widest px-1 gap-2 pb-1 border-b border-zinc-100 dark:border-zinc-800">
+          <span className="col-span-4">Component</span>
           <span className="col-span-3 text-center">Score</span>
-          <span className="col-span-3 text-center">Total</span>
-          <span className="col-span-2 text-center">W%</span>
+          <span className="col-span-3 text-center">Out of</span>
+          <span className="col-span-2 text-center">Wt.</span>
         </div>
 
         {/* FIX: All 4 rows always rendered — no conditional rendering that could cut rows off */}
@@ -534,23 +541,53 @@ const calculateGrade = useCallback(() => {
         {gpa !== null && !result.error && (
           <motion.div
             initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-            className="mt-6 p-6 bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-[1.5rem] flex flex-col items-center"
+            className="mt-6 rounded-[1.5rem] overflow-hidden border border-zinc-200 dark:border-zinc-800"
           >
-            <span className="text-[10px] md:text-xs text-zinc-500 font-bold uppercase tracking-widest mb-1">Subject GPA</span>
-            <div className={`text-6xl md:text-7xl font-black tracking-tighter ${gpaColor}`}>
-              {gpa.toFixed(1)}
-            </div>
-            <div className="mt-2 text-zinc-500 dark:text-zinc-400 font-mono text-sm">
-              Raw Score: <span className="text-zinc-800 dark:text-zinc-200 font-bold">{result.percentage?.toFixed(2)}%</span>
+            {/* Score header */}
+            <div className={`p-6 flex flex-col sm:flex-row items-center sm:items-start gap-5 ${gpa >= 3.0 ? "bg-[#06402B]/5 dark:bg-emerald-500/5" : gpa >= 1.0 ? "bg-amber-500/5" : "bg-red-500/5"}`}>
+              {/* Ring */}
+              <div className="relative w-24 h-24 shrink-0">
+                <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
+                  <circle cx="50" cy="50" r="40" fill="none" strokeWidth="8" className="text-zinc-200 dark:text-zinc-800" stroke="currentColor" />
+                  <motion.circle cx="50" cy="50" r="40" fill="none"
+                    stroke={gpa >= 3.0 ? "#06402B" : gpa >= 1.0 ? "#f59e0b" : "#ef4444"}
+                    strokeWidth="8" strokeLinecap="round"
+                    strokeDasharray={`${2 * Math.PI * 40}`}
+                    initial={{ strokeDashoffset: 2 * Math.PI * 40 }}
+                    animate={{ strokeDashoffset: 2 * Math.PI * 40 * (1 - (result.percentage ?? 0) / 100) }}
+                    transition={{ duration: 1, ease: "easeOut" }}
+                  />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center flex-col">
+                  <span className={`text-xl font-black leading-none ${gpaColor}`}>{gpa.toFixed(1)}</span>
+                  <span className="text-[8px] font-black text-zinc-400 uppercase tracking-widest">GPA</span>
+                </div>
+              </div>
+
+              <div className="text-center sm:text-left">
+                <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-1">Raw Score</p>
+                <p className={`text-4xl font-black tracking-tighter ${gpaColor}`}>{result.percentage?.toFixed(2)}%</p>
+                <p className="text-sm font-bold text-zinc-500 dark:text-zinc-400 mt-1">{gpaLabel(gpa)}</p>
+
+                {/* Score bar */}
+                <div className="mt-3 h-2 w-48 bg-zinc-200 dark:bg-zinc-700 rounded-full overflow-hidden">
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${Math.min(result.percentage ?? 0, 100)}%` }}
+                    transition={{ duration: 0.9, ease: "easeOut" }}
+                    className={`h-full rounded-full ${gpa >= 3.0 ? "bg-[#06402B]" : gpa >= 1.0 ? "bg-amber-500" : "bg-red-500"}`}
+                  />
+                </div>
+              </div>
             </div>
 
             {/* Per-component breakdown */}
-            <div className="mt-4 w-full max-w-sm grid grid-cols-4 gap-2 text-center">
+            <div className="grid grid-cols-4 divide-x divide-zinc-100 dark:divide-zinc-800 border-t border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900">
               {[
-                { label: "Midterm", row: rows.midterms,      isDirect: false },
-                { label: "Finals",  row: rows.finals,        isDirect: false },
-                { label: "Product", row: rows.finalProduct,  isDirect: false },
-                { label: "CS",      row: rows.classStanding, isDirect: true  },
+                { label: "Midterm", row: rows.midterms, isDirect: false },
+                { label: "Finals",  row: rows.finals,   isDirect: false },
+                { label: "Product", row: rows.finalProduct, isDirect: false },
+                { label: "CS",      row: rows.classStanding, isDirect: true },
               ].map(({ label, row, isDirect }) => {
                 const raw = parseFloat(row.raw);
                 const total = parseFloat(row.total);
@@ -558,18 +595,18 @@ const calculateGrade = useCallback(() => {
                 const pts = !isNaN(raw)
                   ? isDirect ? raw : (!isNaN(total) && total > 0 ? (raw / total) * weight : 0)
                   : 0;
+                const hasValue = !isNaN(raw) && row.raw !== "";
                 return (
-                  <div key={label} className="bg-white dark:bg-zinc-900 rounded-xl py-2.5 px-1 border border-zinc-100 dark:border-zinc-800">
-                    <div className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-0.5">{label}</div>
-                    <div className="text-sm font-black text-zinc-800 dark:text-zinc-200 tabular-nums">{pts.toFixed(1)}</div>
+                  <div key={label} className="flex flex-col items-center py-3 px-1 gap-0.5">
+                    <span className="text-[8px] font-black text-zinc-400 uppercase tracking-widest">{label}</span>
+                    <span className={`text-sm font-black tabular-nums ${hasValue ? "text-zinc-900 dark:text-white" : "text-zinc-300 dark:text-zinc-700"}`}>
+                      {hasValue ? pts.toFixed(1) : "—"}
+                    </span>
+                    <span className="text-[8px] text-zinc-400 font-medium">{row.weight}%</span>
                   </div>
                 );
               })}
             </div>
-
-            <p className="mt-4 text-[10px] md:text-xs font-bold uppercase tracking-widest text-zinc-400">
-              {gpaLabel(gpa)}
-            </p>
           </motion.div>
         )}
       </AnimatePresence>
