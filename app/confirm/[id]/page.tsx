@@ -1,0 +1,273 @@
+// app/confirm/[id]/page.tsx
+// Piece 2: QR code confirmation card shown after registration
+// ─────────────────────────────────────────────────────────────────────────────
+// SETUP:  npm install react-qr-code
+// Route:  /confirm/[firestoreDocId]
+// ─────────────────────────────────────────────────────────────────────────────
+
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { useParams } from "next/navigation";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/db";
+import QRCode from "react-qr-code";
+import { motion } from "framer-motion";
+import {
+  FaCheckCircle, FaDownload, FaSpinner, FaCalendarAlt,
+  FaIdCard, FaUser, FaExclamationTriangle, FaImage,
+} from "react-icons/fa";
+
+import FloatingCubes from "@/app/components/FloatingCubes";
+import CircuitCursor from "@/app/components/CircuitCursor";
+
+export default function ConfirmPage() {
+  const { id } = useParams<{ id: string }>();
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+  const [downloadingPng, setDownloadingPng] = useState(false);
+
+  const qrWrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!id) return;
+    (async () => {
+      try {
+        const snap = await getDoc(doc(db, "cvmas_registrations", id));
+        if (snap.exists()) {
+          setData({ id: snap.id, ...snap.data() });
+        } else {
+          setNotFound(true);
+        }
+      } catch {
+        setNotFound(true);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [id]);
+
+  // Converts the rendered QR <svg> into a downloadable PNG, with a small
+  // white padding frame + reference code printed underneath so the saved
+  // image is still legible/usable on its own outside the app.
+  const handleDownloadPng = async () => {
+    const svgEl = qrWrapRef.current?.querySelector("svg");
+    if (!svgEl || !data) return;
+
+    setDownloadingPng(true);
+    try {
+      const refCode = data.id.slice(0, 8).toUpperCase();
+      const svgString = new XMLSerializer().serializeToString(svgEl);
+      const svgBlob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
+      const svgUrl = URL.createObjectURL(svgBlob);
+
+      const img = new Image();
+      const qrPixelSize = 180 * 4; // upscale for a crisp export
+      const padding = 48;
+      const footerHeight = 60;
+
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = reject;
+        img.src = svgUrl;
+      });
+
+      const canvas = document.createElement("canvas");
+      canvas.width = qrPixelSize + padding * 2;
+      canvas.height = qrPixelSize + padding * 2 + footerHeight;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Canvas not supported");
+
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, padding, padding, qrPixelSize, qrPixelSize);
+
+      ctx.fillStyle = "#06402B";
+      ctx.font = "bold 32px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(refCode, canvas.width / 2, qrPixelSize + padding + 42);
+
+      URL.revokeObjectURL(svgUrl);
+
+      const pngUrl = canvas.toDataURL("image/png");
+      const link = document.createElement("a");
+      link.href = pngUrl;
+      link.download = `cvmas-qr-${refCode}.png`;
+      link.click();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setDownloadingPng(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-black">
+        <FaSpinner className="animate-spin text-[#06402B] dark:text-emerald-400" size={32} />
+      </div>
+    );
+  }
+
+  if (notFound || !data) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-zinc-50 dark:bg-black px-4">
+        <FaExclamationTriangle size={32} className="text-red-500" />
+        <p className="text-sm font-bold text-zinc-600 dark:text-zinc-400">Registration not found.</p>
+      </div>
+    );
+  }
+
+  // The QR value encodes the Firestore doc ID — the scanner reads this
+  const qrValue = `cvmas:${data.id}`;
+  const refCode = data.id.slice(0, 8).toUpperCase();
+
+  return (
+    <div className="min-h-screen bg-zinc-50 dark:bg-black relative overflow-hidden font-sans selection:bg-green-500/30 pb-12">
+
+      {/* Ambient background layer — matches the workspace hub's visual language */}
+      <div className="absolute inset-0 z-0 pointer-events-none">
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]" />
+        <div className="absolute top-[10%] left-[-10%] w-[400px] h-[400px] bg-green-500/10 rounded-full blur-3xl opacity-40" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-emerald-500/10 rounded-full blur-3xl opacity-40" />
+        <div className="absolute inset-0 opacity-30 sm:opacity-50">
+          <FloatingCubes />
+        </div>
+      </div>
+
+      <div className="hidden md:block">
+        <CircuitCursor />
+      </div>
+
+      <div className="relative z-10">
+
+        {/* Navbar clearance + success header (now an inset card, not edge-to-edge) */}
+        <div className="pt-24 md:pt-28 px-4">
+          <div className="max-w-sm mx-auto relative overflow-hidden rounded-[2rem] border border-white/10 shadow-2xl bg-[#06402B] text-white text-center px-5 py-8">
+            <div className="absolute inset-0 bg-[url('/scanlines.png')] opacity-10 pointer-events-none" />
+            <motion.div
+              initial={{ scale: 0.5, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: "spring", stiffness: 300, damping: 20 }}
+              className="relative flex justify-center mb-3"
+            >
+              <div className="w-14 h-14 rounded-full bg-white/20 flex items-center justify-center">
+                <FaCheckCircle size={28} className="text-emerald-300" />
+              </div>
+            </motion.div>
+            <h1 className="relative text-xl font-black tracking-tight mb-1">You're pre-registered!</h1>
+            <p className="relative text-sm text-emerald-100">CVMAS Week · DLSAU</p>
+          </div>
+        </div>
+
+        <div className="max-w-sm mx-auto px-4 pt-6 space-y-4">
+
+          {/* QR Card */}
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white dark:bg-zinc-900/60 backdrop-blur-xl rounded-3xl border border-zinc-200 dark:border-zinc-800 p-6 text-center shadow-xl space-y-5"
+          >
+            {/* QR Code */}
+            <div ref={qrWrapRef} className="flex justify-center">
+              <div className="p-4 bg-white rounded-2xl border border-zinc-100 inline-block">
+                <QRCode
+                  value={qrValue}
+                  size={180}
+                  level="H"
+                  fgColor="#06402B"
+                />
+              </div>
+            </div>
+
+            {/* Reference code */}
+            <div>
+              <p className="text-[9px] font-bold uppercase tracking-widest text-zinc-400 mb-1">Reference Code</p>
+              <p className="text-2xl font-black tracking-[0.15em] text-zinc-900 dark:text-white font-mono">
+                {refCode}
+              </p>
+            </div>
+
+            {/* Status badge */}
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+              <span className="text-[10px] font-black uppercase tracking-widest text-amber-600 dark:text-amber-400">
+                Pre-registered
+              </span>
+            </div>
+
+            {/* Student details */}
+            <div className="space-y-2 text-left border-t border-zinc-100 dark:border-zinc-800 pt-4">
+              <DetailRow icon={<FaUser size={10} />} label="Name" value={data.fullName} />
+              <DetailRow icon={<FaIdCard size={10} />} label="ID Number" value={data.idNumber} />
+              <DetailRow icon={<FaCalendarAlt size={10} />} label="Program & Year" value={`${data.program} · ${data.yearLevel}`} />
+              <DetailRow icon={<span className="text-[9px] font-black">BLK</span>} label="Block" value={data.block} />
+            </div>
+
+            {/* Professors list */}
+            {data.professors?.length > 0 && (
+              <div className="text-left border-t border-zinc-100 dark:border-zinc-800 pt-4 space-y-2">
+                <p className="text-[9px] font-black uppercase tracking-widest text-zinc-400">Incentive professors</p>
+                {data.professors.map((p: any, i: number) => (
+                  <div key={i} className="text-xs text-zinc-600 dark:text-zinc-400 font-medium">
+                    <span className="font-bold text-zinc-800 dark:text-zinc-200">{p.professor}</span>
+                    {" — "}{p.subject} · {p.block}
+                  </div>
+                ))}
+              </div>
+            )}
+          </motion.div>
+
+          {/* Instructions */}
+          <div className="p-4 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-2xl space-y-2">
+            <p className="text-[10px] font-black uppercase tracking-widest text-amber-700 dark:text-amber-400">Important</p>
+            <ul className="space-y-1.5 text-xs font-medium text-amber-700 dark:text-amber-300 list-disc list-inside">
+              <li>Screenshot or save this QR code</li>
+              <li>Present this at the CVMAS Week entrance</li>
+              <li>Staff will scan it to mark you as an attendee</li>
+              <li>Your reference code is: <strong>{refCode}</strong></li>
+            </ul>
+          </div>
+
+          {/* Save actions */}
+          <div className="flex gap-3">
+            <button
+              onClick={handleDownloadPng}
+              disabled={downloadingPng}
+              className="flex-1 py-3.5 bg-[#06402B] dark:bg-emerald-600 rounded-2xl text-[11px] font-bold uppercase tracking-widest text-white hover:bg-[#0a5a38] dark:hover:bg-emerald-500 shadow-lg transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
+            >
+              {downloadingPng ? (
+                <><FaSpinner size={11} className="animate-spin" /> Saving…</>
+              ) : (
+                <><FaImage size={11} /> Save as PNG</>
+              )}
+            </button>
+            <button
+              onClick={() => window.print()}
+              className="flex-1 py-3.5 border border-zinc-200 dark:border-zinc-700 rounded-2xl text-[11px] font-bold uppercase tracking-widest text-zinc-500 hover:text-[#06402B] dark:hover:text-emerald-400 hover:border-[#06402B]/30 transition-all flex items-center justify-center gap-2 active:scale-95"
+            >
+              <FaDownload size={11} /> Print / PDF
+            </button>
+          </div>
+
+          <p className="text-center text-[10px] text-zinc-400 pb-4">
+            Need to re-find this page? Go to your browser history or use reference code {refCode} at the event.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DetailRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="flex items-start gap-2">
+      <span className="text-zinc-400 mt-0.5 shrink-0">{icon}</span>
+      <div className="min-w-0">
+        <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-400">{label}: </span>
+        <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200">{value}</span>
+      </div>
+    </div>
+  );
+}
