@@ -12,7 +12,16 @@ html {
 }
 
 /* --- VALENTINE'S THEME OVERRIDES --- */
-
+@layer components {
+  /* This makes your buttons grow slightly and glow when you hover */
+  .paw-hover {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .paw-hover:hover {
+    transform: scale(1.02);
+    box-shadow: 0 10px 15px -3px rgba(6, 64, 43, 0.2);
+  }
+}
 /* 1. Selection Color: Changed from Green to Rose-600 */
 ::selection {
   background-color: #e11d48; /* Rose-600 */

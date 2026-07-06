@@ -9,7 +9,7 @@ import {
   FaQrcode, FaCheckCircle, FaExclamationTriangle,
   FaUser, FaIdCard, FaLayerGroup, FaRedo, FaSpinner,
   FaUpload, FaCamera, FaLock, FaSignInAlt, FaKeyboard,
-  FaUndo, FaHistory, FaBolt, FaTrash, FaChevronDown, FaChevronUp,
+  FaUndo, FaHistory, FaBolt, FaTrash, FaChevronDown, FaChevronUp, FaTimes,
 } from "react-icons/fa";
 import { useRouter } from "next/navigation";
 
@@ -40,7 +40,7 @@ type SessionStats = { scanned: number; checkedIn: number; duplicate: number; err
 
 const EMPTY_STATS: SessionStats = { scanned: 0, checkedIn: 0, duplicate: 0, error: 0 };
 
-// ─── Small storage helpers (sessionStorage only — resets when the shift ends) ─
+// ─── Local Storage Helpers ────────────────────────────────────────────────────
 
 function loadStats(): SessionStats {
   if (typeof window === "undefined") return EMPTY_STATS;
@@ -67,7 +67,7 @@ function timeAgo(ts: number) {
   return `${Math.floor(m / 60)}h ago`;
 }
 
-// ─── Main scanner component ───────────────────────────────────────────────────
+// ─── Main Scanner Component ───────────────────────────────────────────────────
 
 export default function ScanPage() {
   const router = useRouter();
@@ -86,7 +86,6 @@ export default function ScanPage() {
   const [uploadPreview, setUploadPreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
-  // ── QoL state ──────────────────────────────────────────────────────────────
   const [sessionStats, setSessionStats] = useState<SessionStats>(EMPTY_STATS);
   const [recentScans, setRecentScans] = useState<RecentScan[]>([]);
   const [recentOpen, setRecentOpen] = useState(false);
@@ -98,15 +97,12 @@ export default function ScanPage() {
   const [soundOn, setSoundOn] = useState(true);
 
   const processingRef = useRef(false);
-  const lastCheckedInRef = useRef<{ id: string; name: string } | null>(null);
 
-  // Hydrate session stats/log once mounted on the client
   useEffect(() => {
     setSessionStats(loadStats());
     setRecentScans(loadRecent());
   }, []);
 
-  // ── Auth check ─────────────────────────────────────────────────────────────
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
       setAuthUser(user);
@@ -115,7 +111,7 @@ export default function ScanPage() {
     return () => unsub();
   }, []);
 
-  // ── Feedback: tone + vibration so staff can check-in without staring at the screen ─
+  // ── Feedback (Audio/Vibration) ─────────────────────────────────────────────
 
   const playFeedback = useCallback((type: "success" | "duplicate" | "error") => {
     if (soundOn) {
@@ -179,15 +175,21 @@ export default function ScanPage() {
     } catch {}
   }, []);
 
-  // ── Scanner helpers ────────────────────────────────────────────────────────
+  // ── Scanner Engine ─────────────────────────────────────────────────────────
 
   const stopScanner = useCallback(async () => {
     if (scannerRef.current) {
       try {
         await scannerRef.current.stop();
         scannerRef.current.clear();
-      } catch {}
+      } catch (err) {
+        console.warn("Scanner teardown warning:", err);
+      }
       scannerRef.current = null;
+    }
+    // Hard DOM clear to ensure video element is killed on mobile
+    if (containerRef.current) {
+      containerRef.current.innerHTML = '<div id="qr-reader"></div>';
     }
   }, []);
 
@@ -197,9 +199,18 @@ export default function ScanPage() {
 
     await stopScanner();
 
+    // STRICT OFFLINE CHECK
+    if (!navigator.onLine) {
+      setResult({ state: "error", message: "You are offline. Reconnect to Wi-Fi/Data to scan." });
+      recordScan({ name: "Network Error", status: "error" });
+      playFeedback("error");
+      processingRef.current = false;
+      return;
+    }
+
     if (!rawValue.startsWith("cvmas:")) {
       setResult({ state: "error", message: "Invalid QR code. Not a CVMAS registration." });
-      recordScan({ name: "Unrecognized code", status: "error" });
+      recordScan({ name: "Unrecognized format", status: "error" });
       playFeedback("error");
       processingRef.current = false;
       return;
@@ -230,65 +241,63 @@ export default function ScanPage() {
         return;
       }
 
-      // ← This requires admin — check first to give clear feedback
-
       await updateDoc(docRef, {
         status: "attendee",
         checkedInAt: serverTimestamp(),
         checkedInBy: authUser?.uid ?? "unknown",
       });
 
-      lastCheckedInRef.current = { id: data.id, name: data.fullName };
       setResult({ state: "success", data: { ...data, status: "attendee" } });
       recordScan({ name: data.fullName, idNumber: data.idNumber, status: "checked_in" });
       playFeedback("success");
     } catch (err: any) {
       const message = err?.code === "permission-denied"
-        ? "Permission denied. Make sure your account has admin privileges."
-        : "Failed to update registration. Check your connection.";
+        ? "Permission denied. Ensure your account has admin access."
+        : "Failed to update database. Check your connection.";
       setResult({ state: "error", message });
-      recordScan({ name: "Scan failed", status: "error" });
+      recordScan({ name: "System Error", status: "error" });
       playFeedback("error");
     } finally {
       processingRef.current = false;
     }
   }, [stopScanner, authUser, recordScan, playFeedback]);
 
-  // ── Camera scanner ─────────────────────────────────────────────────────────
-
   const startCameraScanner = useCallback(async () => {
     setResult({ state: "scanning" });
     setUploadPreview(null);
     processingRef.current = false;
 
-    const { Html5QrcodeScanner } = await import("html5-qrcode");
+    try {
+      const { Html5QrcodeScanner } = await import("html5-qrcode");
 
-    if (containerRef.current) {
-      containerRef.current.innerHTML = '<div id="qr-reader"></div>';
+      if (containerRef.current) {
+        containerRef.current.innerHTML = '<div id="qr-reader" style="width: 100%;"></div>';
+      }
+
+      const scanner = new Html5QrcodeScanner(
+        "qr-reader",
+        {
+          fps: 10,
+          qrbox: { width: 280, height: 280 },
+          aspectRatio: 1,
+          showTorchButtonIfSupported: true,
+          rememberLastUsedCamera: true,
+        },
+        false
+      );
+
+      scanner.render(
+        (decodedText: string) => processQR(decodedText),
+        () => {}
+      );
+
+      scannerRef.current = scanner;
+      setScannerReady(true);
+    } catch (error) {
+      console.error("Camera init failed", error);
+      setResult({ state: "error", message: "Camera initialization failed. Please allow camera permissions." });
     }
-
-    const scanner = new Html5QrcodeScanner(
-      "qr-reader",
-      {
-        fps: 10,
-        qrbox: { width: 260, height: 260 },
-        aspectRatio: 1,
-        showTorchButtonIfSupported: true,
-        rememberLastUsedCamera: true,
-      },
-      false
-    );
-
-    scanner.render(
-      (decodedText: string) => processQR(decodedText),
-      () => {}
-    );
-
-    scannerRef.current = scanner;
-    setScannerReady(true);
   }, [processQR]);
-
-  // ── Image upload scanner ───────────────────────────────────────────────────
 
   const handleImageUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -321,7 +330,7 @@ export default function ScanPage() {
       console.error("Image scan error:", err);
       setResult({
         state: "error",
-        message: "No valid QR code found in this image. Try a clearer photo with better lighting.",
+        message: "No readable QR code found in this image. Ensure the image is clear and well-lit.",
       });
       recordScan({ name: "Unreadable image", status: "error" });
       playFeedback("error");
@@ -330,8 +339,6 @@ export default function ScanPage() {
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   }, [stopScanner, processQR, recordScan, playFeedback]);
-
-  // ── Mode switch ────────────────────────────────────────────────────────────
 
   const switchMode = useCallback(async (mode: ScanMode) => {
     await stopScanner();
@@ -342,13 +349,11 @@ export default function ScanPage() {
     processingRef.current = false;
   }, [stopScanner]);
 
-  // ── Auto-start camera on mount / mode switch ───────────────────────────────
-
   useEffect(() => {
     if (!authUser || scanMode !== "camera") return;
     startCameraScanner();
     return () => { stopScanner(); };
-  }, [authUser, scanMode]);
+  }, [authUser, scanMode, startCameraScanner, stopScanner]);
 
   const handleReset = useCallback(async () => {
     if (autoResumeTimeoutRef.current) clearTimeout(autoResumeTimeoutRef.current);
@@ -364,11 +369,11 @@ export default function ScanPage() {
     }
   }, [stopScanner, scanMode, startCameraScanner]);
 
-  // ── Undo last check-in (misscan safety net) ────────────────────────────────
+  // ── Undo ───────────────────────────────────────────────────────────────────
 
   const handleUndo = useCallback(async () => {
     if (result.state !== "success") return;
-    if (!window.confirm(`Undo check-in for ${result.data.fullName}? They'll be marked as not yet attended.`)) return;
+    if (!window.confirm(`Undo check-in for ${result.data.fullName}? They will be marked as 'Pending' again.`)) return;
 
     setUndoing(true);
     try {
@@ -383,8 +388,9 @@ export default function ScanPage() {
         try { sessionStorage.setItem("cvmas_scan_stats", JSON.stringify(next)); } catch {}
         return next;
       });
+      // Remove latest success scan from log
       setRecentScans(prev => {
-        const next = prev.filter(s => !(s.time === prev[0]?.time));
+        const next = prev.filter(s => !(s.time === prev[0]?.time && s.status === "checked_in"));
         try { sessionStorage.setItem("cvmas_recent_scans", JSON.stringify(next)); } catch {}
         return next;
       });
@@ -397,7 +403,7 @@ export default function ScanPage() {
     }
   }, [result, handleReset]);
 
-  // ── Auto-resume scanning after a successful / duplicate result ─────────────
+  // ── Auto-Resume Loop ───────────────────────────────────────────────────────
 
   useEffect(() => {
     if (!autoContinue || scanMode !== "camera") return;
@@ -419,21 +425,20 @@ export default function ScanPage() {
       if (autoResumeTimeoutRef.current) clearTimeout(autoResumeTimeoutRef.current);
       setAutoCountdown(null);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [result.state, autoContinue, scanMode]);
+  }, [result.state, autoContinue, scanMode, handleReset]);
 
-  // ── Manual code entry fallback ──────────────────────────────────────────────
+  // ── Manual Input Formatting ────────────────────────────────────────────────
 
   const handleManualSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
-    const code = manualCode.trim();
+    const code = manualCode.trim().toUpperCase();
     if (!code) return;
     setManualEntryOpen(false);
     setManualCode("");
-    processQR(code.startsWith("cvmas:") ? code : `cvmas:${code}`);
+    processQR(code.startsWith("CVMAS:") ? code.toLowerCase() : `cvmas:${code}`);
   }, [manualCode, processQR]);
 
-  // ── Auth loading ───────────────────────────────────────────────────────────
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   if (isCheckingAuth) {
     return (
@@ -443,8 +448,6 @@ export default function ScanPage() {
       </div>
     );
   }
-
-  // ── Not logged in ──────────────────────────────────────────────────────────
 
   if (!authUser) {
     return (
@@ -466,34 +469,25 @@ export default function ScanPage() {
     );
   }
 
-  // ── Main UI ────────────────────────────────────────────────────────────────
-
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black relative overflow-hidden font-sans selection:bg-green-500/30 flex flex-col">
-
-      {/* Ambient background layer — matches the rest of the site, kept subtle behind the camera view */}
+      {/* Background */}
       <div className="absolute inset-0 z-0 pointer-events-none">
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]" />
         <div className="absolute top-[10%] left-[-10%] w-[350px] h-[350px] bg-green-500/10 rounded-full blur-3xl opacity-30" />
         <div className="absolute bottom-[-10%] right-[-10%] w-[400px] h-[400px] bg-emerald-500/10 rounded-full blur-3xl opacity-30" />
-        <div className="absolute inset-0 opacity-20">
-          <FloatingCubes />
-        </div>
+        <div className="absolute inset-0 opacity-20"><FloatingCubes /></div>
       </div>
-
-      <div className="hidden md:block">
-        <CircuitCursor />
-      </div>
+      <div className="hidden md:block"><CircuitCursor /></div>
 
       <div className="relative z-10 flex flex-col flex-1">
-
-        {/* Navbar clearance + header card */}
+        {/* Header */}
         <div className="pt-24 md:pt-28 px-4 shrink-0">
           <div className="max-w-sm mx-auto relative overflow-hidden rounded-[2rem] border border-white/10 shadow-2xl bg-[#06402B] text-white">
             <div className="absolute inset-0 bg-[url('/scanlines.png')] opacity-10 pointer-events-none" />
             <div className="relative px-5 py-5">
               <p className="text-[9px] font-mono tracking-[0.3em] uppercase text-emerald-300 mb-1 text-center">
-                CVMAS Week · Staff
+                CVMAS Week · Terminal
               </p>
               <div className="flex items-center justify-between mb-3">
                 <h1 className="text-lg font-black tracking-tight flex items-center gap-2">
@@ -501,13 +495,13 @@ export default function ScanPage() {
                 </h1>
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  <span className="text-[10px] font-mono text-emerald-300 uppercase tracking-widest">
+                  <span className="text-[10px] font-mono text-emerald-300 uppercase tracking-widest truncate max-w-[80px]">
                     {authUser.email?.split("@")[0]}
                   </span>
                 </div>
               </div>
 
-              {/* Live session tally */}
+              {/* Stats */}
               <div className="flex items-center gap-2">
                 <StatPill label="Scanned" value={sessionStats.scanned} />
                 <StatPill label="Checked in" value={sessionStats.checkedIn} accent="emerald" />
@@ -525,15 +519,13 @@ export default function ScanPage() {
         </div>
 
         <div className="flex-1 flex flex-col items-center px-4 pt-5 pb-10 max-w-sm mx-auto w-full space-y-4">
-
-          {/* QoL toggles: auto-continue + sound */}
+          
+          {/* Toggles */}
           <div className="w-full flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest">
             <button
               onClick={() => setAutoContinue(v => !v)}
               className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border transition-all ${
-                autoContinue
-                  ? "bg-[#06402B]/10 border-[#06402B]/30 text-[#06402B] dark:bg-emerald-500/10 dark:border-emerald-500/30 dark:text-emerald-400"
-                  : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-400"
+                autoContinue ? "bg-[#06402B]/10 border-[#06402B]/30 text-[#06402B] dark:bg-emerald-500/10 dark:border-emerald-500/30 dark:text-emerald-400" : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-400"
               }`}
             >
               <FaBolt size={10} /> Auto-resume {autoContinue ? "on" : "off"}
@@ -541,23 +533,18 @@ export default function ScanPage() {
             <button
               onClick={() => setSoundOn(v => !v)}
               className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border transition-all ${
-                soundOn
-                  ? "bg-[#06402B]/10 border-[#06402B]/30 text-[#06402B] dark:bg-emerald-500/10 dark:border-emerald-500/30 dark:text-emerald-400"
-                  : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-400"
+                soundOn ? "bg-[#06402B]/10 border-[#06402B]/30 text-[#06402B] dark:bg-emerald-500/10 dark:border-emerald-500/30 dark:text-emerald-400" : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-400"
               }`}
             >
               🔊 Sound {soundOn ? "on" : "off"}
             </button>
           </div>
 
-          {/* Mode toggle */}
           <div className="w-full flex bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-1 gap-1">
             <button
               onClick={() => switchMode("camera")}
               className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
-                scanMode === "camera"
-                  ? "bg-[#06402B] text-white shadow-md"
-                  : "text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+                scanMode === "camera" ? "bg-[#06402B] text-white shadow-md" : "text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
               }`}
             >
               <FaCamera size={12} /> Camera
@@ -565,281 +552,171 @@ export default function ScanPage() {
             <button
               onClick={() => switchMode("upload")}
               className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
-                scanMode === "upload"
-                  ? "bg-[#06402B] text-white shadow-md"
-                  : "text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+                scanMode === "upload" ? "bg-[#06402B] text-white shadow-md" : "text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
               }`}
             >
               <FaUpload size={12} /> Upload Image
             </button>
           </div>
 
-          {/* Camera viewport */}
+          {/* Viewport */}
           {scanMode === "camera" && (
-            <div
-              className={`w-full rounded-3xl overflow-hidden border-2 transition-colors duration-300 relative ${
-                result.state === "success"
-                  ? "border-emerald-500"
-                  : result.state === "already_attended"
-                  ? "border-amber-500"
-                  : result.state === "not_found" || result.state === "error"
-                  ? "border-red-500"
-                  : "border-zinc-300 dark:border-zinc-700"
-              }`}
-            >
-              <div ref={containerRef} className="w-full bg-black" style={{ minHeight: 280 }}>
+            <div className="relative w-full rounded-3xl overflow-hidden border-2 transition-colors duration-500 border-zinc-300 dark:border-zinc-700 bg-black aspect-square flex items-center justify-center">
+              
+              <div ref={containerRef} className="absolute inset-0 w-full h-full object-cover">
                 <div id="qr-reader" />
               </div>
 
-              {/* Auto-resume countdown chip */}
-              {autoCountdown !== null && (
-                <button
-                  onClick={handleReset}
-                  className="absolute bottom-3 right-3 flex items-center gap-1.5 px-3 py-1.5 bg-black/70 backdrop-blur-sm text-white text-[10px] font-bold uppercase tracking-widest rounded-full hover:bg-black/90 transition-all"
-                >
-                  Next scan in {autoCountdown}s · tap to skip
-                </button>
+              {/* Viewfinder Overlay */}
+              {result.state === "scanning" && (
+                <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-10">
+                  <div className="w-[60%] h-[60%] relative">
+                    <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-emerald-500 rounded-tl-xl" />
+                    <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-emerald-500 rounded-tr-xl" />
+                    <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-emerald-500 rounded-bl-xl" />
+                    <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-emerald-500 rounded-br-xl" />
+                    
+                    {/* Animated Scanning Laser */}
+                    <motion.div 
+                      animate={{ y: ["0%", "300%"] }} 
+                      transition={{ repeat: Infinity, duration: 2, ease: "linear", repeatType: "reverse" }}
+                      className="absolute top-0 left-0 w-full h-1 bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.8)] opacity-70"
+                    />
+                  </div>
+                </div>
               )}
+
+              <AnimatePresence>
+                {result.state === "scanning" && (
+                  <motion.div
+                    key="chip-scanning" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
+                    className="absolute top-4 left-1/2 -translate-x-1/2 px-4 py-1.5 bg-black/60 backdrop-blur-md text-white text-[10px] font-black uppercase tracking-widest rounded-full z-20"
+                  >
+                    Point camera at QR code
+                  </motion.div>
+                )}
+                {result.state === "loading" && (
+                  <motion.div
+                    key="chip-loading" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
+                    className="absolute top-4 left-1/2 -translate-x-1/2 px-4 py-1.5 bg-black/80 backdrop-blur-md text-white text-[10px] font-black uppercase tracking-widest rounded-full flex items-center gap-2 z-20"
+                  >
+                    <FaSpinner className="animate-spin" size={10} /> Verifying…
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <AnimatePresence>
+                {autoCountdown !== null && (
+                  <motion.button
+                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={handleReset}
+                    className="absolute bottom-4 right-4 flex items-center gap-1.5 px-3 py-1.5 bg-black/70 backdrop-blur-md text-white text-[10px] font-bold uppercase tracking-widest rounded-full hover:bg-black/90 transition-all z-20"
+                  >
+                    Next in {autoCountdown}s · tap to skip
+                  </motion.button>
+                )}
+              </AnimatePresence>
             </div>
           )}
 
-          {/* Upload area */}
           {scanMode === "upload" && (
             <div className="w-full space-y-3">
               <div id="qr-file-reader" className="hidden" />
-
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={handleImageUpload}
-                className="hidden"
-              />
+              <input ref={fileInputRef} type="file" accept="image/*" capture="environment" onChange={handleImageUpload} className="hidden" />
 
               {uploadPreview ? (
                 <div className={`w-full rounded-3xl overflow-hidden border-2 transition-colors duration-300 relative ${
-                  result.state === "success"
-                    ? "border-emerald-500"
-                    : result.state === "already_attended"
-                    ? "border-amber-500"
-                    : result.state === "error" || result.state === "not_found"
-                    ? "border-red-500"
-                    : "border-zinc-300 dark:border-zinc-700"
+                  result.state === "success" ? "border-emerald-500" : result.state === "already_attended" ? "border-amber-500" : result.state === "error" || result.state === "not_found" ? "border-red-500" : "border-zinc-300 dark:border-zinc-700"
                 }`}>
-                  <img
-                    src={uploadPreview}
-                    alt="Uploaded QR"
-                    className="w-full object-contain max-h-72 bg-black"
-                  />
+                  <img src={uploadPreview} alt="Uploaded QR" className="w-full object-contain max-h-72 bg-black" />
                   {isUploading && (
-                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center backdrop-blur-sm">
                       <FaSpinner className="animate-spin text-white" size={28} />
                     </div>
                   )}
                 </div>
               ) : (
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-full py-14 border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-3xl flex flex-col items-center justify-center gap-3 hover:border-[#06402B] dark:hover:border-emerald-500 hover:bg-[#06402B]/5 transition-all active:scale-95 group"
-                >
+                <button onClick={() => fileInputRef.current?.click()} className="w-full py-14 border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-3xl flex flex-col items-center justify-center gap-3 hover:border-[#06402B] dark:hover:border-emerald-500 hover:bg-[#06402B]/5 transition-all active:scale-95 group">
                   <div className="w-14 h-14 rounded-2xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-400 group-hover:text-[#06402B] dark:group-hover:text-emerald-400 transition-colors">
                     <FaUpload size={22} />
                   </div>
                   <div className="text-center">
-                    <p className="text-sm font-black text-zinc-600 dark:text-zinc-400 uppercase tracking-widest">
-                      Tap to upload
-                    </p>
-                    <p className="text-xs text-zinc-400 mt-1 font-medium">
-                      Photo, screenshot, or saved QR image
-                    </p>
+                    <p className="text-sm font-black text-zinc-600 dark:text-zinc-400 uppercase tracking-widest">Tap to upload</p>
+                    <p className="text-xs text-zinc-400 mt-1 font-medium">Photo, screenshot, or saved QR</p>
                   </div>
                 </button>
               )}
 
               {uploadPreview && result.state !== "loading" && (
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-full py-3 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 rounded-xl font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all active:scale-95"
-                >
+                <button onClick={() => fileInputRef.current?.click()} className="w-full py-3 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 rounded-xl font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all active:scale-95">
                   <FaUpload size={10} /> Upload Different Image
                 </button>
               )}
             </div>
           )}
 
-          {/* Manual code entry fallback — for damaged or unreadable QR codes */}
+          {/* Manual Entry Fallback */}
           <div className="w-full">
             {!manualEntryOpen ? (
-              <button
-                onClick={() => setManualEntryOpen(true)}
-                className="w-full py-2.5 text-[11px] font-bold uppercase tracking-widest text-zinc-400 hover:text-[#06402B] dark:hover:text-emerald-400 flex items-center justify-center gap-2 transition-colors"
-              >
+              <button onClick={() => setManualEntryOpen(true)} className="w-full py-2.5 text-[11px] font-bold uppercase tracking-widest text-zinc-400 hover:text-[#06402B] dark:hover:text-emerald-400 flex items-center justify-center gap-2 transition-colors">
                 <FaKeyboard size={11} /> Trouble scanning? Enter reference code
               </button>
             ) : (
-              <motion.form
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                onSubmit={handleManualSubmit}
-                className="w-full flex gap-2 overflow-hidden"
-              >
+              <motion.form initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} onSubmit={handleManualSubmit} className="w-full flex gap-2 overflow-hidden">
                 <input
                   autoFocus
                   value={manualCode}
-                  onChange={e => setManualCode(e.target.value)}
-                  placeholder="Reference code or scanned ID"
-                  className="flex-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2.5 text-sm font-medium text-zinc-900 dark:text-white outline-none focus:border-[#06402B] dark:focus:border-emerald-500"
+                  onChange={e => setManualCode(e.target.value.toUpperCase().replace(/\s+/g, ""))}
+                  placeholder="e.g. A1B2C3D4"
+                  className="flex-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2.5 text-sm font-bold font-mono tracking-widest text-zinc-900 dark:text-white outline-none focus:border-[#06402B] dark:focus:border-emerald-500 uppercase"
                 />
-                <button
-                  type="submit"
-                  className="px-4 py-2.5 bg-[#06402B] dark:bg-emerald-600 text-white rounded-xl text-xs font-black uppercase tracking-widest"
-                >
+                <button type="submit" className="px-4 py-2.5 bg-[#06402B] dark:bg-emerald-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-[#042d1f] dark:hover:bg-emerald-500 transition-colors">
                   Go
                 </button>
-                <button
-                  type="button"
-                  onClick={() => { setManualEntryOpen(false); setManualCode(""); }}
-                  className="px-3 py-2.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 rounded-xl text-xs font-black uppercase tracking-widest"
-                >
-                  ×
+                <button type="button" onClick={() => { setManualEntryOpen(false); setManualCode(""); }} className="px-3 py-2.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">
+                  <FaTimes size={12} />
                 </button>
               </motion.form>
             )}
           </div>
 
-          {/* Result panel */}
+          {/* Idle / Initial State */}
           <AnimatePresence mode="wait">
             {result.state === "idle" && (
               <motion.div key="idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="w-full py-3 text-center">
                 <p className="text-sm font-bold text-zinc-400 uppercase tracking-widest">
-                  {scanMode === "camera" ? "Initializing camera…" : "Upload a QR code image to scan"}
+                  {scanMode === "camera" ? "Ready to scan" : "Upload an image"}
                 </p>
               </motion.div>
-            )}
-
-            {result.state === "scanning" && (
-              <motion.div key="scanning" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="w-full py-3 text-center">
-                <p className="text-sm font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-widest">
-                  Point camera at QR code
-                </p>
-              </motion.div>
-            )}
-
-            {result.state === "loading" && (
-              <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="w-full py-5 text-center flex flex-col items-center gap-3">
-                <FaSpinner className="animate-spin text-[#06402B] dark:text-emerald-400" size={24} />
-                <p className="text-sm font-bold text-zinc-500 uppercase tracking-widest">Verifying…</p>
-              </motion.div>
-            )}
-
-            {result.state === "success" && (
-              <motion.div
-                key="success"
-                initial={{ opacity: 0, scale: 0.95, y: 8 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                className="w-full bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-300 dark:border-emerald-500/30 rounded-3xl p-5 space-y-4"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-full bg-emerald-500 flex items-center justify-center shrink-0 shadow-lg shadow-emerald-500/30">
-                    <FaCheckCircle size={20} className="text-white" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-black uppercase tracking-widest text-emerald-700 dark:text-emerald-400">✓ Checked in!</p>
-                    <p className="text-lg font-black text-zinc-900 dark:text-white leading-tight">{result.data.fullName}</p>
-                  </div>
-                </div>
-                <StudentDetail data={result.data} />
-                <div className="flex gap-2">
-                  <ResetButton onReset={handleReset} label={scanMode === "upload" ? "Scan Another" : "Scan Next"} />
-                  <button
-                    onClick={handleUndo}
-                    disabled={undoing}
-                    title="Wrong person? Undo this check-in"
-                    className="px-4 py-3.5 bg-white dark:bg-zinc-900 border border-emerald-300 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-400 rounded-xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition-all active:scale-95 disabled:opacity-50 shrink-0"
-                  >
-                    {undoing ? <FaSpinner className="animate-spin" size={11} /> : <FaUndo size={11} />}
-                  </button>
-                </div>
-              </motion.div>
-            )}
-
-            {result.state === "already_attended" && (
-              <motion.div
-                key="already"
-                initial={{ opacity: 0, scale: 0.95, y: 8 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                className="w-full bg-amber-50 dark:bg-amber-500/10 border border-amber-300 dark:border-amber-500/30 rounded-3xl p-5 space-y-4"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-full bg-amber-500 flex items-center justify-center shrink-0">
-                    <FaExclamationTriangle size={16} className="text-white" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-black uppercase tracking-widest text-amber-700 dark:text-amber-400">⚠ Already checked in</p>
-                    <p className="text-lg font-black text-zinc-900 dark:text-white leading-tight">{result.data.fullName}</p>
-                  </div>
-                </div>
-                {result.data.checkedInAt && (
-                  <p className="text-xs font-mono text-amber-600 dark:text-amber-400 px-1">
-                    Checked in at: {new Date(result.data.checkedInAt?.toDate?.() ?? result.data.checkedInAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
-                  </p>
-                )}
-                <StudentDetail data={result.data} />
-                <ResetButton onReset={handleReset} label={scanMode === "upload" ? "Scan Another" : "Scan Next"} />
-              </motion.div>
-            )}
-
-            {result.state === "not_found" && (
-              <ErrorPanel
-                title="Not found"
-                message="This QR code doesn't match any CVMAS registration."
-                onReset={handleReset}
-                scanMode={scanMode}
-              />
-            )}
-
-            {result.state === "error" && (
-              <ErrorPanel
-                title="Error"
-                message={(result as any).message}
-                onReset={handleReset}
-                scanMode={scanMode}
-              />
             )}
           </AnimatePresence>
 
-          {/* Recent scans log — lets staff double-check without re-scanning */}
+          {/* Recent Scans Log (Terminal Style) */}
           {recentScans.length > 0 && (
-            <div className="w-full bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden">
+            <div className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-inner mt-4">
               <button
                 onClick={() => setRecentOpen(v => !v)}
-                className="w-full flex items-center justify-between px-4 py-3 text-[11px] font-black uppercase tracking-widest text-zinc-500"
+                className="w-full flex items-center justify-between px-4 py-3 text-[11px] font-black uppercase tracking-widest text-zinc-400 hover:text-zinc-300 hover:bg-zinc-800/50 transition-colors"
               >
-                <span className="flex items-center gap-2"><FaHistory size={11} /> Recent scans ({recentScans.length})</span>
+                <span className="flex items-center gap-2"><FaHistory size={11} /> System Log ({recentScans.length})</span>
                 {recentOpen ? <FaChevronUp size={10} /> : <FaChevronDown size={10} />}
               </button>
+              
               <AnimatePresence>
                 {recentOpen && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: "auto", opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    className="overflow-hidden border-t border-zinc-100 dark:border-zinc-800"
-                  >
-                    <div className="max-h-56 overflow-y-auto divide-y divide-zinc-100 dark:divide-zinc-800">
-                      {recentScans.map((s, i) => (
-                        <div key={i} className="flex items-center gap-2 px-4 py-2.5">
-                          <span className={`w-2 h-2 rounded-full shrink-0 ${
-                            s.status === "checked_in" ? "bg-emerald-500"
-                            : s.status === "duplicate" ? "bg-amber-500"
-                            : "bg-red-500"
-                          }`} />
-                          <div className="min-w-0 flex-1">
-                            <p className="text-xs font-bold text-zinc-700 dark:text-zinc-300 truncate">{s.name}</p>
-                            {s.idNumber && <p className="text-[10px] text-zinc-400 font-mono">{s.idNumber}</p>}
+                  <motion.div initial={{ height: 0 }} animate={{ height: "auto" }} exit={{ height: 0 }} className="overflow-hidden">
+                    <div className="px-4 pb-4 pt-1 space-y-2">
+                      {recentScans.map((scan, i) => (
+                        <div key={i} className="flex items-center justify-between py-1.5 border-b border-zinc-800/50 last:border-0">
+                          <div className="flex items-center gap-2.5 overflow-hidden">
+                            {scan.status === "checked_in" ? <FaCheckCircle size={10} className="text-emerald-500 shrink-0" /> :
+                             scan.status === "duplicate" ? <FaExclamationTriangle size={10} className="text-amber-500 shrink-0" /> :
+                             <FaTimes size={10} className="text-red-500 shrink-0" />}
+                            <div className="truncate">
+                              <p className="text-xs font-bold text-zinc-200 truncate">{scan.name}</p>
+                              {scan.idNumber && <p className="text-[9px] font-mono text-zinc-500 truncate">{scan.idNumber}</p>}
+                            </div>
                           </div>
-                          <span className="text-[10px] text-zinc-400 font-medium shrink-0">{timeAgo(s.time)}</span>
+                          <span className="text-[10px] font-mono text-zinc-500 shrink-0 ml-3">{timeAgo(scan.time)}</span>
                         </div>
                       ))}
                     </div>
@@ -849,17 +726,90 @@ export default function ScanPage() {
             </div>
           )}
 
-          {/* Footer */}
-          <p className="text-[10px] font-mono text-zinc-400 text-center">
-            Real-time sync · Updates instantly · Admin: {authUser.email?.split("@")[0]}
-          </p>
+          {/* Bottom Sheet Results */}
+          <AnimatePresence>
+            {(result.state === "success" || result.state === "already_attended" || result.state === "not_found" || result.state === "error") && (
+              <>
+                <motion.div
+                  key="backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                  onClick={handleReset} className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
+                />
+                <motion.div
+                  key="sheet" initial={{ y: "100%", opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: "100%", opacity: 0 }} transition={{ type: "spring", stiffness: 350, damping: 35 }}
+                  className="fixed bottom-0 left-0 right-0 z-50 max-w-sm mx-auto"
+                >
+                  <div className={`rounded-t-[2rem] p-6 space-y-4 border-t-4 shadow-2xl ${
+                    result.state === "success" ? "bg-white dark:bg-zinc-900 border-emerald-500" : result.state === "already_attended" ? "bg-white dark:bg-zinc-900 border-amber-500" : "bg-white dark:bg-zinc-900 border-red-500"
+                  }`}>
+                    <div className="w-10 h-1 bg-zinc-200 dark:bg-zinc-700 rounded-full mx-auto -mt-2 mb-2" />
+
+                    {result.state === "success" && (
+                      <>
+                        <div className="flex items-center gap-4">
+                          <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 400, damping: 20, delay: 0.1 }} className="w-14 h-14 rounded-2xl bg-emerald-500 flex items-center justify-center shrink-0 shadow-lg shadow-emerald-500/30">
+                            <FaCheckCircle size={24} className="text-white" />
+                          </motion.div>
+                          <div>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400 mb-0.5">✓ Checked In</p>
+                            <p className="text-xl font-black text-zinc-900 dark:text-white leading-tight">{result.data.fullName}</p>
+                          </div>
+                        </div>
+                        <StudentDetail data={result.data} />
+                        <div className="flex gap-2 pt-1">
+                          <ResetButton onReset={handleReset} label="Scan Next" />
+                          <button onClick={handleUndo} disabled={undoing} title="Undo this check-in" className="px-4 py-3.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 rounded-xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all active:scale-95 disabled:opacity-50 shrink-0">
+                            {undoing ? <FaSpinner className="animate-spin" size={11} /> : <FaUndo size={11} />}
+                          </button>
+                        </div>
+                        {autoCountdown !== null && (
+                          <div className="h-1 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                            <motion.div initial={{ width: "100%" }} animate={{ width: "0%" }} transition={{ duration: 2.2, ease: "linear" }} className="h-full bg-emerald-500 rounded-full" />
+                          </div>
+                        )}
+                      </>
+                    )}
+
+                    {result.state === "already_attended" && (
+                      <>
+                        <div className="flex items-center gap-4">
+                          <div className="w-14 h-14 rounded-2xl bg-amber-500 flex items-center justify-center shrink-0">
+                            <FaExclamationTriangle size={22} className="text-white" />
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-amber-600 dark:text-amber-400 mb-0.5">⚠ Already Checked In</p>
+                            <p className="text-xl font-black text-zinc-900 dark:text-white leading-tight">{result.data.fullName}</p>
+                            {result.data.checkedInAt && (
+                              <p className="text-[11px] font-mono text-amber-500 mt-0.5">
+                                at {new Date(result.data.checkedInAt?.toDate?.() ?? result.data.checkedInAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <StudentDetail data={result.data} />
+                        <ResetButton onReset={handleReset} label="Scan Next" />
+                        {autoCountdown !== null && (
+                          <div className="h-1 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                            <motion.div initial={{ width: "100%" }} animate={{ width: "0%" }} transition={{ duration: 2.2, ease: "linear" }} className="h-full bg-amber-500 rounded-full" />
+                          </div>
+                        )}
+                      </>
+                    )}
+
+                    {result.state === "not_found" && <ErrorPanel title="Not found" message="This QR code doesn't match any CVMAS registration." onReset={handleReset} scanMode={scanMode} />}
+                    {result.state === "error" && <ErrorPanel title="Error" message={(result as any).message} onReset={handleReset} scanMode={scanMode} />}
+                  </div>
+                </motion.div>
+              </>
+            )}
+          </AnimatePresence>
+
         </div>
       </div>
     </div>
   );
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+// ─── Sub-Components ───────────────────────────────────────────────────────────
 
 function StatPill({ label, value, accent }: { label: string; value: number; accent?: "emerald" | "amber" }) {
   const color = accent === "emerald" ? "text-emerald-300" : accent === "amber" ? "text-amber-300" : "text-white";
@@ -890,7 +840,7 @@ function StudentDetail({ data }: { data: any }) {
         <div className="mt-2 space-y-1">
           <p className="text-[9px] font-black uppercase tracking-widest text-zinc-400">Incentive professors</p>
           {data.professors.map((p: any, i: number) => (
-            <p key={i} className="text-[11px] text-zinc-600 dark:text-zinc-400 font-medium">
+            <p key={i} className="text-[11px] text-zinc-600 dark:text-zinc-400 font-medium truncate">
               {p.professor} — {p.subject}
             </p>
           ))}
@@ -911,18 +861,9 @@ function ResetButton({ onReset, label = "Scan Next" }: { onReset: () => void; la
   );
 }
 
-function ErrorPanel({ title, message, onReset, scanMode }: {
-  title: string;
-  message: string;
-  onReset: () => void;
-  scanMode: ScanMode;
-}) {
+function ErrorPanel({ title, message, onReset, scanMode }: { title: string; message: string; onReset: () => void; scanMode: ScanMode; }) {
   return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.95, y: 8 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      className="w-full bg-red-50 dark:bg-red-500/10 border border-red-300 dark:border-red-500/30 rounded-3xl p-5 space-y-3 text-center"
-    >
+    <motion.div initial={{ opacity: 0, scale: 0.95, y: 8 }} animate={{ opacity: 1, scale: 1, y: 0 }} className="w-full bg-red-50 dark:bg-red-500/10 border border-red-300 dark:border-red-500/30 rounded-3xl p-5 space-y-3 text-center">
       <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center mx-auto">
         <FaExclamationTriangle size={20} className="text-red-500" />
       </div>
@@ -930,10 +871,7 @@ function ErrorPanel({ title, message, onReset, scanMode }: {
         <p className="text-sm font-black text-red-700 dark:text-red-400 uppercase tracking-widest">{title}</p>
         <p className="text-xs font-medium text-red-600 dark:text-red-300 mt-1 leading-relaxed">{message}</p>
       </div>
-      <button
-        onClick={onReset}
-        className="w-full py-3.5 bg-red-600 hover:bg-red-500 text-white rounded-xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all active:scale-95"
-      >
+      <button onClick={onReset} className="w-full py-3.5 bg-red-600 hover:bg-red-500 text-white rounded-xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all active:scale-95">
         <FaRedo size={11} /> {scanMode === "upload" ? "Try Another Image" : "Try Again"}
       </button>
     </motion.div>
