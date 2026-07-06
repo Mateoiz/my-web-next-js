@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { useTheme } from "next-themes"; // <--- ADD THIS IMPORT
 import { collection, addDoc, serverTimestamp, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/db";
 import { motion, AnimatePresence } from "framer-motion";
@@ -449,6 +450,11 @@ const TOTAL_STEPS = 3;
 
 export default function RegisterPage() {
   const router = useRouter();
+  const { setTheme } = useTheme();
+  
+  useEffect(() => {
+    setTheme("light"); // Forces the navbar to use dark text
+  }, [setTheme]);
   const [step, setStep] = useState(0);
 
   const [fullName, setFullName] = useState("");
