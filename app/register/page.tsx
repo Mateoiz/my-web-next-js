@@ -18,74 +18,72 @@ import NatureCursor from "@/app/components/NatureCursor";
 
 // ─── Data (unchanged) ─────────────────────────────────────────────────────────
 
+const blocks1stYear = [
+  "1st Year A","1st Year B","1st Year C","1st Year D",
+  "1st Year E","1st Year F","1st Year G","1st Year H",
+];
+
 const blocks2ndYear = [
   "2nd Year A","2nd Year B","2nd Year C","2nd Year D","2nd Year E",
   "2nd Year F","2nd Year G","2nd Year H","2nd Year I","2nd Year J",
-  "2nd Year K","2nd Year L","2nd Year M","2nd Year N"
+  "2nd Year K","2nd Year L","2nd Year M","2nd Year N",
 ];
 
+const blocks3rdYear = [
+  "3rd Year A","3rd Year B","3rd Year C","3rd Year D","3rd Year E",
+  "3rd Year F","3rd Year G","3rd Year H","3rd Year I","3rd Year J",
+  "3rd Year K","3rd Year L",
+];
+
+// ─── Incentive badge metadata ─────────────────────────────────────────────────
+// Used in the UI to show what a professor's incentive covers.
+
+export const PROFESSOR_INCENTIVE_SCOPE: Record<string, string> = {
+  "Ellema, Jovanito":   "DVM & Agriculture Seminar",
+  "Nicolas, Elma":      "All Events",
+  "Olido, Elena":       "All Seminars",
+  "Romualdo, Jenita":   "DVM Seminars",
+  "Fragata, Helen":     "All Seminars",
+  "Gravitez, Maurice":  "DVM Seminar",
+  "Jimenez, Marlon":    "All Seminars",
+  "Mirandilla, James Owen": "All Events",
+};
+
+// ─── Professors offering incentives ──────────────────────────────────────────
+// Only professors who confirmed they give bonus points are listed here.
+
 export const PROFESSORS_DATA: Record<string, { subject: string; blocks: string[] }[]> = {
-  "Laurio, Shiela": [{ subject: "Biochemistry Lec & Lab", blocks: ["1st Year A","1st Year B","1st Year C","1st Year D","1st Year E","1st Year F","1st Year G","1st Year H"] }],
-  "Galino-Ibanez, Genevieve": [{ subject: "Biochemistry Lec & Lab", blocks: ["1st Year A","1st Year B","1st Year C","1st Year D","1st Year E","1st Year F","1st Year G","1st Year H"] }],
-  "Butt, Paul Keenan": [{ subject: "Biochemistry Lab", blocks: ["1st Year A","1st Year B","1st Year C","1st Year D","1st Year E","1st Year F","1st Year G","1st Year H"] }],
-  "Jimenez, Marlon": [{ subject: "Animal Production", blocks: ["1st Year A","1st Year B","1st Year C","1st Year D","1st Year E","1st Year F","1st Year G","1st Year H"] }],
-  "Castillo, Roniel": [{ subject: "RZAL101A", blocks: blocks2ndYear }],
-  "Alejo, Ernilita": [{ subject: "RZAL101A", blocks: blocks2ndYear }],
-  "Tolentino, Ma. Lourdes": [{ subject: "RZAL101A", blocks: blocks2ndYear }],
-  "Mirandilla, James Owen": [{ subject: "ANAT101A", blocks: blocks2ndYear }],
-  "Domingo, Cecilia": [{ subject: "ANAT101B", blocks: blocks2ndYear }],
-  "Ortiz": [{ subject: "ANAT101B", blocks: blocks2ndYear }],
-  "Fragata, Helen": [{ subject: "BASC108A", blocks: blocks2ndYear }],
-  "Fulgencio, Niña": [{ subject: "BASC108B", blocks: blocks2ndYear }],
-  "Edisa, Rhio": [{ subject: "BASC107A", blocks: blocks2ndYear }],
-  "Rosales, Joanna": [{ subject: "BASC107A", blocks: blocks2ndYear }],
-  "Romualdo, Jenita": [{ subject: "DEVA100A", blocks: blocks2ndYear }],
-  "Salem, Andrei": [{ subject: "DEVA100B", blocks: blocks2ndYear }],
-  "Guno, Edelmira": [{ subject: "DEVA100B", blocks: blocks2ndYear }],
-  "Olido, Elena": [{ subject: "Pathology Lab", blocks: ["3rd Year A","3rd Year B","3rd Year C","3rd Year D","3rd Year E","3rd Year F","3rd Year G","3rd Year H","3rd Year I","3rd Year J","3rd Year K","3rd Year L"] }],
-  "Manangan, Felisa": [{ subject: "Pathology Lab", blocks: ["3rd Year A","3rd Year B","3rd Year C","3rd Year D","3rd Year E","3rd Year F","3rd Year G","3rd Year H","3rd Year I","3rd Year J","3rd Year K","3rd Year L"] }],
-  "Jusnayan, Peirce": [{ subject: "Physiology Lab", blocks: ["3rd Year A","3rd Year B","3rd Year C","3rd Year D","3rd Year E","3rd Year F","3rd Year G","3rd Year H","3rd Year I","3rd Year J","3rd Year K","3rd Year L"] }],
-  "Ferrer, Elena": [
-    { subject: "Physiology Lab", blocks: ["3rd Year A","3rd Year B","3rd Year C","3rd Year D","3rd Year E","3rd Year F","3rd Year G","3rd Year H","3rd Year I","3rd Year J","3rd Year K","3rd Year L"] },
-    { subject: "Physiology Lec", blocks: ["3rd Year A","3rd Year B","3rd Year C","3rd Year D","3rd Year E","3rd Year F","3rd Year G","3rd Year H","3rd Year I","3rd Year J","3rd Year K","3rd Year L"] },
+  // ── 1st Year ──────────────────────────────────────────────────────────────
+  "Jimenez, Marlon": [
+    { subject: "Animal Production", blocks: blocks1stYear },
   ],
-  "Bagus, Rosario": [
-    { subject: "Pharmacology Lec", blocks: ["3rd Year A","3rd Year B","3rd Year C","3rd Year D","3rd Year E","3rd Year F","3rd Year G","3rd Year H","3rd Year I","3rd Year J","3rd Year K","3rd Year L"] },
-    { subject: "Swine Medicine", blocks: ["4th Year"] },
+  "Gravitez, Maurice": [
+    { subject: "Biochemistry Laboratory", blocks: blocks1stYear },
+    { subject: "Embryology Laboratory",   blocks: blocks1stYear },
   ],
-  "Rivera III, Miguel": [{ subject: "Pharmacology Lec", blocks: ["3rd Year A","3rd Year B","3rd Year C","3rd Year D","3rd Year E","3rd Year F","3rd Year G","3rd Year H","3rd Year I","3rd Year J","3rd Year K","3rd Year L"] }],
-  "Reyes, Kriscel": [{ subject: "Pathology Lec", blocks: ["3rd Year A","3rd Year B","3rd Year C","3rd Year D","3rd Year E","3rd Year F","3rd Year G","3rd Year H","3rd Year I","3rd Year J","3rd Year K","3rd Year L"] }],
-  "Dycoco": [{ subject: "Immunology", blocks: ["3rd Year A","3rd Year B","3rd Year C","3rd Year D","3rd Year E","3rd Year F","3rd Year G","3rd Year H","3rd Year I","3rd Year J","3rd Year K","3rd Year L"] }],
-  "Nicolas, Elma": [{ subject: "Pharmacology Lab", blocks: ["3rd Year A","3rd Year B","3rd Year C","3rd Year D","3rd Year E","3rd Year F","3rd Year G","3rd Year H","3rd Year I","3rd Year J","3rd Year K","3rd Year L"] }],
-  "Coma, Luc Jesse": [
-    { subject: "Pharmacology Lab", blocks: ["3rd Year A","3rd Year B","3rd Year C","3rd Year D","3rd Year E","3rd Year F","3rd Year G","3rd Year H","3rd Year I","3rd Year J","3rd Year K","3rd Year L"] },
-    { subject: "Canine Medicine", blocks: ["4th Year"] },
-  ],
-  "Lorenzo, Clarissa": [{ subject: "Pharmacology Lab", blocks: ["3rd Year A","3rd Year B","3rd Year C","3rd Year D","3rd Year E","3rd Year F","3rd Year G","3rd Year H","3rd Year I","3rd Year J","3rd Year K","3rd Year L"] }],
-  "Glinoga": [{ subject: "Physiology Lec", blocks: ["3rd Year A","3rd Year B","3rd Year C","3rd Year D","3rd Year E","3rd Year F","3rd Year G","3rd Year H","3rd Year I","3rd Year J","3rd Year K","3rd Year L"] }],
-  "Rosario, Almer": [
-    { subject: "Canine Medicine", blocks: ["4th Year"] },
-    { subject: "Feline Medicine", blocks: ["4th Year"] },
-    { subject: "VCIP 3", blocks: ["6th Year"] },
-  ],
-  "Mariano, Monty": [{ subject: "Poultry Medicine", blocks: ["4th Year"] }],
-  "Silbor, Danilo": [{ subject: "Swine Medicine", blocks: ["4th Year"] }],
-  "Miranda, Jocelyn": [
-    { subject: "Equine Medicine", blocks: ["4th Year"] },
-    { subject: "BASC107A", blocks: blocks2ndYear }
+
+  // ── 2nd Year ──────────────────────────────────────────────────────────────
+  "Fragata, Helen": [
+    { subject: "Ruminant Production (BASC108A)", blocks: blocks2ndYear },
   ],
   "Ellema, Jovanito": [
-    { subject: "Ruminant Medicine", blocks: ["4th Year"] },
-    { subject: "BASC108B", blocks: blocks2ndYear }
+    { subject: "Ruminant Production Laboratory (BASC108B)", blocks: blocks2ndYear },
   ],
-  "Guno, Angel": [{ subject: "Ruminant Medicine", blocks: ["4th Year"] }],
-  "Masong, Rizchel": [{ subject: "ESPM", blocks: ["4th Year"] }],
-  "Lalisan, Lindsy Eunice": [{ subject: "ESPM", blocks: ["4th Year"] }],
-  "Cruz, Franz": [{ subject: "Surgery Lec & Lab", blocks: ["5th Year A","5th Year B","5th Year C"] }],
-  "Espiritu, Ana Maria": [{ subject: "PUHL Lec", blocks: ["5th Year A","5th Year B","5th Year C"] }],
-  "Salem, Andrea Mae": [{ subject: "PUHL Lab", blocks: ["5th Year A","5th Year B","5th Year C"] }],
-  "Granadozin, Manuel": [{ subject: "Clerkship", blocks: ["5th Year A","5th Year B","5th Year C"] }],
-  "Retiro, Libeliza": [{ subject: "Clinical Internship", blocks: ["6th Year"] }],
+  "Mirandilla, James Owen": [
+    { subject: "Gross Anatomy Lecture (ANAT101A)", blocks: blocks2ndYear },
+  ],
+  "Romualdo, Jenita": [
+    { subject: "Embryology Lecture (DEVA100A)", blocks: blocks2ndYear },
+  ],
+
+  // ── 3rd Year ──────────────────────────────────────────────────────────────
+  "Nicolas, Elma": [
+    { subject: "Pharmacology Laboratory", blocks: blocks3rdYear },
+  ],
+  "Olido, Elena": [
+    { subject: "Systemic Pathology Laboratory", blocks: blocks3rdYear },
+    { subject: "Ruminant Medicine",             blocks: ["4th Year"] },
+  ],
 };
 
 export const YEAR_LEVELS = ["1st Year","2nd Year","3rd Year","4th Year","5th Year","6th Year"];
@@ -428,6 +426,20 @@ function ProfessorPicker({
           )}
         </AnimatePresence>
       </div>
+
+{/* Incentive scope badge */}
+      <AnimatePresence>
+        {entry.professor && PROFESSOR_INCENTIVE_SCOPE[entry.professor] && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+            className="mx-4 mb-3 flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl"
+          >
+            <span className="text-amber-500 text-[10px]">🎁</span>
+            <p className="text-[10px] font-black text-amber-700 uppercase tracking-widest">
+              Incentive for: {PROFESSOR_INCENTIVE_SCOPE[entry.professor]}
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Footer status */}
       <AnimatePresence>
@@ -1156,7 +1168,7 @@ useEffect(() => {
                   <div>
                     <p className="text-[11px] font-black uppercase tracking-widest text-amber-800 mb-0.5">Bonus Points Notice</p>
                     <p className="text-xs font-medium text-amber-700 leading-relaxed">
-                      Enter correct details — <strong className="font-black">this determines whether you receive your bonus points</strong>. Double-check spelling before submitting.
+                      Only professors who confirmed they are giving bonus points appear in the list. Enter your correct subject and block — <strong className="font-black">this is what gets submitted to your professor</strong>.
                     </p>
                   </div>
                 </div>
@@ -1167,9 +1179,11 @@ useEffect(() => {
                     <div className="w-9 h-9 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center shrink-0"><FaSearch size={14} /></div>
                     <div>
                       <h2 className="text-lg font-black text-zinc-900 leading-none">Bonus Points Hunt</h2>
-                      <p className="text-xs text-zinc-400 mt-0.5">
-                        {filledProfessors.length > 0 ? `${filledProfessors.length} of ${MAX_PROFESSORS} slots filled` : `Up to ${MAX_PROFESSORS} professors`}
-                      </p>
+                    <p className="text-xs text-zinc-400 mt-0.5">
+                      {filledProfessors.length > 0
+                        ? `${filledProfessors.length} professor${filledProfessors.length !== 1 ? "s" : ""} added`
+                        : "Only professors confirmed to give incentives are listed"}
+                    </p>
                     </div>
                   </div>
                   {professors.length < MAX_PROFESSORS && (
