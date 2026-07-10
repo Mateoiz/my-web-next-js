@@ -11,13 +11,13 @@ export default function WalkingPaws({
   size?: number; 
 }) {
   return (
-    <div className="flex items-center justify-center gap-3">
+    <div className="flex items-center justify-center gap-1"> {/* Tightened gap for input fields */}
       {/* Paw 1: Left step */}
       <motion.div
         animate={{ opacity: [0.2, 1, 0.2] }}
         transition={{ duration: 1.2, repeat: Infinity, delay: 0 }}
         className={className}
-        style={{ transform: 'rotate(-15deg) translateY(4px)' }}
+        style={{ transform: 'rotate(-15deg) translateY(2px)' }}
       >
         <FaPaw size={size} />
       </motion.div>
@@ -27,7 +27,7 @@ export default function WalkingPaws({
         animate={{ opacity: [0.2, 1, 0.2] }}
         transition={{ duration: 1.2, repeat: Infinity, delay: 0.4 }}
         className={className}
-        style={{ transform: 'rotate(15deg) translateY(-4px)' }}
+        style={{ transform: 'rotate(15deg) translateY(-2px)' }}
       >
         <FaPaw size={size} />
       </motion.div>
@@ -37,7 +37,7 @@ export default function WalkingPaws({
         animate={{ opacity: [0.2, 1, 0.2] }}
         transition={{ duration: 1.2, repeat: Infinity, delay: 0.8 }}
         className={className}
-        style={{ transform: 'rotate(-15deg) translateY(4px)' }}
+        style={{ transform: 'rotate(-15deg) translateY(2px)' }}
       >
         <FaPaw size={size} />
       </motion.div>

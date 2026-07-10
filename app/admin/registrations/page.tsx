@@ -1,14 +1,15 @@
-// app/admin/registrations/page.tsx
 "use client";
 
 import { useEffect, useState, useMemo, useCallback } from "react";
-import { collection, query, orderBy, onSnapshot } from "firebase/firestore";
+// NOTICE: Added `increment` to the imports below!
+import { collection, query, orderBy, onSnapshot, doc, updateDoc, serverTimestamp, increment } from "firebase/firestore";
 import { db } from "@/lib/db";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   FaQrcode, FaUsers, FaCheckCircle, FaHourglass,
   FaSearch, FaDownload, FaSpinner, FaSync, FaSort,
-  FaSortUp, FaSortDown, FaCircle
+  FaSortUp, FaSortDown, FaCircle, FaClock, FaIdBadge,
+  FaWalking, FaBan
 } from "react-icons/fa";
 
 import FloatingCubes from "@/app/components/FloatingCubes";
@@ -31,16 +32,18 @@ interface Registration {
   studentType: "regular" | "irregular";
   block: string;
   professors: ProfessorEntry[];
-  status: "pre-registered" | "attendee";
-  createdAt: any; // Firestore Timestamp
-  checkedInAt?: any; // Firestore Timestamp
+  status: "pre-registered" | "attendee" | "invalid";
+  createdAt: any; 
+  checkedInAt?: any; 
+  onBreak?: boolean;
+  breakStartedAt?: any;
+  breakCount?: number; // <-- Added Break Count
 }
 
 type SortKey = "fullName" | "idNumber" | "program" | "status" | "createdAt";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-// Safely resolves Firestore timestamps (even pending local ones) into JS Dates
 function resolveDate(ts: any): Date | null {
   if (!ts) return null;
   if (typeof ts.toDate === "function") return ts.toDate();
@@ -58,7 +61,6 @@ function formatTime(ts: any): string {
   });
 }
 
-// Prevents CSV injection attacks (Excel evaluating strings starting with =, +, -, @)
 function escapeCSV(str: string): string {
   if (!str) return '""';
   let escaped = String(str).replace(/"/g, '""');
@@ -66,6 +68,35 @@ function escapeCSV(str: string): string {
     escaped = "'" + escaped;
   }
   return `"${escaped}"`;
+}
+
+function formatIdInput(raw: string) {
+  const digits = raw.replace(/\D/g, "");
+  let f = digits.slice(0, 12);
+  if (f.length > 6) f = `${f.slice(0, 4)}-${f.slice(4, 6)}-${f.slice(6)}`;
+  else if (f.length > 4) f = `${f.slice(0, 4)}-${f.slice(4)}`;
+  return f;
+}
+
+// ─── Live Timer Component for Breaks ──────────────────────────────────────────
+function BreakTimer({ breakStartedAt }: { breakStartedAt: any }) {
+  const [elapsed, setElapsed] = useState("");
+
+  useEffect(() => {
+    const start = resolveDate(breakStartedAt);
+    if (!start) return;
+
+    const interval = setInterval(() => {
+      const diffSecs = Math.floor((Date.now() - start.getTime()) / 1000);
+      const m = Math.floor(diffSecs / 60).toString().padStart(2, "0");
+      const s = (diffSecs % 60).toString().padStart(2, "0");
+      setElapsed(`${m}:${s}`);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [breakStartedAt]);
+
+  return <span className="font-mono tabular-nums">{elapsed || "00:00"}</span>;
 }
 
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
@@ -76,7 +107,7 @@ export default function AdminRegistrationsPage() {
   
   // Filters & Search
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "pre-registered" | "attendee">("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "pre-registered" | "attendee" | "invalid">("all");
   const [profFilter, setProfFilter] = useState("all");
   
   // Sorting
@@ -87,6 +118,10 @@ export default function AdminRegistrationsPage() {
   const [syncStatus, setSyncStatus] = useState<"idle" | "success" | "error">("idle");
   const [lastSynced, setLastSynced] = useState<Date | null>(null);
 
+  // Break Manager State
+  const [breakId, setBreakId] = useState("");
+  const [breakActionStatus, setBreakActionStatus] = useState<{ msg: string; type: "error"|"success" } | null>(null);
+
   // Realtime listener
   useEffect(() => {
     const q = query(collection(db, "cvmas_registrations"), orderBy("createdAt", "desc"));
@@ -96,6 +131,82 @@ export default function AdminRegistrationsPage() {
     });
     return () => unsub();
   }, []);
+
+  // ─── 15 MINUTE RULE AUTOMATION ──────────────────────────────────────────────
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = new Date();
+      registrations.forEach(async (r) => {
+        if (r.onBreak && r.breakStartedAt && r.status !== "invalid") {
+          const breakStart = resolveDate(r.breakStartedAt);
+          if (breakStart) {
+            const diffMins = (now.getTime() - breakStart.getTime()) / 60000;
+            if (diffMins >= 15) {
+              try {
+                await updateDoc(doc(db, "cvmas_registrations", r.id), {
+                  onBreak: false,
+                  status: "invalid", // Cuts the seminar
+                });
+              } catch (e) { console.error("Auto-invalidate failed", e); }
+            }
+          }
+        }
+      });
+    }, 15000); // Check every 15 seconds
+    return () => clearInterval(interval);
+  }, [registrations]);
+
+  const handleBreakAction = async (type: "out" | "in") => {
+    const cleanId = breakId.trim();
+    if (cleanId.length < 14) {
+      setBreakActionStatus({ msg: "Incomplete ID.", type: "error" });
+      return;
+    }
+
+    const student = registrations.find(r => r.idNumber === cleanId);
+    if (!student) {
+      setBreakActionStatus({ msg: "Student not found.", type: "error" });
+      return;
+    }
+    if (student.status !== "attendee" && type === "out") {
+      setBreakActionStatus({ msg: "Student is not checked in.", type: "error" });
+      return;
+    }
+    if (student.status === "invalid") {
+      setBreakActionStatus({ msg: "Student is marked invalid (cut).", type: "error" });
+      return;
+    }
+
+    try {
+      if (type === "out") {
+        if (student.onBreak) {
+          setBreakActionStatus({ msg: "Already on break.", type: "error" });
+          return;
+        }
+        await updateDoc(doc(db, "cvmas_registrations", student.id), {
+          onBreak: true,
+          breakStartedAt: serverTimestamp(),
+          breakCount: increment(1) // <-- Increments the break count automatically!
+        });
+        setBreakActionStatus({ msg: "Pass Issued. Break started.", type: "success" });
+      } else {
+        if (!student.onBreak) {
+          setBreakActionStatus({ msg: "Student is not on break.", type: "error" });
+          return;
+        }
+        await updateDoc(doc(db, "cvmas_registrations", student.id), {
+          onBreak: false,
+          breakStartedAt: null,
+        });
+        setBreakActionStatus({ msg: "ID Returned. Break ended.", type: "success" });
+      }
+      setBreakId("");
+      setTimeout(() => setBreakActionStatus(null), 3000);
+    } catch (e) {
+      console.error(e);
+      setBreakActionStatus({ msg: "Failed to update.", type: "error" });
+    }
+  };
 
   // Unique professors list for the dropdown filter
   const allProfessors = useMemo(() => {
@@ -125,7 +236,6 @@ export default function AdminRegistrationsPage() {
       let valA: any = a[sortConfig.key];
       let valB: any = b[sortConfig.key];
 
-      // Handle timestamps for sorting
       if (sortConfig.key === "createdAt") {
         valA = resolveDate(a.createdAt)?.getTime() || 0;
         valB = resolveDate(b.createdAt)?.getTime() || 0;
@@ -141,6 +251,7 @@ export default function AdminRegistrationsPage() {
 
   const totalAttendees = registrations.filter((r) => r.status === "attendee").length;
   const totalPre = registrations.filter((r) => r.status === "pre-registered").length;
+  const totalOnBreak = registrations.filter((r) => r.onBreak).length;
 
   const handleSort = (key: SortKey) => {
     setSortConfig(prev => ({
@@ -153,7 +264,7 @@ export default function AdminRegistrationsPage() {
   const exportCSV = useCallback(() => {
     const headers = [
       "Reference Code", "Full Name", "ID Number", "Program",
-      "Year Level", "Student Type", "Block", "Status",
+      "Year Level", "Student Type", "Block", "Status", "Break Status", "Total Breaks Taken",
       "Registered At", "Checked In At", "Professors"
     ];
     
@@ -165,7 +276,9 @@ export default function AdminRegistrationsPage() {
       r.yearLevel,
       r.studentType,
       r.block,
-      r.status,
+      r.status.toUpperCase(),
+      r.onBreak ? "ON BREAK" : "—",
+      (r.breakCount || 0).toString(), // <-- Added to CSV
       formatTime(r.createdAt),
       formatTime(r.checkedInAt),
       r.professors?.map((p) => `${p.professor} (${p.subject} · ${p.block})`).join(" | ") ?? "",
@@ -181,12 +294,10 @@ export default function AdminRegistrationsPage() {
     URL.revokeObjectURL(url);
   }, [filteredAndSorted]);
 
-  // Safely serialize and Sync to Google Sheets
   const syncToSheets = async () => {
     setIsSyncing(true);
     setSyncStatus("idle");
     
-    // STRICT SERIALIZATION: Ensure timestamps don't break JSON.stringify
     const safePayload = registrations.map(r => ({
       ...r,
       createdAt: resolveDate(r.createdAt)?.toISOString() || null,
@@ -246,7 +357,6 @@ export default function AdminRegistrationsPage() {
               </h1>
             </div>
             
-            {/* Sync Button in Header */}
             <div className="relative z-10 w-full md:w-auto flex flex-col items-end">
               <button
                 onClick={syncToSheets}
@@ -272,42 +382,68 @@ export default function AdminRegistrationsPage() {
 
         <div className="max-w-7xl mx-auto px-4 pt-5 space-y-5 pb-20">
 
-          {/* Stat cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {[
-              { label: "Total Registrations", value: registrations.length, color: "text-zinc-900 dark:text-zinc-100", bg: "bg-white dark:bg-zinc-900", icon: <FaQrcode size={16} /> },
-              { label: "Checked In", value: totalAttendees, color: "text-emerald-700 dark:text-emerald-400", bg: "bg-emerald-50 dark:bg-emerald-500/10", icon: <FaCheckCircle size={16} /> },
-              { label: "Pending", value: totalPre, color: "text-amber-700 dark:text-amber-400", bg: "bg-amber-50 dark:bg-amber-500/10", icon: <FaHourglass size={16} /> },
-            ].map((s) => (
-              <div key={s.label} className={`${s.bg} rounded-2xl border border-zinc-200 dark:border-zinc-800 p-5 flex items-center justify-between shadow-sm`}>
+          {/* CR Break Manager & Stats Row */}
+          <div className="flex flex-col xl:flex-row gap-4">
+            
+            {/* Break Manager Panel */}
+            <div className="xl:w-1/3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-sm flex flex-col">
+              <div className="flex items-center justify-between mb-4">
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-1">{s.label}</p>
-                  <p className={`text-3xl font-black leading-none ${s.color}`}>{s.value}</p>
+                  <h2 className="text-sm font-black flex items-center gap-2 text-zinc-900 dark:text-white">
+                    <FaWalking className="text-amber-500" /> CR Break Manager
+                  </h2>
+                  <p className="text-[10px] text-zinc-500 mt-0.5">Auto-cuts attendee if gone for &gt; 15 mins</p>
                 </div>
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center ${s.color.replace('text-', 'bg-').split(' ')[0]}/10 ${s.color}`}>
-                  {s.icon}
+                <div className="w-8 h-8 rounded-full bg-amber-50 dark:bg-amber-500/10 text-amber-600 flex items-center justify-center font-black text-xs">
+                  {totalOnBreak}
                 </div>
               </div>
-            ))}
-          </div>
 
-          {/* Attendance progress bar */}
-          {registrations.length > 0 && (
-            <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-5 shadow-sm">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-bold uppercase tracking-widest text-zinc-500">Live Attendance Rate</span>
-                <span className="text-lg font-black text-zinc-900 dark:text-zinc-100">
-                  {Math.round((totalAttendees / registrations.length) * 100)}%
-                </span>
-              </div>
-              <div className="h-3 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden shadow-inner">
-                <motion.div
-                  initial={{ width: 0 }} animate={{ width: `${(totalAttendees / registrations.length) * 100}%` }} transition={{ duration: 1, ease: "easeOut" }}
-                  className="h-full bg-emerald-500 rounded-full"
-                />
+              <div className="space-y-2">
+                <div className="relative">
+                  <FaIdBadge className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={12} />
+                  <input 
+                    type="text" value={breakId} onChange={e => setBreakId(formatIdInput(e.target.value))}
+                    placeholder="20XX-XX-XXXXXX" maxLength={14}
+                    className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl pl-9 pr-4 py-2 text-sm font-mono font-bold tracking-widest text-zinc-900 dark:text-white outline-none focus:border-amber-500"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => handleBreakAction("out")} disabled={breakId.length < 14} className="flex-1 bg-amber-500 hover:bg-amber-400 text-white rounded-xl py-2 text-xs font-black uppercase tracking-widest disabled:opacity-50 transition-all active:scale-95 shadow-sm">
+                    Issue Pass
+                  </button>
+                  <button onClick={() => handleBreakAction("in")} disabled={breakId.length < 14} className="flex-1 bg-[#06402B] hover:bg-[#08553a] text-white rounded-xl py-2 text-xs font-black uppercase tracking-widest disabled:opacity-50 transition-all active:scale-95 shadow-sm">
+                    Return ID
+                  </button>
+                </div>
+                {breakActionStatus && (
+                  <p className={`text-[10px] font-bold text-center mt-1 ${breakActionStatus.type === "error" ? "text-red-500" : "text-emerald-500"}`}>
+                    {breakActionStatus.msg}
+                  </p>
+                )}
               </div>
             </div>
-          )}
+
+            {/* Stat cards */}
+            <div className="xl:w-2/3 grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {[
+                { label: "Total Registrations", value: registrations.length, color: "text-zinc-900 dark:text-zinc-100", bg: "bg-white dark:bg-zinc-900", icon: <FaQrcode size={16} /> },
+                { label: "Checked In", value: totalAttendees, color: "text-emerald-700 dark:text-emerald-400", bg: "bg-emerald-50 dark:bg-emerald-500/10", icon: <FaCheckCircle size={16} /> },
+                { label: "Pending", value: totalPre, color: "text-zinc-500 dark:text-zinc-400", bg: "bg-zinc-50 dark:bg-zinc-800/50", icon: <FaHourglass size={16} /> },
+              ].map((s) => (
+                <div key={s.label} className={`${s.bg} rounded-2xl border border-zinc-200 dark:border-zinc-800 p-5 flex flex-col justify-between shadow-sm`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">{s.label}</p>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${s.color.replace('text-', 'bg-').split(' ')[0]}/10 ${s.color}`}>
+                      {s.icon}
+                    </div>
+                  </div>
+                  <p className={`text-4xl font-black leading-none ${s.color}`}>{s.value}</p>
+                </div>
+              ))}
+            </div>
+
+          </div>
 
           {/* Toolbar (Search & Filters) */}
           <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between bg-white dark:bg-zinc-900 p-3 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
@@ -322,14 +458,14 @@ export default function AdminRegistrationsPage() {
 
             <div className="flex flex-wrap gap-2 items-center">
               <div className="flex bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-1">
-                {(["all", "pre-registered", "attendee"] as const).map((f) => (
+                {(["all", "pre-registered", "attendee", "invalid"] as const).map((f) => (
                   <button
                     key={f} onClick={() => setStatusFilter(f)}
                     className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
                       statusFilter === f ? "bg-[#06402B] text-white shadow-sm" : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
                     }`}
                   >
-                    {f === "all" ? "All" : f === "pre-registered" ? "Pending" : "Attended"}
+                    {f === "all" ? "All" : f === "pre-registered" ? "Pending" : f === "attendee" ? "Attended" : "Cut/Invalid"}
                   </button>
                 ))}
               </div>
@@ -383,7 +519,7 @@ export default function AdminRegistrationsPage() {
                         <motion.tr
                           key={r.id}
                           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                          className="hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors group"
+                          className={`transition-colors group ${r.status === 'invalid' ? 'bg-red-50/50 dark:bg-red-900/10' : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/30'}`}
                         >
                           <td className="px-5 py-3">
                             <span className="font-mono text-[11px] font-bold text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-2 py-1 rounded-md">
@@ -421,7 +557,13 @@ export default function AdminRegistrationsPage() {
                             ) : <span className="text-zinc-400 text-xs">—</span>}
                           </td>
                           <td className="px-5 py-3">
-                            <StatusBadge status={r.status} checkedInAt={r.checkedInAt} />
+                            <StatusBadge 
+                              status={r.status} 
+                              checkedInAt={r.checkedInAt} 
+                              onBreak={r.onBreak} 
+                              breakStartedAt={r.breakStartedAt}
+                              breakCount={r.breakCount}
+                            />
                           </td>
                           <td className="px-5 py-3">
                             <span className="text-[11px] text-zinc-500 dark:text-zinc-400 font-mono whitespace-nowrap">{formatTime(r.createdAt)}</span>
@@ -467,21 +609,61 @@ function SortableHeader({ label, sortKey, currentSort, onSort }: { label: string
   );
 }
 
-function StatusBadge({ status, checkedInAt }: { status: string, checkedInAt?: any }) {
+function StatusBadge({ status, checkedInAt, onBreak, breakStartedAt, breakCount }: { status: string, checkedInAt?: any, onBreak?: boolean, breakStartedAt?: any, breakCount?: number }) {
+  if (status === "invalid") {
+    return (
+      <div className="flex flex-col items-start gap-1">
+        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-widest border bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-400 border-red-200 dark:border-red-500/20">
+          <FaBan size={10} /> Cut Seminar
+        </div>
+        {breakCount && breakCount > 0 && (
+          <span className="text-[9px] font-bold text-zinc-500 bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded">
+            Breaks taken: {breakCount}
+          </span>
+        )}
+      </div>
+    );
+  }
+  
+  if (onBreak) {
+    return (
+      <div className="flex flex-col items-start gap-1">
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-widest border bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-500/20">
+          <FaWalking size={10} /> On Break
+        </span>
+        <span className="text-[9px] font-mono text-amber-600 dark:text-amber-500 flex items-center gap-1">
+          <FaClock size={8} /> <BreakTimer breakStartedAt={breakStartedAt} />
+        </span>
+        {breakCount && breakCount > 0 && (
+          <span className="text-[9px] font-bold text-zinc-500 bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded">
+            Breaks taken: {breakCount}
+          </span>
+        )}
+      </div>
+    );
+  }
+
   const isAttended = status === "attendee";
   return (
     <div className="flex flex-col items-start gap-1">
       <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-widest border ${
         isAttended
           ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/20"
-          : "bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-500/20"
+          : "bg-zinc-50 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700"
       }`}>
         {isAttended ? <FaCheckCircle size={10} /> : <FaCircle size={6} className="animate-pulse" />}
         {isAttended ? "Attended" : "Pending"}
       </span>
+      
       {isAttended && checkedInAt && (
         <span className="text-[9px] font-mono text-zinc-400 whitespace-nowrap">
-          {formatTime(checkedInAt).split(',')[1]} {/* Just show the time */}
+          {formatTime(checkedInAt).split(',')[1]}
+        </span>
+      )}
+      
+      {breakCount && breakCount > 0 && (
+        <span className="text-[9px] font-bold text-zinc-500 bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded mt-0.5">
+          Breaks taken: {breakCount}
         </span>
       )}
     </div>

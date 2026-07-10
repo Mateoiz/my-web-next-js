@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
+import {
+  doc, getDoc, updateDoc, serverTimestamp,
+  collection, getDocs, DocumentReference,
+} from "firebase/firestore";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { auth, db } from "@/lib/db";
 import { motion, AnimatePresence } from "framer-motion";
@@ -67,6 +70,22 @@ function timeAgo(ts: number) {
   return `${Math.floor(m / 60)}h ago`;
 }
 
+// ─── Reference code resolution ─────────────────────────────────────────────────
+// The dashboard shows a short "REF CODE" (e.g. "RB53BQQG") which is a display
+// slice of the real Firestore document ID, not a separately stored field. A
+// manual getDoc() against that short string will never match. Instead, we
+// find any registration whose real doc ID starts with the typed code
+// (case-insensitive) — this works for every existing registration with no
+// migration needed, since it derives the same way the dashboard displays it.
+async function resolveRefCode(code: string): Promise<{ id: string } | null> {
+  const cleanCode = code.trim().toUpperCase();
+  if (!cleanCode) return null;
+
+  const snap = await getDocs(collection(db, "cvmas_registrations"));
+  const match = snap.docs.find(d => d.id.toUpperCase().startsWith(cleanCode));
+  return match ? { id: match.id } : null;
+}
+
 // ─── Main Scanner Component ───────────────────────────────────────────────────
 
 export default function ScanPage() {
@@ -93,6 +112,7 @@ export default function ScanPage() {
   const [autoCountdown, setAutoCountdown] = useState<number | null>(null);
   const [manualEntryOpen, setManualEntryOpen] = useState(false);
   const [manualCode, setManualCode] = useState("");
+  const [manualSubmitting, setManualSubmitting] = useState(false);
   const [undoing, setUndoing] = useState(false);
   const [soundOn, setSoundOn] = useState(true);
 
@@ -193,6 +213,39 @@ export default function ScanPage() {
     }
   }, []);
 
+  // Shared check-in logic once we have a resolved document reference —
+  // used by both the QR path (doc ID known directly) and the manual
+  // reference-code path (doc ID resolved via prefix match first).
+  const checkInDocRef = useCallback(async (docRef: DocumentReference) => {
+    const snap = await getDoc(docRef);
+
+    if (!snap.exists()) {
+      setResult({ state: "not_found" });
+      recordScan({ name: "Unknown reference", status: "not_found" });
+      playFeedback("error");
+      return;
+    }
+
+    const data = { id: snap.id, ...snap.data() } as any;
+
+    if (data.status === "attendee") {
+      setResult({ state: "already_attended", data });
+      recordScan({ name: data.fullName, idNumber: data.idNumber, status: "duplicate" });
+      playFeedback("duplicate");
+      return;
+    }
+
+    await updateDoc(docRef, {
+      status: "attendee",
+      checkedInAt: serverTimestamp(),
+      checkedInBy: authUser?.uid ?? "unknown",
+    });
+
+    setResult({ state: "success", data: { ...data, status: "attendee" } });
+    recordScan({ name: data.fullName, idNumber: data.idNumber, status: "checked_in" });
+    playFeedback("success");
+  }, [authUser, recordScan, playFeedback]);
+
   const processQR = useCallback(async (rawValue: string) => {
     if (processingRef.current) return;
     processingRef.current = true;
@@ -220,36 +273,7 @@ export default function ScanPage() {
     setResult({ state: "loading" });
 
     try {
-      const docRef = doc(db, "cvmas_registrations", docId);
-      const snap = await getDoc(docRef);
-
-      if (!snap.exists()) {
-        setResult({ state: "not_found" });
-        recordScan({ name: "Unknown QR", status: "not_found" });
-        playFeedback("error");
-        processingRef.current = false;
-        return;
-      }
-
-      const data = { id: snap.id, ...snap.data() } as any;
-
-      if (data.status === "attendee") {
-        setResult({ state: "already_attended", data });
-        recordScan({ name: data.fullName, idNumber: data.idNumber, status: "duplicate" });
-        playFeedback("duplicate");
-        processingRef.current = false;
-        return;
-      }
-
-      await updateDoc(docRef, {
-        status: "attendee",
-        checkedInAt: serverTimestamp(),
-        checkedInBy: authUser?.uid ?? "unknown",
-      });
-
-      setResult({ state: "success", data: { ...data, status: "attendee" } });
-      recordScan({ name: data.fullName, idNumber: data.idNumber, status: "checked_in" });
-      playFeedback("success");
+      await checkInDocRef(doc(db, "cvmas_registrations", docId));
     } catch (err: any) {
       const message = err?.code === "permission-denied"
         ? "Permission denied. Ensure your account has admin access."
@@ -260,7 +284,47 @@ export default function ScanPage() {
     } finally {
       processingRef.current = false;
     }
-  }, [stopScanner, authUser, recordScan, playFeedback]);
+  }, [stopScanner, recordScan, playFeedback, checkInDocRef]);
+
+  // Manual reference-code path: resolve the short REF CODE to a real doc ID
+  // by prefix match, then run through the same check-in logic as the QR path.
+  const processRefCode = useCallback(async (code: string) => {
+    if (processingRef.current) return;
+    processingRef.current = true;
+
+    await stopScanner();
+
+    if (!navigator.onLine) {
+      setResult({ state: "error", message: "You are offline. Reconnect to Wi-Fi/Data to scan." });
+      recordScan({ name: "Network Error", status: "error" });
+      playFeedback("error");
+      processingRef.current = false;
+      return;
+    }
+
+    setResult({ state: "loading" });
+
+    try {
+      const resolved = await resolveRefCode(code);
+      if (!resolved) {
+        setResult({ state: "not_found" });
+        recordScan({ name: `Ref code ${code.toUpperCase()}`, status: "not_found" });
+        playFeedback("error");
+        processingRef.current = false;
+        return;
+      }
+      await checkInDocRef(doc(db, "cvmas_registrations", resolved.id));
+    } catch (err: any) {
+      const message = err?.code === "permission-denied"
+        ? "Permission denied. Ensure your account has admin access."
+        : "Failed to update database. Check your connection.";
+      setResult({ state: "error", message });
+      recordScan({ name: "System Error", status: "error" });
+      playFeedback("error");
+    } finally {
+      processingRef.current = false;
+    }
+  }, [stopScanner, recordScan, playFeedback, checkInDocRef]);
 
   const startCameraScanner = useCallback(async () => {
     setResult({ state: "scanning" });
@@ -427,16 +491,18 @@ export default function ScanPage() {
     };
   }, [result.state, autoContinue, scanMode, handleReset]);
 
-  // ── Manual Input Formatting ────────────────────────────────────────────────
+  // ── Manual Input ────────────────────────────────────────────────────────────
 
-  const handleManualSubmit = useCallback((e: React.FormEvent) => {
+  const handleManualSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
-    const code = manualCode.trim().toUpperCase();
-    if (!code) return;
+    const code = manualCode.trim();
+    if (!code || manualSubmitting) return;
+    setManualSubmitting(true);
     setManualEntryOpen(false);
     setManualCode("");
-    processQR(code.startsWith("CVMAS:") ? code.toLowerCase() : `cvmas:${code}`);
-  }, [manualCode, processQR]);
+    await processRefCode(code);
+    setManualSubmitting(false);
+  }, [manualCode, manualSubmitting, processRefCode]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -666,11 +732,12 @@ export default function ScanPage() {
                   autoFocus
                   value={manualCode}
                   onChange={e => setManualCode(e.target.value.toUpperCase().replace(/\s+/g, ""))}
-                  placeholder="e.g. A1B2C3D4"
-                  className="flex-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2.5 text-sm font-bold font-mono tracking-widest text-zinc-900 dark:text-white outline-none focus:border-[#06402B] dark:focus:border-emerald-500 uppercase"
+                  placeholder="e.g. RB53BQQG"
+                  disabled={manualSubmitting}
+                  className="flex-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2.5 text-sm font-bold font-mono tracking-widest text-zinc-900 dark:text-white outline-none focus:border-[#06402B] dark:focus:border-emerald-500 uppercase disabled:opacity-60"
                 />
-                <button type="submit" className="px-4 py-2.5 bg-[#06402B] dark:bg-emerald-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-[#042d1f] dark:hover:bg-emerald-500 transition-colors">
-                  Go
+                <button type="submit" disabled={manualSubmitting || !manualCode.trim()} className="px-4 py-2.5 bg-[#06402B] dark:bg-emerald-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-[#042d1f] dark:hover:bg-emerald-500 transition-colors disabled:opacity-50 flex items-center justify-center min-w-[52px]">
+                  {manualSubmitting ? <FaSpinner className="animate-spin" size={12} /> : "Go"}
                 </button>
                 <button type="button" onClick={() => { setManualEntryOpen(false); setManualCode(""); }} className="px-3 py-2.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">
                   <FaTimes size={12} />
@@ -795,7 +862,7 @@ export default function ScanPage() {
                       </>
                     )}
 
-                    {result.state === "not_found" && <ErrorPanel title="Not found" message="This QR code doesn't match any CVMAS registration." onReset={handleReset} scanMode={scanMode} />}
+                    {result.state === "not_found" && <ErrorPanel title="Not found" message="This code doesn't match any CVMAS registration." onReset={handleReset} scanMode={scanMode} />}
                     {result.state === "error" && <ErrorPanel title="Error" message={(result as any).message} onReset={handleReset} scanMode={scanMode} />}
                   </div>
                 </motion.div>

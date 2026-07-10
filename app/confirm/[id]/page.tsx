@@ -1,4 +1,3 @@
-// app/confirm/[id]/page.tsx
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
@@ -7,9 +6,11 @@ import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/db";
 import QRCode from "react-qr-code";
 import { motion, AnimatePresence } from "framer-motion";
+import Link from "next/link"; 
 import {
   FaCheckCircle, FaDownload, FaSpinner, FaCalendarAlt,
-  FaIdCard, FaUser, FaExclamationTriangle, FaImage, FaCopy, FaShareSquare
+  FaIdCard, FaUser, FaExclamationTriangle, FaImage, FaCopy, FaShareSquare,
+  FaSignOutAlt 
 } from "react-icons/fa";
 
 import FloatingCubes from "@/app/components/FloatingCubes";
@@ -23,9 +24,7 @@ export default function ConfirmPage() {
   const [downloadingPng, setDownloadingPng] = useState(false);
   const [copied, setCopied] = useState(false);
   
-  // Detect if Web Share API is available (usually true on iOS/Android)
   const [canShare, setCanShare] = useState(false);
-
   const qrWrapRef = useRef<HTMLDivElement>(null);
 
   const fetchRegistration = useCallback(async () => {
@@ -49,7 +48,6 @@ export default function ConfirmPage() {
 
   useEffect(() => {
     fetchRegistration();
-    // Check if the browser supports sharing files natively
     if (typeof navigator !== "undefined" && navigator.canShare()) {
       setCanShare(true);
     }
@@ -63,9 +61,6 @@ export default function ConfirmPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // Converts the rendered QR <svg> into a downloadable PNG, with a small
-  // white padding frame + reference code printed underneath. 
-  // Uses Native Share on mobile, standard download on desktop.
   const handleSaveOrSharePng = async () => {
     const svgEl = qrWrapRef.current?.querySelector("svg");
     if (!svgEl || !data) return;
@@ -74,7 +69,6 @@ export default function ConfirmPage() {
     try {
       const refCode = data.id.slice(0, 8).toUpperCase();
       
-      // Clone SVG to ensure dimensions are explicitly set for Safari
       const clonedSvg = svgEl.cloneNode(true) as SVGSVGElement;
       clonedSvg.setAttribute("width", "720");
       clonedSvg.setAttribute("height", "720");
@@ -84,7 +78,7 @@ export default function ConfirmPage() {
       const svgUrl = URL.createObjectURL(svgBlob);
 
       const img = new Image();
-      const qrPixelSize = 720; // Crisp export size
+      const qrPixelSize = 720; 
       const padding = 60;
       const footerHeight = 80;
 
@@ -100,14 +94,10 @@ export default function ConfirmPage() {
       const ctx = canvas.getContext("2d");
       if (!ctx) throw new Error("Canvas not supported");
 
-      // Draw white background
       ctx.fillStyle = "#ffffff";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      
-      // Draw QR Code
       ctx.drawImage(img, padding, padding, qrPixelSize, qrPixelSize);
 
-      // Draw text footer
       ctx.fillStyle = "#06402B";
       ctx.font = "bold 42px sans-serif";
       ctx.textAlign = "center";
@@ -115,7 +105,6 @@ export default function ConfirmPage() {
 
       URL.revokeObjectURL(svgUrl);
 
-      // Try Native Share API first (iOS/Android) for better UX
       if (canShare) {
         canvas.toBlob(async (blob) => {
           if (!blob) return;
@@ -131,14 +120,12 @@ export default function ConfirmPage() {
               triggerDownload(canvas.toDataURL("image/png"), refCode);
             }
           } catch (shareError: any) {
-            // If user aborted share, do nothing. Otherwise fallback to download.
             if (shareError.name !== "AbortError") {
               triggerDownload(canvas.toDataURL("image/png"), refCode);
             }
           }
         }, "image/png");
       } else {
-        // Fallback for Desktop
         triggerDownload(canvas.toDataURL("image/png"), refCode);
       }
     } catch (err) {
@@ -194,14 +181,12 @@ export default function ConfirmPage() {
     );
   }
 
-  // The QR value encodes the Firestore doc ID — the scanner reads this
   const qrValue = `cvmas:${data.id}`;
   const refCode = data.id.slice(0, 8).toUpperCase();
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black relative overflow-hidden font-sans selection:bg-green-500/30 pb-12 print:bg-white print:text-black">
 
-      {/* Ambient background layer — hidden during print */}
       <div className="absolute inset-0 z-0 pointer-events-none print:hidden">
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]" />
         <div className="absolute top-[10%] left-[-10%] w-[400px] h-[400px] bg-green-500/10 rounded-full blur-3xl opacity-40" />
@@ -217,7 +202,6 @@ export default function ConfirmPage() {
 
       <div className="relative z-10">
 
-        {/* Header - Hides on print to save ink */}
         <div className="pt-16 md:pt-24 px-4 print:hidden">
           <div className="max-w-sm mx-auto relative overflow-hidden rounded-[2rem] border border-white/10 shadow-2xl bg-[#06402B] text-white text-center px-5 py-8">
             <div className="absolute inset-0 bg-[url('/scanlines.png')] opacity-10 pointer-events-none" />
@@ -236,12 +220,10 @@ export default function ConfirmPage() {
 
         <div className="max-w-sm mx-auto px-4 pt-6 space-y-4 print:pt-0 print:shadow-none print:max-w-full">
 
-          {/* QR Card - Main focus for print */}
           <motion.div
             initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
             className="bg-white dark:bg-zinc-900/60 backdrop-blur-xl rounded-3xl border border-zinc-200 dark:border-zinc-800 p-6 text-center shadow-xl space-y-5 print:border-none print:shadow-none print:p-0 print:bg-transparent"
           >
-            {/* QR Code - Forced white bg for scanning reliability */}
             <div ref={qrWrapRef} className="flex justify-center">
               <div className="p-4 bg-white rounded-2xl border border-zinc-200 shadow-sm inline-block">
                 <QRCode
@@ -255,7 +237,6 @@ export default function ConfirmPage() {
               </div>
             </div>
 
-            {/* Reference code + Copy */}
             <div>
               <p className="text-[9px] font-bold uppercase tracking-widest text-zinc-400 mb-1">Reference Code</p>
               <div className="flex items-center justify-center gap-2">
@@ -272,7 +253,6 @@ export default function ConfirmPage() {
               </div>
             </div>
 
-            {/* Status badge */}
             <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-xl print:bg-transparent print:border-zinc-300">
               <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse print:animate-none print:bg-zinc-400" />
               <span className="text-[10px] font-black uppercase tracking-widest text-amber-700 dark:text-amber-400 print:text-zinc-600">
@@ -280,7 +260,6 @@ export default function ConfirmPage() {
               </span>
             </div>
 
-            {/* Student details */}
             <div className="space-y-2 text-left border-t border-zinc-100 dark:border-zinc-800 pt-4 print:border-zinc-300">
               <DetailRow icon={<FaUser size={10} />} label="Name" value={data.fullName} />
               <DetailRow icon={<FaIdCard size={10} />} label="ID Number" value={data.idNumber} />
@@ -288,7 +267,6 @@ export default function ConfirmPage() {
               <DetailRow icon={<span className="text-[9px] font-black">BLK</span>} label="Block" value={data.block} />
             </div>
 
-            {/* Professors list */}
             {data.professors?.length > 0 && (
               <div className="text-left border-t border-zinc-100 dark:border-zinc-800 pt-4 space-y-2 print:border-zinc-300">
                 <p className="text-[9px] font-black uppercase tracking-widest text-zinc-400">Incentive professors</p>
@@ -302,7 +280,6 @@ export default function ConfirmPage() {
             )}
           </motion.div>
 
-          {/* Instructions - Hidden on print */}
           <div className="p-4 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-2xl space-y-2 print:hidden">
             <p className="text-[10px] font-black uppercase tracking-widest text-amber-700 dark:text-amber-400">Important</p>
             <ul className="space-y-1.5 text-xs font-medium text-amber-700 dark:text-amber-300 list-disc list-inside">
@@ -312,7 +289,6 @@ export default function ConfirmPage() {
             </ul>
           </div>
 
-          {/* Save actions - Hidden on print */}
           <div className="flex gap-3 print:hidden">
             <button
               onClick={handleSaveOrSharePng}
@@ -332,10 +308,25 @@ export default function ConfirmPage() {
               <FaDownload size={11} /> Print / PDF
             </button>
           </div>
+          
+          {/* ─── NEW: SEAMLESS CHECK-OUT LINK ─── */}
+          <div className="pt-6 print:hidden">
+            <div className="relative mb-4">
+              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-zinc-200 dark:border-zinc-800"></div></div>
+              <div className="relative flex justify-center"><span className="bg-zinc-50 dark:bg-black px-4 text-[10px] uppercase tracking-widest font-black text-zinc-400">Event Over?</span></div>
+            </div>
+            
+            <Link 
+              href="/checkout"
+              className="w-full py-4 bg-amber-500 hover:bg-amber-400 text-white rounded-2xl font-black text-sm uppercase tracking-widest transition-all flex items-center justify-center gap-2 active:scale-95 shadow-md shadow-amber-500/20"
+            >
+              Self Check-Out <FaSignOutAlt size={13} />
+            </Link>
+            <p className="text-center text-[10px] text-zinc-400 mt-3 pb-4">
+              Tap here at the end of the seminar to record your attendance.
+            </p>
+          </div>
 
-          <p className="text-center text-[10px] text-zinc-400 pb-4 print:hidden">
-            Need to re-find this page? Check your browser history or keep note of reference code <strong>{refCode}</strong>.
-          </p>
         </div>
       </div>
     </div>

@@ -9,7 +9,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   FaArrowRight, FaCheckCircle, FaCloudUploadAlt, FaExclamationTriangle,
   FaPlus, FaSearch, FaSpinner, FaTimes, FaTrashAlt, FaUndo, FaLightbulb,
-  FaPaw, FaSeedling, FaLeaf, FaBone, FaWifi, FaUtensils, FaChevronRight
+  FaPaw, FaSeedling, FaLeaf, FaBone, FaWifi, FaUtensils, FaChevronRight,
+  FaMicrophone, FaUserMd
 } from "react-icons/fa";
 import FloatingNature from "@/app/components/FloatingNature";
 import WalkingPaws from "@/app/components/WalkingPaws";
@@ -89,9 +90,40 @@ export const PROFESSORS_DATA: Record<string, { subject: string; blocks: string[]
 
 export const YEAR_LEVELS = ["1st Year","2nd Year","3rd Year","4th Year","5th Year","6th Year"];
 export const PROGRAM_OPTIONS = [
-  "Doctor of Veterinary Medicine (DVM)",
+  "Doctor of Veterinary Medicine",
   "Bachelor of Science in Agriculture",
   "Bachelor of Science in Food Technology"
+];
+
+// ─── Seminar options ────────────────────────────────────────────────────────
+
+interface SeminarOption {
+  id: string;
+  title: string;
+  speaker: string;
+}
+
+export const SEMINAR_OPTIONS: SeminarOption[] = [
+  {
+    id: "lao-c-aller-genius",
+    title: "Aller-Genius: New Frontiers in Veterinary Allergy Care",
+    speaker: "Criselda C. Lao, DVM, RN, MAN, USRN, FelPCCP, FelPCVS-CA",
+  },
+  {
+    id: "lao-k-photobiomodulation",
+    title: "Use of Photobiomodulation Therapy in Chronic Kidney Disease Cases in the Philippines: A Pilot Study",
+    speaker: "Ken Anthony L. Lao, DVM, FelPCCP, FelPCVS-CA",
+  },
+  {
+    id: "sy-emergency",
+    title: "Emergency Topic",
+    speaker: "Nikki & Joshua Sy",
+  },
+  {
+    id: "austria-nutrition-surgery",
+    title: "Nutrition in Surgery",
+    speaker: "Everlyn Austria",
+  },
 ];
 
 interface ProfessorEntry { professor: string; subject: string; block: string; }
@@ -467,6 +499,7 @@ export default function RegisterPage() {
   const [yearLevel, setYearLevel] = useState("");
   const [studentType, setStudentType] = useState<"regular" | "irregular" | "">("");
   const [block, setBlock] = useState("");
+  const [seminars, setSeminars] = useState<string[]>([]);
   const [professors, setProfessors] = useState<ProfessorEntry[]>([{ professor: "", subject: "", block: "" }]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -487,6 +520,10 @@ export default function RegisterPage() {
     setTimeout(() => errorRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
   }, []);
 
+  const toggleSeminar = useCallback((id: string) => {
+    setSeminars(prev => prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]);
+  }, []);
+
   // Draft restore
   useEffect(() => {
     try {
@@ -499,6 +536,7 @@ export default function RegisterPage() {
         if (d.yearLevel) setYearLevel(d.yearLevel);
         if (d.studentType) setStudentType(d.studentType);
         if (d.block) setBlock(d.block);
+        if (Array.isArray(d.seminars)) setSeminars(d.seminars);
         if (Array.isArray(d.professors) && d.professors.length > 0) setProfessors(d.professors);
         if (typeof d.step === "number") setStep(d.step);
         setDraftRestored(true);
@@ -510,22 +548,22 @@ export default function RegisterPage() {
   // Autosave draft
   useEffect(() => {
     if (!hydratedRef.current || draftClearedRef.current) return;
-    const hasContent = fullName || idNumber || yearLevel || studentType || block || professors.some(p => p.professor);
+    const hasContent = fullName || idNumber || yearLevel || studentType || block || seminars.length > 0 || professors.some(p => p.professor);
     if (!hasContent) return;
-    try { sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ fullName, idNumber, program, yearLevel, studentType, block, professors, step })); } catch {}
-  }, [fullName, idNumber, program, yearLevel, studentType, block, professors, step]);
+    try { sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ fullName, idNumber, program, yearLevel, studentType, block, seminars, professors, step })); } catch {}
+  }, [fullName, idNumber, program, yearLevel, studentType, block, seminars, professors, step]);
 
   // Before unload
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
       if (draftClearedRef.current || isSubmitting) return;
-      if (fullName || idNumber || yearLevel || block || professors.some(p => p.professor)) {
+      if (fullName || idNumber || yearLevel || block || seminars.length > 0 || professors.some(p => p.professor)) {
         e.preventDefault(); e.returnValue = "";
       }
     };
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
-  }, [fullName, idNumber, yearLevel, block, professors, isSubmitting]);
+  }, [fullName, idNumber, yearLevel, block, seminars, professors, isSubmitting]);
 
   // Connectivity
   useEffect(() => {
@@ -545,6 +583,7 @@ export default function RegisterPage() {
   const startOver = useCallback(() => {
     if (!window.confirm("Discard this draft and start fresh?")) return;
     setFullName(""); setIdNumber(""); setYearLevel(""); setStudentType(""); setBlock("");
+    setSeminars([]);
     setProfessors([{ professor: "", subject: "", block: "" }]);
     setStep(0); setIdError(""); setError("");
     clearDraft(); draftClearedRef.current = false; setDraftRestored(false);
@@ -558,15 +597,35 @@ export default function RegisterPage() {
     setIdNumber(f);
   };
 
-  useEffect(() => {
+useEffect(() => {
     const trimmed = idNumber.trim();
-    if (!trimmed) { setIdError(""); setIdChecking(false); setIdYearWarning(""); return; }
-    if (!ID_REGEX.test(trimmed)) { setIdError(""); setIdChecking(false); setIdYearWarning(""); return; }
+    
+    // 1. If empty, stop animation and clear errors
+    if (!trimmed) { 
+      setIdError(""); 
+      setIdChecking(false); 
+      setIdYearWarning(""); 
+      return; 
+    }
+    
+    // 2. WHILE TYPING: Show the walking paws (idChecking = true), but DON'T query the DB yet
+    if (!ID_REGEX.test(trimmed)) { 
+      setIdError(""); 
+      setIdChecking(true); // <--- CHANGED TO TRUE: Paws will walk while typing!
+      setIdYearWarning(""); 
+      return; 
+    }
+    
+    // 3. DONE TYPING: Check for weird years
     const yearPart = parseInt(trimmed.slice(0, 4), 10);
     const currentYear = new Date().getFullYear();
     setIdYearWarning(yearPart < currentYear - 8 || yearPart > currentYear + 1 ? `Double-check — "${yearPart}" looks unusual.` : "");
+    
+    // 4. QUERY DB: Keep paws walking while checking Firebase
     const token = ++idCheckTokenRef.current;
-    setIdChecking(true); setIdError("");
+    setIdChecking(true); 
+    setIdError("");
+    
     const t = setTimeout(async () => {
       try {
         const snap = await getDocs(query(collection(db, "cvmas_registrations"), where("idNumber", "==", trimmed)));
@@ -575,9 +634,11 @@ export default function RegisterPage() {
       } catch {
         if (idCheckTokenRef.current === token) setIdError("Couldn't verify ID — check your connection.");
       } finally {
+        // 5. FINISHED: Stop the paws and show the Checkmark or Error
         if (idCheckTokenRef.current === token) setIdChecking(false);
       }
     }, 550);
+    
     return () => clearTimeout(t);
   }, [idNumber]);
 
@@ -614,9 +675,11 @@ export default function RegisterPage() {
     [fullName, nameError, idNumber, idError, idChecking]
   );
 
+  const seminarsValid = seminars.length > 0;
+
   const step1Valid = useMemo(() =>
-    !!yearLevel && !!studentType && !blockError && (studentType === "irregular" || block.trim().length > 0),
-    [yearLevel, studentType, block, blockError]
+    !!yearLevel && !!studentType && !blockError && (studentType === "irregular" || block.trim().length > 0) && seminarsValid,
+    [yearLevel, studentType, block, blockError, seminarsValid]
   );
 
   const filledProfessors = useMemo(() => professors.filter(isValidProfessorEntry), [professors]);
@@ -630,7 +693,11 @@ export default function RegisterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (step === 0) { if (step0Valid) goNext(); else showError("Please complete every field before continuing."); return; }
-    if (step === 1) { if (step1Valid) goNext(); else showError("Please complete every field before continuing."); return; }
+    if (step === 1) {
+      if (step1Valid) goNext();
+      else showError(!seminarsValid ? "Select at least one seminar you're attending." : "Please complete every field before continuing.");
+      return;
+    }
     if (!step2Valid) { showError(hasDuplicateProfessors ? "Fix duplicate professor entries first." : "Add at least one complete professor entry."); return; }
     if (nameError || idError || blockError) { showError("Please fix highlighted fields before submitting."); return; }
     if (isSubmitting || submitLockRef.current) return;
@@ -644,8 +711,10 @@ export default function RegisterPage() {
     const cleanId = idNumber.trim();
     const cleanBlock = studentType === "regular" ? formatBlockStr(block) : block.trim() ? `Irregular (${formatBlockStr(block)})` : "Irregular";
     const finalProfessors = professors.filter(isValidProfessorEntry);
+    const finalSeminars = SEMINAR_OPTIONS.filter(s => seminars.includes(s.id));
 
     if (finalProfessors.length === 0) { showError("Add at least one complete professor entry."); setIsSubmitting(false); submitLockRef.current = false; return; }
+    if (finalSeminars.length === 0) { showError("Select at least one seminar you're attending."); setIsSubmitting(false); submitLockRef.current = false; return; }
 
     try {
       const submitPromise = (async () => {
@@ -654,6 +723,7 @@ export default function RegisterPage() {
         return addDoc(collection(db, "cvmas_registrations"), {
           fullName: cleanName, idNumber: cleanId, program, yearLevel, studentType,
           block: cleanBlock, professors: finalProfessors,
+          seminars: finalSeminars,
           status: "pre-registered", createdAt: serverTimestamp(),
         });
       })();
@@ -672,7 +742,7 @@ export default function RegisterPage() {
 
   const stepConfig = [
     { title: "Your Details", desc: "Name and ID number", color: "border-t-[#06402B]", icon: <FaPaw size={14} /> },
-    { title: "Academic Roots", desc: "Year level and block", color: "border-t-emerald-500", icon: <FaSeedling size={14} /> },
+    { title: "Academic Roots", desc: "Year level, block & seminars", color: "border-t-emerald-500", icon: <FaSeedling size={14} /> },
     { title: "Bonus Points Hunt", desc: "Professors giving incentives", color: "border-t-amber-500", icon: <FaSearch size={14} /> },
   ];
 
@@ -717,7 +787,7 @@ export default function RegisterPage() {
                   🐾 DLSAU · CVMAS Week 2025
                 </div>
                 <h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight text-white leading-tight mb-2">
-                  Event<br className="sm:hidden" /> Pre-Registration
+                  Hilway<br className="sm:hidden" /> Talks
                 </h1>
                 <p className="text-emerald-100/80 text-sm md:text-base font-medium max-w-md leading-relaxed">
                   Register to get your official entrance QR code. Screenshot it after — you'll need it at the door.
@@ -824,22 +894,29 @@ export default function RegisterPage() {
                       />
                     </Field>
 
-                    <Field label="ID Number" error={idError} warning={idYearWarning} hint="Format: 20XX-XX-XXXXXX" required htmlFor="idNumber">
-                      <div className="relative">
-                        <input
-                          id="idNumber" type="text" inputMode="numeric" value={idNumber}
-                          onChange={handleIdChange}
-                          placeholder="20XX-XX-XXXXXX"
-                          maxLength={ID_MAX}
-                          className={`${inputCls} font-mono tracking-widest ${idError ? "border-red-400 bg-red-50" : ""} pr-10`}
-                        />
-                        <div className="absolute right-3.5 top-1/2 -translate-y-1/2">
-                          {idChecking && <FaSpinner size={12} className="animate-spin text-[#06402B]" />}
-                          {!idChecking && ID_REGEX.test(idNumber) && !idError && <FaCheckCircle size={12} className="text-[#06402B]" />}
-                          {!idChecking && idError && <FaExclamationTriangle size={12} className="text-red-500" />}
-                        </div>
-                      </div>
-                    </Field>
+<Field label="ID Number" error={idError} warning={idYearWarning} hint="Format: 20XX-XX-XXXXXX" required htmlFor="idNumber">
+  <div className="relative">
+    <input
+      id="idNumber"
+      type="text" 
+      inputMode="numeric"
+      value={idNumber}
+      onChange={handleIdChange}
+      placeholder="20XX-XX-XXXXXX"
+      maxLength={ID_MAX}
+      // Added pr-14 to give the 3 paws enough room to animate
+      className={`${inputCls} font-mono tracking-widest ${idError ? "border-red-400 bg-red-50" : ""} pr-14`}
+    />
+    <div className="absolute right-3.5 top-1/2 -translate-y-1/2 flex items-center justify-end">
+      {/* Renders the custom animation when checking */}
+      {idChecking && <WalkingPaws size={10} className="text-[#06402B]" />}
+      
+      {/* Success / Error states */}
+      {!idChecking && ID_REGEX.test(idNumber) && !idError && <FaCheckCircle size={12} className="text-[#06402B]" />}
+      {!idChecking && idError && <FaExclamationTriangle size={12} className="text-red-500" />}
+    </div>
+  </div>
+</Field>
 
                     <Field label="Program" required>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -915,7 +992,7 @@ export default function RegisterPage() {
                       <div className="w-9 h-9 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0"><FaSeedling size={15} /></div>
                       <div>
                         <h2 className="text-lg font-black text-zinc-900 leading-none">Academic Roots</h2>
-                        <p className="text-xs text-zinc-400 mt-0.5">Year level and block section</p>
+                        <p className="text-xs text-zinc-400 mt-0.5">Year level, block section, and seminars</p>
                       </div>
                     </div>
 
@@ -981,6 +1058,46 @@ export default function RegisterPage() {
                         )}
                       </AnimatePresence>
                     </div>
+
+                    {/* Seminars */}
+                    <Field
+                      label="Seminars You're Attending"
+                      required
+                      hint="Select every session you plan to attend — this is used for attendance and record keeping."
+                    >
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {SEMINAR_OPTIONS.map(sem => {
+                          const selected = seminars.includes(sem.id);
+                          return (
+                            <button
+                              key={sem.id}
+                              type="button"
+                              onClick={() => toggleSeminar(sem.id)}
+                              aria-pressed={selected}
+                              className={`text-left p-4 rounded-2xl border-2 transition-all flex items-start gap-3 ${
+                                selected
+                                  ? "border-[#06402B] bg-[#06402B]/5 shadow-sm"
+                                  : "border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50"
+                              }`}
+                            >
+                              <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 mt-0.5 transition-colors ${
+                                selected ? "bg-[#06402B] text-white" : "bg-zinc-100 text-zinc-400"
+                              }`}>
+                                {selected ? <FaCheckCircle size={12} /> : <FaMicrophone size={11} />}
+                              </div>
+                              <div className="min-w-0">
+                                <p className={`text-xs font-black leading-snug ${selected ? "text-[#06402B]" : "text-zinc-800"}`}>
+                                  {sem.title}
+                                </p>
+                                <p className="flex items-center gap-1.5 text-[11px] font-medium text-zinc-500 mt-1">
+                                  <FaUserMd size={9} className="shrink-0" /> {sem.speaker}
+                                </p>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </Field>
                   </div>
 
                   {/* Side */}
@@ -1000,6 +1117,10 @@ export default function RegisterPage() {
                           <span className="text-zinc-500 font-medium">Program</span>
                           <span className="font-bold text-zinc-700 truncate max-w-[140px]">{program.split(" ")[0]}</span>
                         </div>
+                        <div className="flex justify-between text-xs">
+                          <span className="text-zinc-500 font-medium">Seminars</span>
+                          <span className="font-bold text-zinc-700">{seminars.length || "—"}</span>
+                        </div>
                       </div>
                     </div>
 
@@ -1015,6 +1136,11 @@ export default function RegisterPage() {
                         Professors <FaArrowRight size={13} />
                       </button>
                     </div>
+                    {!step1Valid && !seminarsValid && !!yearLevel && !!studentType && (
+                      <p className="text-center text-[11px] text-zinc-400 font-medium">
+                        Select at least one seminar to continue
+                      </p>
+                    )}
                   </div>
                 </div>
               </motion.div>
@@ -1122,6 +1248,16 @@ export default function RegisterPage() {
                         <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest mb-1">Academic</p>
                         <p className="font-bold text-zinc-700 text-xs">{yearLevel} · {studentType === "regular" ? formatBlockStr(block) : "Irregular"}</p>
                         <p className="text-zinc-500 text-xs">{program.split(" ")[0]}</p>
+                      </div>
+                    </div>
+                    <div className="mt-3 pt-3 border-t border-zinc-100">
+                      <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest mb-2">Seminars ({seminars.length})</p>
+                      <div className="flex flex-wrap gap-2">
+                        {SEMINAR_OPTIONS.filter(s => seminars.includes(s.id)).map(s => (
+                          <span key={s.id} className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-lg text-[11px] font-bold">
+                            <FaMicrophone size={9} /> {s.title}
+                          </span>
+                        ))}
                       </div>
                     </div>
                     <div className="mt-3 pt-3 border-t border-zinc-100">
