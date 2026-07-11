@@ -48,8 +48,17 @@ export default function ConfirmPage() {
 
   useEffect(() => {
     fetchRegistration();
-    if (typeof navigator !== "undefined" && navigator.canShare()) {
-      setCanShare(true);
+    try {
+      if (
+        typeof navigator !== "undefined" &&
+        typeof navigator.share === "function" &&
+        typeof navigator.canShare === "function" &&
+        navigator.canShare({ files: [new File([""], "test.png", { type: "image/png" })] })
+      ) {
+        setCanShare(true);
+      }
+    } catch {
+      // canShare not supported — fall back to download
     }
   }, [fetchRegistration]);
 
@@ -61,76 +70,148 @@ export default function ConfirmPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleSaveOrSharePng = async () => {
+const handleSaveOrSharePng = async () => {
     const svgEl = qrWrapRef.current?.querySelector("svg");
     if (!svgEl || !data) return;
 
     setDownloadingPng(true);
+
     try {
       const refCode = data.id.slice(0, 8).toUpperCase();
-      
-      const clonedSvg = svgEl.cloneNode(true) as SVGSVGElement;
-      clonedSvg.setAttribute("width", "720");
-      clonedSvg.setAttribute("height", "720");
-      
-      const svgString = new XMLSerializer().serializeToString(clonedSvg);
-      const svgBlob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
-      const svgUrl = URL.createObjectURL(svgBlob);
+      const QR_SIZE = 600;
+      const PADDING = 48;
+      const HEADER_H = 64;
+      const FOOTER_H = 72;
+      const W = QR_SIZE + PADDING * 2;
+      const H = HEADER_H + QR_SIZE + PADDING + FOOTER_H;
 
-      const img = new Image();
-      const qrPixelSize = 720; 
-      const padding = 60;
-      const footerHeight = 80;
-
-      await new Promise<void>((resolve, reject) => {
-        img.onload = () => resolve();
-        img.onerror = reject;
-        img.src = svgUrl;
+      // ── 1. Serialise the live SVG ───────────────────────────────────────
+      const cloned = svgEl.cloneNode(true) as SVGSVGElement;
+      cloned.setAttribute("width",  String(QR_SIZE));
+      cloned.setAttribute("height", String(QR_SIZE));
+      // Force viewBox so it scales correctly
+      if (!cloned.getAttribute("viewBox")) {
+        cloned.setAttribute("viewBox", `0 0 ${QR_SIZE} ${QR_SIZE}`);
+      }
+      // Inline any currentColor / CSS vars that canvas can't resolve
+      cloned.querySelectorAll<SVGElement>("*").forEach(el => {
+        const fill = getComputedStyle(el).fill;
+        if (fill && fill !== "none") el.setAttribute("fill", fill);
       });
 
+      const svgString = new XMLSerializer().serializeToString(cloned);
+      // base64 encode — avoids CORS / blob-URL timing issues on iOS
+      const svgB64 = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgString)));
+
+      // ── 2. Load into an Image ───────────────────────────────────────────
+      const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const i = new Image();
+        i.onload  = () => resolve(i);
+        i.onerror = reject;
+        i.src = svgB64;
+      });
+
+      // ── 3. Draw on canvas ───────────────────────────────────────────────
       const canvas = document.createElement("canvas");
-      canvas.width = qrPixelSize + padding * 2;
-      canvas.height = qrPixelSize + padding * 2 + footerHeight;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) throw new Error("Canvas not supported");
+      // 2× retina scaling
+      const SCALE = 2;
+      canvas.width  = W * SCALE;
+      canvas.height = H * SCALE;
+      const ctx = canvas.getContext("2d")!;
+      ctx.scale(SCALE, SCALE);
 
+      // Background
       ctx.fillStyle = "#ffffff";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, padding, padding, qrPixelSize, qrPixelSize);
+      ctx.fillRect(0, 0, W, H);
 
+      // Header strip
       ctx.fillStyle = "#06402B";
-      ctx.font = "bold 42px sans-serif";
+      ctx.fillRect(0, 0, W, HEADER_H);
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 18px -apple-system, BlinkMacSystemFont, sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText(refCode, canvas.width / 2, qrPixelSize + padding + 56);
+      ctx.fillText("CVMAS WEEK · DLSAU", W / 2, HEADER_H / 2 + 7);
 
-      URL.revokeObjectURL(svgUrl);
+      // QR code
+      ctx.drawImage(img, PADDING, HEADER_H, QR_SIZE, QR_SIZE);
 
-      if (canShare) {
-        canvas.toBlob(async (blob) => {
-          if (!blob) return;
-          const file = new File([blob], `cvmas-qr-${refCode}.png`, { type: "image/png" });
-          try {
-            if (navigator.canShare({ files: [file] })) {
-              await navigator.share({
-                title: "CVMAS QR Ticket",
-                text: `My CVMAS Registration Code: ${refCode}`,
-                files: [file]
-              });
-            } else {
-              triggerDownload(canvas.toDataURL("image/png"), refCode);
-            }
-          } catch (shareError: any) {
-            if (shareError.name !== "AbortError") {
-              triggerDownload(canvas.toDataURL("image/png"), refCode);
-            }
+      // Thin border around QR
+      ctx.strokeStyle = "#e4e4e7";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(PADDING, HEADER_H, QR_SIZE, QR_SIZE);
+
+      // Footer — ref code
+      const footerY = HEADER_H + QR_SIZE;
+      ctx.fillStyle = "#f4f4f5";
+      ctx.fillRect(0, footerY, W, FOOTER_H);
+      ctx.fillStyle = "#71717a";
+      ctx.font = "600 11px -apple-system, BlinkMacSystemFont, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("REFERENCE CODE", W / 2, footerY + 22);
+      ctx.fillStyle = "#06402B";
+      ctx.font = "bold 28px ui-monospace, monospace";
+      ctx.fillText(refCode, W / 2, footerY + 54);
+
+      // ── 4. Export ───────────────────────────────────────────────────────
+      // toBlob with explicit type + quality is more reliable than toDataURL on iOS
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob(b => b ? resolve(b) : reject(new Error("toBlob failed")), "image/png");
+      });
+
+      const file = new File([blob], `cvmas-qr-${refCode}.png`, { type: "image/png" });
+
+      // ── 5. Share → Download fallback chain ─────────────────────────────
+      let shared = false;
+
+      // A: Web Share API with files (iOS 15+, Chrome Android)
+      if (
+        typeof navigator.share === "function" &&
+        typeof navigator.canShare === "function"
+      ) {
+        try {
+          if (navigator.canShare({ files: [file] })) {
+            await navigator.share({
+              title: "CVMAS QR Ticket",
+              text: `My CVMAS Registration Code: ${refCode}`,
+              files: [file],
+            });
+            shared = true;
           }
-        }, "image/png");
-      } else {
-        triggerDownload(canvas.toDataURL("image/png"), refCode);
+        } catch (e: any) {
+          // AbortError = user cancelled — don't fall through to download
+          if (e?.name === "AbortError") { setDownloadingPng(false); return; }
+          // Any other error: fall through to next method
+        }
       }
+
+      if (shared) { setDownloadingPng(false); return; }
+
+      // B: Open blob in new tab (iOS Safari shows "Save to Photos" / "AirDrop" sheet)
+      const blobUrl = URL.createObjectURL(blob);
+      const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+
+      if (isIOS) {
+        // On iOS, opening the blob URL lets the user long-press → Save Image
+        window.open(blobUrl, "_blank");
+        // Revoke after a delay so the tab can load it first
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 30_000);
+      } else {
+        // C: Standard <a download> — works on Chrome, Firefox, Edge desktop/Android
+        const a = document.createElement("a");
+        a.href = blobUrl;
+        a.download = `cvmas-qr-${refCode}.png`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 5_000);
+      }
+
     } catch (err) {
-      console.error("Failed to generate image:", err);
-      alert("Failed to generate image. Please try taking a screenshot instead.");
+      console.error("QR image export failed:", err);
+      alert(
+        "Couldn't generate the image automatically.\n\n" +
+        "Tip: Take a screenshot of this page — it works just as well at the entrance."
+      );
     } finally {
       setDownloadingPng(false);
     }
@@ -289,6 +370,14 @@ export default function ConfirmPage() {
             </ul>
           </div>
 
+{/iphone|ipad|ipod/i.test(typeof navigator !== "undefined" ? navigator.userAgent : "") && (
+            <div className="flex items-start gap-2 px-4 py-3 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-2xl text-blue-700 dark:text-blue-300">
+              <span className="text-base shrink-0">📱</span>
+              <p className="text-[11px] font-medium leading-relaxed">
+                iPhone tip: Tap <strong>"Save / Share"</strong> then long-press the image → <strong>Save to Photos</strong>. Or just take a screenshot — it works at the entrance too.
+              </p>
+            </div>
+          )}
           <div className="flex gap-3 print:hidden">
             <button
               onClick={handleSaveOrSharePng}
@@ -298,7 +387,7 @@ export default function ConfirmPage() {
               {downloadingPng ? (
                 <><FaSpinner size={11} className="animate-spin" /> Saving…</>
               ) : (
-                <>{canShare ? <FaShareSquare size={11} /> : <FaImage size={11} />} {canShare ? "Share Ticket" : "Save as PNG"}</>
+              <>{canShare ? <FaShareSquare size={11} /> : <FaImage size={11} />} {canShare ? "Share / Save" : "Save as Image"}</>
               )}
             </button>
             <button
