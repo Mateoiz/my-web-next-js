@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
+import { motion } from "framer-motion";
 import { FaFacebook, FaInstagram, FaYoutube } from "react-icons/fa";
 
 // Org founding date — drives the live uptime readout below.
@@ -20,8 +21,7 @@ const NAV_LINKS = [
 
 const SOCIAL_LINKS = [
   { icon: FaFacebook, label: "facebook", href: "https://www.facebook.com/JPCSDLSAU" },
-  { icon: FaInstagram, label: "instagram", href: "https://www.instagram.com/jpcs_dlsau?igsh=YXo5emdqNTNpaDd6" },
-  { icon: FaYoutube, label: "youtube", href: "https://youtube.com" },
+  { icon: FaInstagram, label: "instagram", href: "https://www.instagram.com/jpcs.dlsau/" },
 ];
 
 function formatUptime(ms: number) {
@@ -62,12 +62,63 @@ export default function Footer() {
 
   const currentYear = new Date().getFullYear();
 
-  return (
-    <footer className="relative z-10 bg-black text-zinc-400 mt-auto border-t border-green-500/20 overflow-hidden font-sans">
-      {/* Top hairline glow, consistent with the rest of the site's cyber border treatment */}
-      <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-green-500/60 to-transparent" />
+  // Add these two hooks near the top of your Footer component, alongside your other useState calls:
+const [mouseX, setMouseX] = useState(0);
+const [mouseY, setMouseY] = useState(0);
 
-      <div className="relative max-w-7xl mx-auto px-6 py-16">
+const handleFooterMouseMove = (e: React.MouseEvent<HTMLElement>) => {
+  const rect = e.currentTarget.getBoundingClientRect();
+  const x = (e.clientX - rect.left) / rect.width - 0.5;  // -0.5 to 0.5
+  const y = (e.clientY - rect.top) / rect.height - 0.5;
+  setMouseX(x);
+  setMouseY(y);
+};
+  return (
+<footer
+  onMouseMove={handleFooterMouseMove}
+  className="relative z-10 bg-black text-zinc-400 mt-auto border-t border-green-500/20 overflow-hidden font-sans"
+>
+  {/* Building backdrop — subtle mouse-parallax + slow drift */}
+  <div className="absolute inset-0 z-0 pointer-events-none">
+    <motion.div
+      animate={{
+        x: mouseX * 14,
+        y: mouseY * 10,
+      }}
+      transition={{ type: "spring", stiffness: 40, damping: 15 }}
+      className="absolute inset-[-3%]"
+    >
+      <Image
+        src="https://storage.googleapis.com/world-study-prod/media/school_photo/2696/1e6e2619-ca20-49a8-8078-91f3ed2e46f3.jpg"
+        alt=""
+        fill
+        className="object-cover object-center"
+      />
+    </motion.div>
+
+    {/* Dark wash, keeps color but darkens for contrast */}
+    <div className="absolute inset-0 bg-black/60" />
+    <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/70 to-black" />
+
+    {/* Slow horizontal light sweep — echoes the scanline motif from your scanner page */}
+    <motion.div
+      animate={{ x: ["-30%", "130%"] }}
+      transition={{ repeat: Infinity, duration: 9, ease: "linear", repeatDelay: 3 }}
+      className="absolute top-0 bottom-0 w-1/3 bg-gradient-to-r from-transparent via-green-400/[0.06] to-transparent skew-x-12"
+    />
+
+    {/* Soft breathing glow near the top, ties into the green brand accent */}
+    <motion.div
+      animate={{ opacity: [0.15, 0.3, 0.15] }}
+      transition={{ repeat: Infinity, duration: 5, ease: "easeInOut" }}
+      className="absolute top-0 left-1/2 -translate-x-1/2 w-[500px] h-[200px] bg-green-500/20 rounded-full blur-3xl"
+    />
+  </div>
+
+      {/* Top hairline glow, consistent with the rest of the site's cyber border treatment */}
+      <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-green-500/60 to-transparent z-10" />
+
+      <div className="relative z-10 max-w-7xl mx-auto px-6 py-16">
         <div className="grid grid-cols-1 md:grid-cols-[1.2fr_1fr_1fr] gap-12 md:gap-8">
 
           {/* ── Identity block, styled as a terminal whoami card ── */}
@@ -140,7 +191,7 @@ export default function Footer() {
       </div>
 
       {/* ── Bottom status bar — mirrors the BootScreen line styling ── */}
-      <div className="relative border-t border-zinc-900">
+      <div className="relative z-10 border-t border-zinc-900">
         <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-3 font-mono text-xs">
           <div className="flex items-center gap-2 text-zinc-500">
             <span className="relative flex h-1.5 w-1.5">

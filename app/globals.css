@@ -53,18 +53,13 @@ html {
   80%       { transform: translateX(4px); }
 }
 
-/* --- SPLASH SCREEN & CHAT MODE LOGIC --- */
+/* --- SPLASH SCREEN LOGIC --- */
 
-/* Hides elements when splash is active OR when in chat mode */
+/* Hides elements when splash is active */
 body.splash-active nav,
 body.splash-active .ThemeToggle,
 body.splash-active .MusicPlayer,
-body.splash-active [data-hide-on-splash="true"],
-
-/* NEW: Hide global UI when in Chat Mode to prevent blocking inputs */
-body.chat-mode nav,
-body.chat-mode .ThemeToggle,
-body.chat-mode footer
+body.splash-active [data-hide-on-splash="true"]
 {
   display: none !important;
 }
