@@ -757,8 +757,7 @@ useEffect(() => {
       else showError(!seminarsValid ? "Select at least one seminar you're attending." : "Please complete every field before continuing.");
       return;
     }
-    if (!step2Valid) { showError(hasDuplicateProfessors ? "Fix duplicate professor entries first." : "Add at least one complete professor entry."); return; }
-    if (nameError || idError || blockError) { showError("Please fix highlighted fields before submitting."); return; }
+if (hasDuplicateProfessors) { showError("Fix duplicate professor entries first."); return; }    if (nameError || idError || blockError) { showError("Please fix highlighted fields before submitting."); return; }
     if (isSubmitting || submitLockRef.current) return;
     if (typeof navigator !== "undefined" && !navigator.onLine) { showError("You're offline. Reconnect and try again."); return; }
 
@@ -1025,19 +1024,11 @@ useEffect(() => {
                       ))}
                     </div>
 
-                    {/* CTA */}
-<button type="submit" disabled={!step2Valid || isSubmitting || isOffline}
-  className="flex-1 py-4 bg-[#06402B] ..."
+{/* CTA */}
+<button type="submit" disabled={!step0Valid}
+  className="w-full py-4 bg-[#06402B] text-white rounded-2xl font-black text-sm uppercase tracking-widest disabled:opacity-40 hover:bg-[#0a5a38] shadow-lg transition-all flex items-center justify-center gap-2 active:scale-95"
 >
-  {isSubmitting ? (
-    <><FaSpinner className="animate-spin" size={14} /> Submitting…</>
-  ) : isOffline ? (
-    <><FaWifi size={13} /> Offline — Reconnect</>
-  ) : filledProfessors.length === 0 ? (
-    <>Skip & Register 🐾</>
-  ) : (
-    <>Complete Registration 🐾</>
-  )}
+  Continue <FaArrowRight size={13} />
 </button>
 
                     {!step0Valid && (
@@ -1300,12 +1291,7 @@ useEffect(() => {
                   )}
                 </AnimatePresence>
                     
-                    
-{/* Add this below the professor grid */}
-<p className="text-center text-[11px] text-zinc-400 font-medium">
-  No professor incentives?{" "}
-  <span className="font-bold text-zinc-500">You can skip this step.</span>
-</p>
+
                 {/* Final review */}
                 {step2Valid && (
                   <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
@@ -1365,17 +1351,17 @@ useEffect(() => {
                   >
                     Back
                   </button>
-                  <button type="submit" disabled={!step2Valid || isSubmitting || isOffline}
-                    className="flex-1 py-4 bg-[#06402B] text-white rounded-2xl font-black text-sm uppercase tracking-widest disabled:opacity-40 hover:bg-[#0a5a38] shadow-xl transition-all flex items-center justify-center gap-2 active:scale-95"
-                  >
-                    {isSubmitting ? (
-                      <><FaSpinner className="animate-spin" size={14} /> Submitting…</>
-                    ) : isOffline ? (
-                      <><FaWifi size={13} /> Offline — Reconnect</>
-                    ) : (
-                      <>Complete Registration 🐾</>
-                    )}
-                  </button>
+  <button type="submit" disabled={hasDuplicateProfessors || isSubmitting || isOffline}
+  className="flex-1 py-4 bg-[#06402B] text-white rounded-2xl font-black text-sm uppercase tracking-widest disabled:opacity-40 hover:bg-[#0a5a38] shadow-xl transition-all flex items-center justify-center gap-2 active:scale-95"
+>
+  {isSubmitting ? (
+    <><FaSpinner className="animate-spin" size={14} /> Submitting…</>
+  ) : isOffline ? (
+    <><FaWifi size={13} /> Offline — Reconnect</>
+  ) : (
+    <>Complete Registration 🐾</>
+  )}
+</button>
                 </div>
 
                 <p className="text-center text-[11px] text-zinc-400 font-medium pb-4">
