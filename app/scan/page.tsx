@@ -234,7 +234,7 @@ export default function ScanPage() {
       return;
     }
 
-    if (data.seminars && !data.seminars.includes(activeSeminar.id)) {
+    if (data.seminars && data.seminars.length > 0 && !data.seminars.includes(activeSeminar.id)) {
       setResult({ state: "not_registered", data, seminar: activeSeminar });
       recordScan({ name: data.fullName, idNumber: data.idNumber, status: "error" });
       playFeedback("error");

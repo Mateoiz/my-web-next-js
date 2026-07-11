@@ -16,7 +16,18 @@ import FloatingNature from "@/app/components/FloatingNature";
 import WalkingPaws from "@/app/components/WalkingPaws";
 import NatureCursor from "@/app/components/NatureCursor";
 
-// ─── Data (unchanged) 
+// ─── Programs & Year Levels ───────────────────────────────────────────────────
+
+export const PROG_DVM = "Doctor of Veterinary Medicine";
+export const PROG_AGRI = "Bachelor of Science in Agriculture";
+export const PROG_FT = "Bachelor of Science in Food Technology";
+
+export const YEAR_LEVELS = ["1st Year","2nd Year","3rd Year","4th Year","5th Year","6th Year"];
+export const PROGRAM_OPTIONS = [PROG_DVM, PROG_AGRI, PROG_FT];
+
+const DVM_AGRI = [PROG_DVM, PROG_AGRI];
+
+// ─── Data ───────────────────────────────────────────────────────────────────── 
 
 const blocks1stYear = [
   "1st Year A","1st Year B","1st Year C","1st Year D",
@@ -35,7 +46,7 @@ const blocks3rdYear = [
   "3rd Year K","3rd Year L",
 ];
 
-// ─── Incentive badge metadata ─
+// ─── Incentive badge metadata ─────────────────────────────────────────────────
 
 export const PROFESSOR_INCENTIVE_SCOPE: Record<string, string> = {
   "Ellema, Jovanito":   "DVM & Agriculture Seminar",
@@ -43,60 +54,72 @@ export const PROFESSOR_INCENTIVE_SCOPE: Record<string, string> = {
   "Olido, Elena":       "All Seminars",
   "Romualdo, Jenita":   "DVM Seminars",
   "Fragata, Helen":     "All Seminars",
-  "Gravitez, Maurice":  "DVM Seminar",
+  "Gravidez, Maurice":  "DVM Seminar",
   "Jimenez, Marlon":    "All Seminars",
   "Mirandilla, James Owen": "All Events",
+  "Un Ho King, Solomon": "Food Tech Seminar",
+  "Maniego, Janine":     "Food Tech Seminar",
+  "Salem, Andrea Mae":   "Food Tech Seminar",
 };
 
-// ─── Professors offering incentives 
+// ─── Professors offering incentives ─────────────────────────────────────────── 
 
-export const PROFESSORS_DATA: Record<string, { subject: string; blocks: string[] }[]> = {
-  // ── 1st Year 
+export const PROFESSORS_DATA: Record<string, { subject: string; blocks: string[]; programs: string[] }[]> = {
+  // ── 1st Year (DVM/Agri)
   "Jimenez, Marlon": [
-    { subject: "Animal Production", blocks: blocks1stYear },
+    { subject: "Animal Production", blocks: blocks1stYear, programs: DVM_AGRI },
   ],
   "Gravidez, Maurice": [
-    { subject: "Biochemistry Laboratory", blocks: blocks1stYear },
-    { subject: "Embryology Laboratory",   blocks: blocks1stYear },
+    { subject: "Biochemistry Laboratory", blocks: blocks1stYear, programs: DVM_AGRI },
+    { subject: "Embryology Laboratory",   blocks: blocks1stYear, programs: DVM_AGRI },
   ],
 
-  // ── 2nd Year 
+  // ── 2nd Year (DVM/Agri)
   "Fragata, Helen": [
-    { subject: "Ruminant Production (BASC108A)", blocks: blocks2ndYear },
+    { subject: "Ruminant Production (BASC108A)", blocks: blocks2ndYear, programs: DVM_AGRI },
   ],
   "Ellema, Jovanito": [
-    { subject: "Ruminant Production Laboratory (BASC108B)", blocks: blocks2ndYear },
+    { subject: "Ruminant Production Laboratory (BASC108B)", blocks: blocks2ndYear, programs: DVM_AGRI },
   ],
   "Mirandilla, James Owen": [
-    { subject: "Gross Anatomy Lecture (ANAT101A)", blocks: blocks2ndYear },
+    { subject: "Gross Anatomy Lecture (ANAT101A)", blocks: blocks2ndYear, programs: DVM_AGRI },
   ],
   "Romualdo, Jenita": [
-    { subject: "Embryology Lecture (DEVA100A)", blocks: blocks2ndYear },
+    { subject: "Embryology Lecture (DEVA100A)", blocks: blocks2ndYear, programs: DVM_AGRI },
   ],
 
-  // ── 3rd Year 
+  // ── 3rd Year (DVM/Agri)
   "Nicolas, Elma": [
-    { subject: "Pharmacology Laboratory", blocks: blocks3rdYear },
+    { subject: "Pharmacology Laboratory", blocks: blocks3rdYear, programs: DVM_AGRI },
   ],
   "Olido, Elena": [
-    { subject: "Systemic Pathology Laboratory", blocks: blocks3rdYear },
-    { subject: "Ruminant Medicine",             blocks: ["4th Year"] },
+    { subject: "Systemic Pathology Laboratory", blocks: blocks3rdYear, programs: DVM_AGRI },
+    { subject: "Ruminant Medicine",             blocks: ["4th Year"], programs: DVM_AGRI },
   ],
+
+  // ── Food Technology Professors ──
+  "Un Ho King, Solomon": [
+    { subject: "Food Engineering (Laboratory)", blocks: ["Monday, 8:00 AM–2:00 PM"], programs: [PROG_FT] },
+    { subject: "Food Engineering (Lecture)", blocks: ["Wednesday, 7:00 AM–9:00 AM"], programs: [PROG_FT] },
+    { subject: "Product Development", blocks: ["Wednesday, 10:00 AM–12:00 PM"], programs: [PROG_FT] }
+  ],
+  "Maniego, Janine": [
+    { subject: "Meat Science (Lecture)", blocks: ["Monday, 8:00 AM–11:00 AM"], programs: [PROG_FT] }
+  ],
+  "Salem, Andrea Mae": [ 
+    { subject: "PUHL Lab", blocks: ["5th Year A","5th Year B","5th Year C"], programs: DVM_AGRI },
+    { subject: "Food Analysis (Laboratory)", blocks: ["Monday, 11:30 AM–5:30 PM"], programs: [PROG_FT] },
+    { subject: "Food Analysis (Lecture & Laboratory)", blocks: ["Wednesday, 8:00 AM–12:00 PM"], programs: [PROG_FT] }
+  ]
 };
 
-export const YEAR_LEVELS = ["1st Year","2nd Year","3rd Year","4th Year","5th Year","6th Year"];
-export const PROGRAM_OPTIONS = [
-  "Doctor of Veterinary Medicine",
-  "Bachelor of Science in Agriculture",
-  "Bachelor of Science in Food Technology"
-];
-
-// ─── Seminar options ────────────────────────────────────────────────────────
+// ─── Dynamic Seminar options ────────────────────────────────────────────────
 
 interface SeminarOption {
   id: string;
   title: string;
   speaker: string;
+  programs: string[];
 }
 
 export const SEMINAR_OPTIONS: SeminarOption[] = [
@@ -104,22 +127,32 @@ export const SEMINAR_OPTIONS: SeminarOption[] = [
     id: "lao-c-aller-genius",
     title: "Aller-Genius: New Frontiers in Veterinary Allergy Care",
     speaker: "Criselda C. Lao, DVM, RN, MAN, USRN, FelPCCP, FelPCVS-CA",
+    programs: DVM_AGRI
   },
   {
     id: "lao-k-photobiomodulation",
     title: "Use of Photobiomodulation Therapy in Chronic Kidney Disease Cases in the Philippines: A Pilot Study",
     speaker: "Ken Anthony L. Lao, DVM, FelPCCP, FelPCVS-CA",
+    programs: DVM_AGRI
   },
   {
     id: "sy-emergency",
     title: "Emergency Topic",
     speaker: "Nikki & Joshua Sy",
+    programs: DVM_AGRI
   },
   {
     id: "austria-nutrition-surgery",
     title: "Nutrition in Surgery",
     speaker: "Everlyn Austria",
+    programs: DVM_AGRI
   },
+  {
+    id: "dela-cruz-source",
+    title: "From Source to Safety: The importance of water microbiology in public health and food system",
+    speaker: "Mr. Bryan Dela Cruz",
+    programs: [PROG_FT]
+  }
 ];
 
 interface ProfessorEntry { professor: string; subject: string; block: string; }
@@ -141,9 +174,9 @@ function formatName(s: string) {
 function formatBlockStr(s: string) {
   return s.replace(/\s+/g, " ").trim().replace(/\b\w/g, c => c.toUpperCase());
 }
-function isValidProfessorEntry(p: ProfessorEntry): boolean {
+function isValidProfessorEntry(p: ProfessorEntry, program: string): boolean {
   if (!p.professor || !p.subject || !p.block) return false;
-  const subjectData = PROFESSORS_DATA[p.professor]?.find(s => s.subject === p.subject);
+  const subjectData = PROFESSORS_DATA[p.professor]?.find(s => s.subject === p.subject && s.programs.includes(program));
   if (!subjectData) return false;
   if (subjectData.blocks.includes(p.block)) return true;
   const trimmed = p.block.trim();
@@ -153,7 +186,7 @@ function isValidProfessorEntry(p: ProfessorEntry): boolean {
 // ─── Professor Picker ─────────────────────────────────────────────────────────
 
 function ProfessorPicker({
-  entry, index, onChange, onRemove, canRemove, isDuplicate, studentType, globalBlock
+  entry, index, onChange, onRemove, canRemove, isDuplicate, studentType, globalBlock, program
 }: {
   entry: ProfessorEntry; index: number;
   onChange: (e: ProfessorEntry) => void;
@@ -161,6 +194,7 @@ function ProfessorPicker({
   isDuplicate: boolean;
   studentType: "regular" | "irregular" | "";
   globalBlock: string;
+  program: string;
 }) {
   const [searchQuery, setSearchQuery] = useState(entry.professor);
   const [open, setOpen] = useState(false);
@@ -169,18 +203,23 @@ function ProfessorPicker({
   const wrapRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const allProfessors = Object.keys(PROFESSORS_DATA);
+  // Filter professors to only those who teach subjects for the selected program
+  const programProfessors = useMemo(() => {
+    return Object.keys(PROFESSORS_DATA).filter(prof => 
+      PROFESSORS_DATA[prof].some(s => s.programs.includes(program))
+    );
+  }, [program]);
 
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return [];
-    return allProfessors.filter(p => {
+    return programProfessors.filter(p => {
       if (p.toLowerCase().includes(q)) return true;
-      return (PROFESSORS_DATA[p] || []).some(s => s.subject.toLowerCase().includes(q));
+      return PROFESSORS_DATA[p].some(s => s.programs.includes(program) && s.subject.toLowerCase().includes(q));
     });
-  }, [searchQuery]);
+  }, [searchQuery, programProfessors, program]);
 
-  const selectedSubjects = entry.professor ? PROFESSORS_DATA[entry.professor] ?? [] : [];
+  const selectedSubjects = entry.professor ? (PROFESSORS_DATA[entry.professor] || []).filter(s => s.programs.includes(program)) : [];
   const selectedBlocks = entry.subject
     ? selectedSubjects.find(s => s.subject === entry.subject)?.blocks ?? []
     : [];
@@ -211,12 +250,16 @@ function ProfessorPicker({
     setSearchQuery(name);
     setOpen(false);
     setCustomBlockMode(false);
-    const subjects = PROFESSORS_DATA[name] ?? [];
+    
+    // Auto-select subject and block if there's only one option for this program
+    const subjects = (PROFESSORS_DATA[name] ?? []).filter(s => s.programs.includes(program));
     let autoSubject = "", autoBlock = "";
+    
     if (subjects.length === 1) {
       autoSubject = subjects[0].subject;
-      if (subjects[0].blocks.length === 1) autoBlock = subjects[0].blocks[0];
-      else if (studentType === "regular" && globalBlock) {
+      if (subjects[0].blocks.length === 1) {
+        autoBlock = subjects[0].blocks[0];
+      } else if (studentType === "regular" && globalBlock) {
         const match = subjects[0].blocks.find(b => b.toLowerCase() === globalBlock.toLowerCase());
         if (match) autoBlock = match;
       }
@@ -325,7 +368,7 @@ function ProfessorPicker({
                       const q = searchQuery.trim().toLowerCase();
                       const matchIdx = prof.toLowerCase().indexOf(q);
                       const subjects = PROFESSORS_DATA[prof] || [];
-                      const matchedSubject = matchIdx < 0 ? subjects.find(s => s.subject.toLowerCase().includes(q)) : null;
+                      const matchedSubject = matchIdx < 0 ? subjects.find(s => s.programs.includes(program) && s.subject.toLowerCase().includes(q)) : null;
                       return (
                         <li key={prof}>
                           <button type="button"
@@ -378,7 +421,7 @@ function ProfessorPicker({
         <AnimatePresence>
           {entry.subject && selectedBlocks.length > 1 && (
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-              <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-2">Block</p>
+              <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-2">Block or Schedule</p>
               <div className="flex flex-wrap gap-1.5">
                 {selectedBlocks.map(b => (
                   <button key={b} type="button" onClick={() => { setCustomBlockMode(false); onChange({ ...entry, block: b }); }}
@@ -424,7 +467,7 @@ function ProfessorPicker({
         </AnimatePresence>
       </div>
 
-{/* Incentive scope badge */}
+      {/* Incentive scope badge */}
       <AnimatePresence>
         {entry.professor && PROFESSOR_INCENTIVE_SCOPE[entry.professor] && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
@@ -533,6 +576,11 @@ export default function RegisterPage() {
     setSeminars(prev => prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]);
   }, []);
 
+  // Filter available seminars dynamically based on selected program
+  const availableSeminars = useMemo(() => {
+    return SEMINAR_OPTIONS.filter(sem => sem.programs.includes(program));
+  }, [program]);
+
   // Draft restore
   useEffect(() => {
     try {
@@ -620,7 +668,7 @@ useEffect(() => {
     // 2. WHILE TYPING: Show the walking paws (idChecking = true), but DON'T query the DB yet
     if (!ID_REGEX.test(trimmed)) { 
       setIdError(""); 
-      setIdChecking(true); // <--- CHANGED TO TRUE: Paws will walk while typing!
+      setIdChecking(true); 
       setIdYearWarning(""); 
       return; 
     }
@@ -643,7 +691,6 @@ useEffect(() => {
       } catch {
         if (idCheckTokenRef.current === token) setIdError("Couldn't verify ID — check your connection.");
       } finally {
-        // 5. FINISHED: Stop the paws and show the Checkmark or Error
         if (idCheckTokenRef.current === token) setIdChecking(false);
       }
     }, 550);
@@ -691,10 +738,13 @@ useEffect(() => {
     [yearLevel, studentType, block, blockError, seminarsValid]
   );
 
-  const filledProfessors = useMemo(() => professors.filter(isValidProfessorEntry), [professors]);
+  const filledProfessors = useMemo(() => professors.filter(p => isValidProfessorEntry(p, program)), [professors, program]);
   const hasDuplicateProfessors = duplicateKeys.size > 0;
-  const step2Valid = useMemo(() => filledProfessors.length > 0 && !hasDuplicateProfessors, [filledProfessors, hasDuplicateProfessors]);
-  const incompleteProfessorCount = useMemo(() => professors.filter(p => (p.professor || p.subject || p.block) && !isValidProfessorEntry(p)).length, [professors]);
+  const step2Valid = useMemo(() =>
+  !hasDuplicateProfessors,
+  [hasDuplicateProfessors]
+);
+  const incompleteProfessorCount = useMemo(() => professors.filter(p => (p.professor || p.subject || p.block) && !isValidProfessorEntry(p, program)).length, [professors, program]);
 
   const goNext = () => { setError(""); setStep(s => Math.min(s + 1, TOTAL_STEPS - 1)); window.scrollTo({ top: 0, behavior: "smooth" }); };
   const goBack = () => { setError(""); setStep(s => Math.max(s - 1, 0)); window.scrollTo({ top: 0, behavior: "smooth" }); };
@@ -719,10 +769,8 @@ useEffect(() => {
     const cleanName = formatName(fullName);
     const cleanId = idNumber.trim();
     const cleanBlock = studentType === "regular" ? formatBlockStr(block) : block.trim() ? `Irregular (${formatBlockStr(block)})` : "Irregular";
-    const finalProfessors = professors.filter(isValidProfessorEntry);
+    const finalProfessors = professors.filter(p => isValidProfessorEntry(p, program));
     const finalSeminars = SEMINAR_OPTIONS.filter(s => seminars.includes(s.id));
-
-    if (finalProfessors.length === 0) { showError("Add at least one complete professor entry."); setIsSubmitting(false); submitLockRef.current = false; return; }
     if (finalSeminars.length === 0) { showError("Select at least one seminar you're attending."); setIsSubmitting(false); submitLockRef.current = false; return; }
 
     try {
@@ -903,36 +951,42 @@ useEffect(() => {
                       />
                     </Field>
 
-<Field label="ID Number" error={idError} warning={idYearWarning} hint="Format: 20XX-XX-XXXXXX" required htmlFor="idNumber">
-  <div className="relative">
-    <input
-      id="idNumber"
-      type="text" 
-      inputMode="numeric"
-      value={idNumber}
-      onChange={handleIdChange}
-      placeholder="20XX-XX-XXXXXX"
-      maxLength={ID_MAX}
-      // Added pr-14 to give the 3 paws enough room to animate
-      className={`${inputCls} font-mono tracking-widest ${idError ? "border-red-400 bg-red-50" : ""} pr-14`}
-    />
-    <div className="absolute right-3.5 top-1/2 -translate-y-1/2 flex items-center justify-end">
-      {/* Renders the custom animation when checking */}
-      {idChecking && <WalkingPaws size={10} className="text-[#06402B]" />}
-      
-      {/* Success / Error states */}
-      {!idChecking && ID_REGEX.test(idNumber) && !idError && <FaCheckCircle size={12} className="text-[#06402B]" />}
-      {!idChecking && idError && <FaExclamationTriangle size={12} className="text-red-500" />}
-    </div>
-  </div>
-</Field>
+                    <Field label="ID Number" error={idError} warning={idYearWarning} hint="Format: 20XX-XX-XXXXXX" required htmlFor="idNumber">
+                      <div className="relative">
+                        <input
+                          id="idNumber"
+                          type="text" 
+                          inputMode="numeric"
+                          value={idNumber}
+                          onChange={handleIdChange}
+                          placeholder="20XX-XX-XXXXXX"
+                          maxLength={ID_MAX}
+                          // Added pr-14 to give the 3 paws enough room to animate
+                          className={`${inputCls} font-mono tracking-widest ${idError ? "border-red-400 bg-red-50" : ""} pr-14`}
+                        />
+                        <div className="absolute right-3.5 top-1/2 -translate-y-1/2 flex items-center justify-end">
+                          {/* Renders the custom animation when checking */}
+                          {idChecking && <WalkingPaws size={10} className="text-[#06402B]" />}
+                          
+                          {/* Success / Error states */}
+                          {!idChecking && ID_REGEX.test(idNumber) && !idError && <FaCheckCircle size={12} className="text-[#06402B]" />}
+                          {!idChecking && idError && <FaExclamationTriangle size={12} className="text-red-500" />}
+                        </div>
+                      </div>
+                    </Field>
 
                     <Field label="Program" required>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         {PROGRAM_OPTIONS.map(p => {
                           const Icon = p.includes("Veterinary") ? FaBone : p.includes("Food") ? FaUtensils : FaSeedling;
                           return (
-                            <button key={p} type="button" onClick={() => setProgram(p)}
+                            <button key={p} type="button" onClick={() => {
+                              if (program !== p) {
+                                setProgram(p);
+                                setSeminars([]); // Reset seminars on program change to avoid keeping invalid options
+                                setProfessors([{ professor: "", subject: "", block: "" }]); // Reset professors to prevent DVM profs being sent for Food Tech
+                              }
+                            }}
                               className={`w-full py-3 px-4 rounded-xl border-2 text-xs font-black transition-all flex flex-col items-center gap-2 text-center leading-tight ${
                                 program === p ? "border-[#06402B] bg-[#06402B]/5 text-[#06402B] shadow-sm" : "border-zinc-200 text-zinc-500 hover:border-zinc-300 hover:bg-zinc-50"
                               }`}
@@ -972,11 +1026,19 @@ useEffect(() => {
                     </div>
 
                     {/* CTA */}
-                    <button type="submit" disabled={!step0Valid}
-                      className="w-full py-4 bg-[#06402B] text-white rounded-2xl font-black text-sm uppercase tracking-widest disabled:opacity-40 hover:bg-[#0a5a38] shadow-lg transition-all flex items-center justify-center gap-2 active:scale-95"
-                    >
-                      Continue <FaArrowRight size={13} />
-                    </button>
+<button type="submit" disabled={!step2Valid || isSubmitting || isOffline}
+  className="flex-1 py-4 bg-[#06402B] ..."
+>
+  {isSubmitting ? (
+    <><FaSpinner className="animate-spin" size={14} /> Submitting…</>
+  ) : isOffline ? (
+    <><FaWifi size={13} /> Offline — Reconnect</>
+  ) : filledProfessors.length === 0 ? (
+    <>Skip & Register 🐾</>
+  ) : (
+    <>Complete Registration 🐾</>
+  )}
+</button>
 
                     {!step0Valid && (
                       <p className="text-center text-[11px] text-zinc-400 font-medium">
@@ -1041,7 +1103,7 @@ useEffect(() => {
                                 onBlur={e => setBlock(formatBlockStr(e.target.value))}
                                 placeholder="e.g. 2nd Year A"
                                 maxLength={BLOCK_MAX}
-                                className={`${inputCls} ${blockError ? "border-red-400 bg-red-50" : ""}`}
+                                className={`${inputCls} flex-1 ${blockError ? "border-red-400 bg-red-50" : ""}`}
                                 autoFocus
                               />
                             </Field>
@@ -1071,7 +1133,7 @@ useEffect(() => {
                       hint="Select every session you plan to attend — this is used for attendance and record keeping."
                     >
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {SEMINAR_OPTIONS.map(sem => {
+                        {availableSeminars.map(sem => {
                           const selected = seminars.includes(sem.id);
                           return (
                             <button
@@ -1198,9 +1260,11 @@ useEffect(() => {
                           canRemove={professors.length > 1}
                           isDuplicate={!!key && duplicateKeys.has(key)}
                           studentType={studentType} globalBlock={block}
+                          program={program}
                         />
                       );
                     })}
+                    
 
                     {/* Add card */}
                     {professors.length < MAX_PROFESSORS && (
@@ -1235,7 +1299,13 @@ useEffect(() => {
                     </motion.div>
                   )}
                 </AnimatePresence>
-
+                    
+                    
+{/* Add this below the professor grid */}
+<p className="text-center text-[11px] text-zinc-400 font-medium">
+  No professor incentives?{" "}
+  <span className="font-bold text-zinc-500">You can skip this step.</span>
+</p>
                 {/* Final review */}
                 {step2Valid && (
                   <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
