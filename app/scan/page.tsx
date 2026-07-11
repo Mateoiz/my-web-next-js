@@ -3,18 +3,19 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import {
   doc, getDoc, updateDoc, serverTimestamp,
-  collection, getDocs, DocumentReference,
+  collection, getDocs, DocumentReference, deleteField
 } from "firebase/firestore";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { auth, db } from "@/lib/db";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   FaQrcode, FaCheckCircle, FaExclamationTriangle,
-  FaUser, FaIdCard, FaLayerGroup, FaRedo, FaSpinner,
+  FaIdCard, FaLayerGroup, FaRedo, FaSpinner,
   FaUpload, FaCamera, FaLock, FaSignInAlt, FaKeyboard,
   FaUndo, FaHistory, FaBolt, FaTrash, FaChevronDown, FaChevronUp, FaTimes,
 } from "react-icons/fa";
 import { useRouter } from "next/navigation";
+import { SEMINAR_OPTIONS, type Seminar } from "@/lib/seminars";
 
 import FloatingCubes from "@/app/components/FloatingCubes";
 import CircuitCursor from "@/app/components/CircuitCursor";
@@ -25,9 +26,10 @@ type ScanResult =
   | { state: "idle" }
   | { state: "scanning" }
   | { state: "loading" }
-  | { state: "already_attended"; data: any }
-  | { state: "success"; data: any }
+  | { state: "already_attended"; data: any; seminar: Seminar }
+  | { state: "success"; data: any; seminar: Seminar }
   | { state: "not_found" }
+  | { state: "not_registered"; data: any; seminar: Seminar }
   | { state: "error"; message: string };
 
 type ScanMode = "camera" | "upload";
@@ -71,12 +73,7 @@ function timeAgo(ts: number) {
 }
 
 // ─── Reference code resolution ─────────────────────────────────────────────────
-// The dashboard shows a short "REF CODE" (e.g. "RB53BQQG") which is a display
-// slice of the real Firestore document ID, not a separately stored field. A
-// manual getDoc() against that short string will never match. Instead, we
-// find any registration whose real doc ID starts with the typed code
-// (case-insensitive) — this works for every existing registration with no
-// migration needed, since it derives the same way the dashboard displays it.
+
 async function resolveRefCode(code: string): Promise<{ id: string } | null> {
   const cleanCode = code.trim().toUpperCase();
   if (!cleanCode) return null;
@@ -96,7 +93,10 @@ export default function ScanPage() {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const autoResumeTimeoutRef = useRef<any>(null);
   const autoResumeIntervalRef = useRef<any>(null);
-
+  
+  const [activeSeminarId, setActiveSeminarId] = useState<string | null>(null);
+  const [seminarListOpen, setSeminarListOpen] = useState(true);
+  
   const [result, setResult] = useState<ScanResult>({ state: "idle" });
   const [scanMode, setScanMode] = useState<ScanMode>("camera");
   const [scannerReady, setScannerReady] = useState(false);
@@ -117,6 +117,8 @@ export default function ScanPage() {
   const [soundOn, setSoundOn] = useState(true);
 
   const processingRef = useRef(false);
+
+  const activeSeminar = SEMINAR_OPTIONS.find(s => s.id === activeSeminarId) ?? null;
 
   useEffect(() => {
     setSessionStats(loadStats());
@@ -207,16 +209,13 @@ export default function ScanPage() {
       }
       scannerRef.current = null;
     }
-    // Hard DOM clear to ensure video element is killed on mobile
     if (containerRef.current) {
       containerRef.current.innerHTML = '<div id="qr-reader"></div>';
     }
   }, []);
 
-  // Shared check-in logic once we have a resolved document reference —
-  // used by both the QR path (doc ID known directly) and the manual
-  // reference-code path (doc ID resolved via prefix match first).
   const checkInDocRef = useCallback(async (docRef: DocumentReference) => {
+    if (!activeSeminar) return;
     const snap = await getDoc(docRef);
 
     if (!snap.exists()) {
@@ -228,31 +227,41 @@ export default function ScanPage() {
 
     const data = { id: snap.id, ...snap.data() } as any;
 
-    if (data.status === "attendee") {
-      setResult({ state: "already_attended", data });
+    if (data.seminarAttendance?.[activeSeminar.id]) {
+      setResult({ state: "already_attended", data, seminar: activeSeminar });
       recordScan({ name: data.fullName, idNumber: data.idNumber, status: "duplicate" });
       playFeedback("duplicate");
       return;
     }
 
+    if (data.seminars && !data.seminars.includes(activeSeminar.id)) {
+      setResult({ state: "not_registered", data, seminar: activeSeminar });
+      recordScan({ name: data.fullName, idNumber: data.idNumber, status: "error" });
+      playFeedback("error");
+      return;
+    }
+
     await updateDoc(docRef, {
+      [`seminarAttendance.${activeSeminar.id}.checkedInAt`]: serverTimestamp(),
+      [`seminarAttendance.${activeSeminar.id}.checkedInBy`]: authUser?.uid ?? "unknown",
       status: "attendee",
-      checkedInAt: serverTimestamp(),
-      checkedInBy: authUser?.uid ?? "unknown",
+      lastCheckedInAt: serverTimestamp(),
     });
 
-    setResult({ state: "success", data: { ...data, status: "attendee" } });
+    setResult({ state: "success", data: { ...data, status: "attendee" }, seminar: activeSeminar });
     recordScan({ name: data.fullName, idNumber: data.idNumber, status: "checked_in" });
     playFeedback("success");
-  }, [authUser, recordScan, playFeedback]);
+  }, [authUser, recordScan, playFeedback, activeSeminar]);
 
   const processQR = useCallback(async (rawValue: string) => {
     if (processingRef.current) return;
+    if (!activeSeminar) {
+      setResult({ state: "error", message: "Please select a seminar first." });
+      return;
+    }
     processingRef.current = true;
-
     await stopScanner();
 
-    // STRICT OFFLINE CHECK
     if (!navigator.onLine) {
       setResult({ state: "error", message: "You are offline. Reconnect to Wi-Fi/Data to scan." });
       recordScan({ name: "Network Error", status: "error" });
@@ -284,14 +293,15 @@ export default function ScanPage() {
     } finally {
       processingRef.current = false;
     }
-  }, [stopScanner, recordScan, playFeedback, checkInDocRef]);
+  }, [stopScanner, recordScan, playFeedback, checkInDocRef, activeSeminar]);
 
-  // Manual reference-code path: resolve the short REF CODE to a real doc ID
-  // by prefix match, then run through the same check-in logic as the QR path.
   const processRefCode = useCallback(async (code: string) => {
     if (processingRef.current) return;
+    if (!activeSeminar) {
+      setResult({ state: "error", message: "Please select a seminar first." });
+      return;
+    }
     processingRef.current = true;
-
     await stopScanner();
 
     if (!navigator.onLine) {
@@ -324,7 +334,7 @@ export default function ScanPage() {
     } finally {
       processingRef.current = false;
     }
-  }, [stopScanner, recordScan, playFeedback, checkInDocRef]);
+  }, [stopScanner, recordScan, playFeedback, checkInDocRef, activeSeminar]);
 
   const startCameraScanner = useCallback(async () => {
     setResult({ state: "scanning" });
@@ -414,10 +424,10 @@ export default function ScanPage() {
   }, [stopScanner]);
 
   useEffect(() => {
-    if (!authUser || scanMode !== "camera") return;
+    if (!authUser || scanMode !== "camera" || !activeSeminar) return;
     startCameraScanner();
     return () => { stopScanner(); };
-  }, [authUser, scanMode, startCameraScanner, stopScanner]);
+  }, [authUser, scanMode, startCameraScanner, stopScanner, activeSeminar]);
 
   const handleReset = useCallback(async () => {
     if (autoResumeTimeoutRef.current) clearTimeout(autoResumeTimeoutRef.current);
@@ -428,24 +438,29 @@ export default function ScanPage() {
     setScannerReady(false);
     setResult({ state: "idle" });
     processingRef.current = false;
-    if (scanMode === "camera") {
+    if (scanMode === "camera" && activeSeminar) {
       startCameraScanner();
     }
-  }, [stopScanner, scanMode, startCameraScanner]);
+  }, [stopScanner, scanMode, startCameraScanner, activeSeminar]);
+
+  const selectSeminar = (id: string) => {
+    setActiveSeminarId(id);
+    setSeminarListOpen(false);
+    handleReset();
+  };
 
   // ── Undo ───────────────────────────────────────────────────────────────────
 
   const handleUndo = useCallback(async () => {
     if (result.state !== "success") return;
-    if (!window.confirm(`Undo check-in for ${result.data.fullName}? They will be marked as 'Pending' again.`)) return;
+    if (!activeSeminar) return;
+    if (!window.confirm(`Undo check-in for ${result.data.fullName}?`)) return;
 
     setUndoing(true);
     try {
       const docRef = doc(db, "cvmas_registrations", result.data.id);
       await updateDoc(docRef, {
-        status: "pre-registered",
-        checkedInAt: null,
-        checkedInBy: null,
+        [`seminarAttendance.${activeSeminar.id}`]: deleteField(),
       });
       setSessionStats(prev => {
         const next = { ...prev, checkedIn: Math.max(0, prev.checkedIn - 1) };
@@ -465,7 +480,7 @@ export default function ScanPage() {
     } finally {
       setUndoing(false);
     }
-  }, [result, handleReset]);
+  }, [result, handleReset, activeSeminar]);
 
   // ── Auto-Resume Loop ───────────────────────────────────────────────────────
 
@@ -586,216 +601,289 @@ export default function ScanPage() {
 
         <div className="flex-1 flex flex-col items-center px-4 pt-5 pb-10 max-w-sm mx-auto w-full space-y-4">
           
-          {/* Toggles */}
-          <div className="w-full flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest">
+          {/* ── Seminar selector ── */}
+          <div className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden shadow-sm z-20 relative">
             <button
-              onClick={() => setAutoContinue(v => !v)}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border transition-all ${
-                autoContinue ? "bg-[#06402B]/10 border-[#06402B]/30 text-[#06402B] dark:bg-emerald-500/10 dark:border-emerald-500/30 dark:text-emerald-400" : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-400"
-              }`}
+              onClick={() => setSeminarListOpen(o => !o)}
+              className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
             >
-              <FaBolt size={10} /> Auto-resume {autoContinue ? "on" : "off"}
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className={`w-2 h-2 rounded-full shrink-0 ${activeSeminar ? "bg-emerald-500 animate-pulse" : "bg-zinc-300 dark:bg-zinc-600"}`} />
+                <div className="min-w-0 text-left">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Active Seminar</p>
+                  <p className={`text-sm font-black truncate ${activeSeminar ? "text-zinc-900 dark:text-white" : "text-zinc-400"}`}>
+                    {activeSeminar ? activeSeminar.title : "Tap to select seminar"}
+                  </p>
+                </div>
+              </div>
+              {seminarListOpen ? <FaChevronUp size={11} className="text-zinc-400 shrink-0" /> : <FaChevronDown size={11} className="text-zinc-400 shrink-0" />}
             </button>
-            <button
-              onClick={() => setSoundOn(v => !v)}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border transition-all ${
-                soundOn ? "bg-[#06402B]/10 border-[#06402B]/30 text-[#06402B] dark:bg-emerald-500/10 dark:border-emerald-500/30 dark:text-emerald-400" : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-400"
-              }`}
-            >
-              🔊 Sound {soundOn ? "on" : "off"}
-            </button>
+
+            <AnimatePresence>
+              {seminarListOpen && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden border-t border-zinc-100 dark:border-zinc-800"
+                >
+                  <div className="p-3 space-y-2">
+                    {SEMINAR_OPTIONS.map((s, i) => (
+                      <button
+                        key={s.id}
+                        onClick={() => selectSeminar(s.id)}
+                        className={`w-full text-left px-4 py-3.5 rounded-xl border-2 transition-all ${
+                          activeSeminarId === s.id
+                            ? "border-[#06402B] bg-[#06402B]/5 dark:bg-emerald-500/10"
+                            : "border-zinc-100 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50"
+                        }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 mt-0.5 ${
+                            activeSeminarId === s.id ? "bg-[#06402B] text-white" : "bg-zinc-200 dark:bg-zinc-700 text-zinc-500"
+                          }`}>
+                            {activeSeminarId === s.id ? <FaCheckCircle size={9} /> : i + 1}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className={`text-xs font-black leading-tight ${
+                              activeSeminarId === s.id ? "text-[#06402B] dark:text-emerald-400" : "text-zinc-800 dark:text-zinc-200"
+                            }`}>
+                              {s.title}
+                            </p>
+                            <p className="text-[10px] text-zinc-400 mt-0.5 font-medium leading-snug">{s.speaker}</p>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
-          <div className="w-full flex bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-1 gap-1">
-            <button
-              onClick={() => switchMode("camera")}
-              className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
-                scanMode === "camera" ? "bg-[#06402B] text-white shadow-md" : "text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
-              }`}
-            >
-              <FaCamera size={12} /> Camera
-            </button>
-            <button
-              onClick={() => switchMode("upload")}
-              className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
-                scanMode === "upload" ? "bg-[#06402B] text-white shadow-md" : "text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
-              }`}
-            >
-              <FaUpload size={12} /> Upload Image
-            </button>
-          </div>
-
-          {/* Viewport */}
-          {scanMode === "camera" && (
-            <div className="relative w-full rounded-3xl overflow-hidden border-2 transition-colors duration-500 border-zinc-300 dark:border-zinc-700 bg-black aspect-square flex items-center justify-center">
-              
-              <div ref={containerRef} className="absolute inset-0 w-full h-full object-cover">
-                <div id="qr-reader" />
+          {/* Gate: must select seminar before continuing */}
+          {!activeSeminar ? (
+            <div className="w-full py-14 flex flex-col items-center justify-center gap-3 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-3xl">
+              <FaQrcode size={28} className="text-zinc-300 dark:text-zinc-700" />
+              <p className="text-sm font-bold text-zinc-400 uppercase tracking-widest text-center">
+                Select a seminar above<br />to start scanning
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* Toggles */}
+              <div className="w-full flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest">
+                <button
+                  onClick={() => setAutoContinue(v => !v)}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border transition-all ${
+                    autoContinue ? "bg-[#06402B]/10 border-[#06402B]/30 text-[#06402B] dark:bg-emerald-500/10 dark:border-emerald-500/30 dark:text-emerald-400" : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-400"
+                  }`}
+                >
+                  <FaBolt size={10} /> Auto-resume {autoContinue ? "on" : "off"}
+                </button>
+                <button
+                  onClick={() => setSoundOn(v => !v)}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border transition-all ${
+                    soundOn ? "bg-[#06402B]/10 border-[#06402B]/30 text-[#06402B] dark:bg-emerald-500/10 dark:border-emerald-500/30 dark:text-emerald-400" : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-400"
+                  }`}
+                >
+                  🔊 Sound {soundOn ? "on" : "off"}
+                </button>
               </div>
 
-              {/* Viewfinder Overlay */}
-              {result.state === "scanning" && (
-                <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-10">
-                  <div className="w-[60%] h-[60%] relative">
-                    <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-emerald-500 rounded-tl-xl" />
-                    <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-emerald-500 rounded-tr-xl" />
-                    <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-emerald-500 rounded-bl-xl" />
-                    <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-emerald-500 rounded-br-xl" />
-                    
-                    {/* Animated Scanning Laser */}
-                    <motion.div 
-                      animate={{ y: ["0%", "300%"] }} 
-                      transition={{ repeat: Infinity, duration: 2, ease: "linear", repeatType: "reverse" }}
-                      className="absolute top-0 left-0 w-full h-1 bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.8)] opacity-70"
-                    />
+              <div className="w-full flex bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-1 gap-1">
+                <button
+                  onClick={() => switchMode("camera")}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+                    scanMode === "camera" ? "bg-[#06402B] text-white shadow-md" : "text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+                  }`}
+                >
+                  <FaCamera size={12} /> Camera
+                </button>
+                <button
+                  onClick={() => switchMode("upload")}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+                    scanMode === "upload" ? "bg-[#06402B] text-white shadow-md" : "text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+                  }`}
+                >
+                  <FaUpload size={12} /> Upload Image
+                </button>
+              </div>
+
+              {/* Viewport */}
+              {scanMode === "camera" && (
+                <div className="relative w-full rounded-3xl overflow-hidden border-2 transition-colors duration-500 border-zinc-300 dark:border-zinc-700 bg-black aspect-square flex items-center justify-center">
+                  
+                  <div ref={containerRef} className="absolute inset-0 w-full h-full object-cover">
+                    <div id="qr-reader" />
                   </div>
-                </div>
-              )}
 
-              <AnimatePresence>
-                {result.state === "scanning" && (
-                  <motion.div
-                    key="chip-scanning" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
-                    className="absolute top-4 left-1/2 -translate-x-1/2 px-4 py-1.5 bg-black/60 backdrop-blur-md text-white text-[10px] font-black uppercase tracking-widest rounded-full z-20"
-                  >
-                    Point camera at QR code
-                  </motion.div>
-                )}
-                {result.state === "loading" && (
-                  <motion.div
-                    key="chip-loading" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
-                    className="absolute top-4 left-1/2 -translate-x-1/2 px-4 py-1.5 bg-black/80 backdrop-blur-md text-white text-[10px] font-black uppercase tracking-widest rounded-full flex items-center gap-2 z-20"
-                  >
-                    <FaSpinner className="animate-spin" size={10} /> Verifying…
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              <AnimatePresence>
-                {autoCountdown !== null && (
-                  <motion.button
-                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={handleReset}
-                    className="absolute bottom-4 right-4 flex items-center gap-1.5 px-3 py-1.5 bg-black/70 backdrop-blur-md text-white text-[10px] font-bold uppercase tracking-widest rounded-full hover:bg-black/90 transition-all z-20"
-                  >
-                    Next in {autoCountdown}s · tap to skip
-                  </motion.button>
-                )}
-              </AnimatePresence>
-            </div>
-          )}
-
-          {scanMode === "upload" && (
-            <div className="w-full space-y-3">
-              <div id="qr-file-reader" className="hidden" />
-              <input ref={fileInputRef} type="file" accept="image/*" capture="environment" onChange={handleImageUpload} className="hidden" />
-
-              {uploadPreview ? (
-                <div className={`w-full rounded-3xl overflow-hidden border-2 transition-colors duration-300 relative ${
-                  result.state === "success" ? "border-emerald-500" : result.state === "already_attended" ? "border-amber-500" : result.state === "error" || result.state === "not_found" ? "border-red-500" : "border-zinc-300 dark:border-zinc-700"
-                }`}>
-                  <img src={uploadPreview} alt="Uploaded QR" className="w-full object-contain max-h-72 bg-black" />
-                  {isUploading && (
-                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center backdrop-blur-sm">
-                      <FaSpinner className="animate-spin text-white" size={28} />
+                  {/* Viewfinder Overlay */}
+                  {result.state === "scanning" && (
+                    <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-10">
+                      <div className="w-[60%] h-[60%] relative">
+                        <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-emerald-500 rounded-tl-xl" />
+                        <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-emerald-500 rounded-tr-xl" />
+                        <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-emerald-500 rounded-bl-xl" />
+                        <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-emerald-500 rounded-br-xl" />
+                        
+                        {/* Animated Scanning Laser */}
+                        <motion.div 
+                          animate={{ y: ["0%", "300%"] }} 
+                          transition={{ repeat: Infinity, duration: 2, ease: "linear", repeatType: "reverse" }}
+                          className="absolute top-0 left-0 w-full h-1 bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.8)] opacity-70"
+                        />
+                      </div>
                     </div>
                   )}
+
+                  <AnimatePresence>
+                    {result.state === "scanning" && (
+                      <motion.div
+                        key="chip-scanning" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
+                        className="absolute top-4 left-1/2 -translate-x-1/2 px-4 py-1.5 bg-black/60 backdrop-blur-md text-white text-[10px] font-black uppercase tracking-widest rounded-full z-20"
+                      >
+                        Point camera at QR code
+                      </motion.div>
+                    )}
+                    {result.state === "loading" && (
+                      <motion.div
+                        key="chip-loading" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
+                        className="absolute top-4 left-1/2 -translate-x-1/2 px-4 py-1.5 bg-black/80 backdrop-blur-md text-white text-[10px] font-black uppercase tracking-widest rounded-full flex items-center gap-2 z-20"
+                      >
+                        <FaSpinner className="animate-spin" size={10} /> Verifying…
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  <AnimatePresence>
+                    {autoCountdown !== null && (
+                      <motion.button
+                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={handleReset}
+                        className="absolute bottom-4 right-4 flex items-center gap-1.5 px-3 py-1.5 bg-black/70 backdrop-blur-md text-white text-[10px] font-bold uppercase tracking-widest rounded-full hover:bg-black/90 transition-all z-20"
+                      >
+                        Next in {autoCountdown}s · tap to skip
+                      </motion.button>
+                    )}
+                  </AnimatePresence>
                 </div>
-              ) : (
-                <button onClick={() => fileInputRef.current?.click()} className="w-full py-14 border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-3xl flex flex-col items-center justify-center gap-3 hover:border-[#06402B] dark:hover:border-emerald-500 hover:bg-[#06402B]/5 transition-all active:scale-95 group">
-                  <div className="w-14 h-14 rounded-2xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-400 group-hover:text-[#06402B] dark:group-hover:text-emerald-400 transition-colors">
-                    <FaUpload size={22} />
-                  </div>
-                  <div className="text-center">
-                    <p className="text-sm font-black text-zinc-600 dark:text-zinc-400 uppercase tracking-widest">Tap to upload</p>
-                    <p className="text-xs text-zinc-400 mt-1 font-medium">Photo, screenshot, or saved QR</p>
-                  </div>
-                </button>
               )}
 
-              {uploadPreview && result.state !== "loading" && (
-                <button onClick={() => fileInputRef.current?.click()} className="w-full py-3 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 rounded-xl font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all active:scale-95">
-                  <FaUpload size={10} /> Upload Different Image
-                </button>
-              )}
-            </div>
-          )}
+              {scanMode === "upload" && (
+                <div className="w-full space-y-3">
+                  <div id="qr-file-reader" className="hidden" />
+                  <input ref={fileInputRef} type="file" accept="image/*" capture="environment" onChange={handleImageUpload} className="hidden" />
 
-          {/* Manual Entry Fallback */}
-          <div className="w-full">
-            {!manualEntryOpen ? (
-              <button onClick={() => setManualEntryOpen(true)} className="w-full py-2.5 text-[11px] font-bold uppercase tracking-widest text-zinc-400 hover:text-[#06402B] dark:hover:text-emerald-400 flex items-center justify-center gap-2 transition-colors">
-                <FaKeyboard size={11} /> Trouble scanning? Enter reference code
-              </button>
-            ) : (
-              <motion.form initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} onSubmit={handleManualSubmit} className="w-full flex gap-2 overflow-hidden">
-                <input
-                  autoFocus
-                  value={manualCode}
-                  onChange={e => setManualCode(e.target.value.toUpperCase().replace(/\s+/g, ""))}
-                  placeholder="e.g. RB53BQQG"
-                  disabled={manualSubmitting}
-                  className="flex-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2.5 text-sm font-bold font-mono tracking-widest text-zinc-900 dark:text-white outline-none focus:border-[#06402B] dark:focus:border-emerald-500 uppercase disabled:opacity-60"
-                />
-                <button type="submit" disabled={manualSubmitting || !manualCode.trim()} className="px-4 py-2.5 bg-[#06402B] dark:bg-emerald-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-[#042d1f] dark:hover:bg-emerald-500 transition-colors disabled:opacity-50 flex items-center justify-center min-w-[52px]">
-                  {manualSubmitting ? <FaSpinner className="animate-spin" size={12} /> : "Go"}
-                </button>
-                <button type="button" onClick={() => { setManualEntryOpen(false); setManualCode(""); }} className="px-3 py-2.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">
-                  <FaTimes size={12} />
-                </button>
-              </motion.form>
-            )}
-          </div>
-
-          {/* Idle / Initial State */}
-          <AnimatePresence mode="wait">
-            {result.state === "idle" && (
-              <motion.div key="idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="w-full py-3 text-center">
-                <p className="text-sm font-bold text-zinc-400 uppercase tracking-widest">
-                  {scanMode === "camera" ? "Ready to scan" : "Upload an image"}
-                </p>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Recent Scans Log (Terminal Style) */}
-          {recentScans.length > 0 && (
-            <div className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-inner mt-4">
-              <button
-                onClick={() => setRecentOpen(v => !v)}
-                className="w-full flex items-center justify-between px-4 py-3 text-[11px] font-black uppercase tracking-widest text-zinc-400 hover:text-zinc-300 hover:bg-zinc-800/50 transition-colors"
-              >
-                <span className="flex items-center gap-2"><FaHistory size={11} /> System Log ({recentScans.length})</span>
-                {recentOpen ? <FaChevronUp size={10} /> : <FaChevronDown size={10} />}
-              </button>
-              
-              <AnimatePresence>
-                {recentOpen && (
-                  <motion.div initial={{ height: 0 }} animate={{ height: "auto" }} exit={{ height: 0 }} className="overflow-hidden">
-                    <div className="px-4 pb-4 pt-1 space-y-2">
-                      {recentScans.map((scan, i) => (
-                        <div key={i} className="flex items-center justify-between py-1.5 border-b border-zinc-800/50 last:border-0">
-                          <div className="flex items-center gap-2.5 overflow-hidden">
-                            {scan.status === "checked_in" ? <FaCheckCircle size={10} className="text-emerald-500 shrink-0" /> :
-                             scan.status === "duplicate" ? <FaExclamationTriangle size={10} className="text-amber-500 shrink-0" /> :
-                             <FaTimes size={10} className="text-red-500 shrink-0" />}
-                            <div className="truncate">
-                              <p className="text-xs font-bold text-zinc-200 truncate">{scan.name}</p>
-                              {scan.idNumber && <p className="text-[9px] font-mono text-zinc-500 truncate">{scan.idNumber}</p>}
-                            </div>
-                          </div>
-                          <span className="text-[10px] font-mono text-zinc-500 shrink-0 ml-3">{timeAgo(scan.time)}</span>
+                  {uploadPreview ? (
+                    <div className={`w-full rounded-3xl overflow-hidden border-2 transition-colors duration-300 relative ${
+                      result.state === "success" ? "border-emerald-500" : result.state === "already_attended" ? "border-amber-500" : result.state === "not_registered" || result.state === "error" || result.state === "not_found" ? "border-red-500" : "border-zinc-300 dark:border-zinc-700"
+                    }`}>
+                      <img src={uploadPreview} alt="Uploaded QR" className="w-full object-contain max-h-72 bg-black" />
+                      {isUploading && (
+                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center backdrop-blur-sm">
+                          <FaSpinner className="animate-spin text-white" size={28} />
                         </div>
-                      ))}
+                      )}
                     </div>
+                  ) : (
+                    <button onClick={() => fileInputRef.current?.click()} className="w-full py-14 border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-3xl flex flex-col items-center justify-center gap-3 hover:border-[#06402B] dark:hover:border-emerald-500 hover:bg-[#06402B]/5 transition-all active:scale-95 group">
+                      <div className="w-14 h-14 rounded-2xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-400 group-hover:text-[#06402B] dark:group-hover:text-emerald-400 transition-colors">
+                        <FaUpload size={22} />
+                      </div>
+                      <div className="text-center">
+                        <p className="text-sm font-black text-zinc-600 dark:text-zinc-400 uppercase tracking-widest">Tap to upload</p>
+                        <p className="text-xs text-zinc-400 mt-1 font-medium">Photo, screenshot, or saved QR</p>
+                      </div>
+                    </button>
+                  )}
+
+                  {uploadPreview && result.state !== "loading" && (
+                    <button onClick={() => fileInputRef.current?.click()} className="w-full py-3 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 rounded-xl font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all active:scale-95">
+                      <FaUpload size={10} /> Upload Different Image
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Manual Entry Fallback */}
+              <div className="w-full">
+                {!manualEntryOpen ? (
+                  <button onClick={() => setManualEntryOpen(true)} className="w-full py-2.5 text-[11px] font-bold uppercase tracking-widest text-zinc-400 hover:text-[#06402B] dark:hover:text-emerald-400 flex items-center justify-center gap-2 transition-colors">
+                    <FaKeyboard size={11} /> Trouble scanning? Enter reference code
+                  </button>
+                ) : (
+                  <motion.form initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} onSubmit={handleManualSubmit} className="w-full flex gap-2 overflow-hidden">
+                    <input
+                      autoFocus
+                      value={manualCode}
+                      onChange={e => setManualCode(e.target.value.toUpperCase().replace(/\s+/g, ""))}
+                      placeholder="e.g. RB53BQQG"
+                      disabled={manualSubmitting}
+                      className="flex-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2.5 text-sm font-bold font-mono tracking-widest text-zinc-900 dark:text-white outline-none focus:border-[#06402B] dark:focus:border-emerald-500 uppercase disabled:opacity-60"
+                    />
+                    <button type="submit" disabled={manualSubmitting || !manualCode.trim()} className="px-4 py-2.5 bg-[#06402B] dark:bg-emerald-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-[#042d1f] dark:hover:bg-emerald-500 transition-colors disabled:opacity-50 flex items-center justify-center min-w-[52px]">
+                      {manualSubmitting ? <FaSpinner className="animate-spin" size={12} /> : "Go"}
+                    </button>
+                    <button type="button" onClick={() => { setManualEntryOpen(false); setManualCode(""); }} className="px-3 py-2.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">
+                      <FaTimes size={12} />
+                    </button>
+                  </motion.form>
+                )}
+              </div>
+
+              {/* Idle / Initial State */}
+              <AnimatePresence mode="wait">
+                {result.state === "idle" && (
+                  <motion.div key="idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="w-full py-3 text-center">
+                    <p className="text-sm font-bold text-zinc-400 uppercase tracking-widest">
+                      {scanMode === "camera" ? "Ready to scan" : "Upload an image"}
+                    </p>
                   </motion.div>
                 )}
               </AnimatePresence>
-            </div>
+
+              {/* Recent Scans Log (Terminal Style) */}
+              {recentScans.length > 0 && (
+                <div className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-inner mt-4">
+                  <button
+                    onClick={() => setRecentOpen(v => !v)}
+                    className="w-full flex items-center justify-between px-4 py-3 text-[11px] font-black uppercase tracking-widest text-zinc-400 hover:text-zinc-300 hover:bg-zinc-800/50 transition-colors"
+                  >
+                    <span className="flex items-center gap-2"><FaHistory size={11} /> System Log ({recentScans.length})</span>
+                    {recentOpen ? <FaChevronUp size={10} /> : <FaChevronDown size={10} />}
+                  </button>
+                  
+                  <AnimatePresence>
+                    {recentOpen && (
+                      <motion.div initial={{ height: 0 }} animate={{ height: "auto" }} exit={{ height: 0 }} className="overflow-hidden">
+                        <div className="px-4 pb-4 pt-1 space-y-2">
+                          {recentScans.map((scan, i) => (
+                            <div key={i} className="flex items-center justify-between py-1.5 border-b border-zinc-800/50 last:border-0">
+                              <div className="flex items-center gap-2.5 overflow-hidden">
+                                {scan.status === "checked_in" ? <FaCheckCircle size={10} className="text-emerald-500 shrink-0" /> :
+                                scan.status === "duplicate" ? <FaExclamationTriangle size={10} className="text-amber-500 shrink-0" /> :
+                                <FaTimes size={10} className="text-red-500 shrink-0" />}
+                                <div className="truncate">
+                                  <p className="text-xs font-bold text-zinc-200 truncate">{scan.name}</p>
+                                  {scan.idNumber && <p className="text-[9px] font-mono text-zinc-500 truncate">{scan.idNumber}</p>}
+                                </div>
+                              </div>
+                              <span className="text-[10px] font-mono text-zinc-500 shrink-0 ml-3">{timeAgo(scan.time)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              )}
+            </>
           )}
 
           {/* Bottom Sheet Results */}
           <AnimatePresence>
-            {(result.state === "success" || result.state === "already_attended" || result.state === "not_found" || result.state === "error") && (
+            {(result.state === "success" || result.state === "already_attended" || result.state === "not_found" || result.state === "not_registered" || result.state === "error") && (
               <>
                 <motion.div
                   key="backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -810,18 +898,20 @@ export default function ScanPage() {
                   }`}>
                     <div className="w-10 h-1 bg-zinc-200 dark:bg-zinc-700 rounded-full mx-auto -mt-2 mb-2" />
 
+                    {/* SUCCESS */}
                     {result.state === "success" && (
                       <>
                         <div className="flex items-center gap-4">
                           <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 400, damping: 20, delay: 0.1 }} className="w-14 h-14 rounded-2xl bg-emerald-500 flex items-center justify-center shrink-0 shadow-lg shadow-emerald-500/30">
                             <FaCheckCircle size={24} className="text-white" />
                           </motion.div>
-                          <div>
+                          <div className="min-w-0">
                             <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400 mb-0.5">✓ Checked In</p>
-                            <p className="text-xl font-black text-zinc-900 dark:text-white leading-tight">{result.data.fullName}</p>
+                            <p className="text-xl font-black text-zinc-900 dark:text-white leading-tight truncate">{result.data.fullName}</p>
+                            <p className="text-[11px] font-bold text-zinc-500 mt-0.5 truncate">{result.seminar.title}</p>
                           </div>
                         </div>
-                        <StudentDetail data={result.data} />
+                        <StudentDetail data={result.data} activeSeminarId={result.seminar.id} />
                         <div className="flex gap-2 pt-1">
                           <ResetButton onReset={handleReset} label="Scan Next" />
                           <button onClick={handleUndo} disabled={undoing} title="Undo this check-in" className="px-4 py-3.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 rounded-xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all active:scale-95 disabled:opacity-50 shrink-0">
@@ -836,23 +926,25 @@ export default function ScanPage() {
                       </>
                     )}
 
+                    {/* ALREADY ATTENDED */}
                     {result.state === "already_attended" && (
                       <>
                         <div className="flex items-center gap-4">
                           <div className="w-14 h-14 rounded-2xl bg-amber-500 flex items-center justify-center shrink-0">
                             <FaExclamationTriangle size={22} className="text-white" />
                           </div>
-                          <div>
+                          <div className="min-w-0">
                             <p className="text-[10px] font-black uppercase tracking-widest text-amber-600 dark:text-amber-400 mb-0.5">⚠ Already Checked In</p>
-                            <p className="text-xl font-black text-zinc-900 dark:text-white leading-tight">{result.data.fullName}</p>
-                            {result.data.checkedInAt && (
+                            <p className="text-xl font-black text-zinc-900 dark:text-white leading-tight truncate">{result.data.fullName}</p>
+                            <p className="text-[11px] font-bold text-zinc-500 mt-0.5 truncate">{result.seminar.title}</p>
+                            {result.data.seminarAttendance?.[result.seminar.id]?.checkedInAt && (
                               <p className="text-[11px] font-mono text-amber-500 mt-0.5">
-                                at {new Date(result.data.checkedInAt?.toDate?.() ?? result.data.checkedInAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
+                                at {new Date(result.data.seminarAttendance[result.seminar.id].checkedInAt?.toDate?.() ?? result.data.seminarAttendance[result.seminar.id].checkedInAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
                               </p>
                             )}
                           </div>
                         </div>
-                        <StudentDetail data={result.data} />
+                        <StudentDetail data={result.data} activeSeminarId={result.seminar.id} />
                         <ResetButton onReset={handleReset} label="Scan Next" />
                         {autoCountdown !== null && (
                           <div className="h-1 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
@@ -862,6 +954,25 @@ export default function ScanPage() {
                       </>
                     )}
 
+                    {/* NOT REGISTERED FOR THIS SPECIFIC SEMINAR */}
+                    {result.state === "not_registered" && (
+                      <>
+                        <div className="flex items-center gap-4">
+                          <div className="w-14 h-14 rounded-2xl bg-red-500/10 flex items-center justify-center shrink-0">
+                            <FaTimes size={22} className="text-red-500" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-[10px] font-black uppercase tracking-widest text-red-500 mb-0.5">Not Registered</p>
+                            <p className="text-xl font-black text-zinc-900 dark:text-white leading-tight truncate">{result.data.fullName}</p>
+                            <p className="text-[11px] font-bold text-zinc-400 mt-0.5 truncate">Did not register for this seminar</p>
+                          </div>
+                        </div>
+                        <StudentDetail data={result.data} activeSeminarId={result.seminar.id} />
+                        <ResetButton onReset={handleReset} label="Scan Next" />
+                      </>
+                    )}
+
+                    {/* OTHER ERRORS */}
                     {result.state === "not_found" && <ErrorPanel title="Not found" message="This code doesn't match any CVMAS registration." onReset={handleReset} scanMode={scanMode} />}
                     {result.state === "error" && <ErrorPanel title="Error" message={(result as any).message} onReset={handleReset} scanMode={scanMode} />}
                   </div>
@@ -888,31 +999,67 @@ function StatPill({ label, value, accent }: { label: string; value: number; acce
   );
 }
 
-function StudentDetail({ data }: { data: any }) {
+function StudentDetail({ data, activeSeminarId }: { data: any; activeSeminarId?: string }) {
+  const attendance = data.seminarAttendance ?? {};
+
   return (
-    <div className="space-y-1.5 text-sm border-t border-zinc-200/50 dark:border-zinc-700/50 pt-3">
+    <div className="space-y-3 border-t border-zinc-200 dark:border-zinc-700 pt-3">
       <div className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400">
         <FaIdCard size={10} className="shrink-0" />
-        <span className="font-mono text-xs">{data.idNumber}</span>
-        <span className="text-zinc-400">·</span>
-        <span className="text-xs font-bold">{data.program} {data.yearLevel}</span>
+        <span className="font-mono text-xs font-bold">{data.idNumber}</span>
+        <span className="text-zinc-300 dark:text-zinc-600">·</span>
+        <span className="text-xs font-bold">{data.yearLevel}</span>
+        <span className="text-zinc-300 dark:text-zinc-600">·</span>
+        <span className="text-xs font-medium capitalize">{data.studentType}</span>
       </div>
       <div className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400">
         <FaLayerGroup size={10} className="shrink-0" />
         <span className="text-xs font-bold">{data.block}</span>
-        <span className="text-zinc-400">·</span>
-        <span className="text-xs capitalize font-medium">{data.studentType}</span>
       </div>
-      {data.professors?.length > 0 && (
-        <div className="mt-2 space-y-1">
-          <p className="text-[9px] font-black uppercase tracking-widest text-zinc-400">Incentive professors</p>
-          {data.professors.map((p: any, i: number) => (
-            <p key={i} className="text-[11px] text-zinc-600 dark:text-zinc-400 font-medium truncate">
-              {p.professor} — {p.subject}
-            </p>
-          ))}
-        </div>
-      )}
+
+      {/* Seminar attendance tracker */}
+      <div className="space-y-1.5 pt-1">
+        <p className="text-[9px] font-black uppercase tracking-widest text-zinc-400">Seminar Attendance</p>
+        {SEMINAR_OPTIONS.map(s => {
+          const attended = !!attendance[s.id];
+          const isCurrent = s.id === activeSeminarId;
+          const checkedInTime = attendance[s.id]?.checkedInAt;
+          return (
+            <div key={s.id} className={`flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all ${
+              isCurrent && attended
+                ? "bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20"
+                : isCurrent
+                ? "bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700"
+                : attended
+                ? "bg-zinc-50 dark:bg-zinc-800/30 border border-transparent dark:border-transparent"
+                : "opacity-40 border border-transparent dark:border-transparent"
+            }`}>
+              <div className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 ${
+                attended ? "bg-emerald-500" : "bg-zinc-200 dark:bg-zinc-700"
+              }`}>
+                {attended && <FaCheckCircle size={8} className="text-white" />}
+              </div>
+              <div className="flex flex-col min-w-0 flex-1">
+                <p className={`text-[11px] font-bold truncate leading-tight ${
+                  isCurrent
+                    ? attended ? "text-emerald-700 dark:text-emerald-400" : "text-zinc-700 dark:text-zinc-300"
+                    : "text-zinc-500 dark:text-zinc-500"
+                }`}>
+                  {s.title}
+                </p>
+              </div>
+              {attended && checkedInTime && (
+                <p className="text-[9px] font-mono text-zinc-400 shrink-0">
+                  {new Date(checkedInTime?.toDate?.() ?? checkedInTime).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
+                </p>
+              )}
+              {isCurrent && !attended && (
+                <span className="text-[9px] font-black uppercase tracking-widest text-zinc-400 shrink-0">Now</span>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

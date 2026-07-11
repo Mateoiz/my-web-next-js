@@ -8,11 +8,12 @@ import {
   FaCheckCircle, FaExclamationTriangle, FaSpinner, FaSignOutAlt,
   FaPaw, FaIdCard, FaClock, FaLock,
 } from "react-icons/fa";
+import { SEMINAR_OPTIONS } from "@/lib/seminars";
 
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
 // Change this to however many minutes the event requires for full attendance.
 // Students who try to check out before this window will be blocked.
-const MIN_ATTENDANCE_MINUTES = 180; // 3 hours
+const MIN_ATTENDANCE_MINUTES = 60; // 1 hour
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -24,9 +25,9 @@ type CheckoutState =
   | { state: "loading" }
   | { state: "not_found" }
   | { state: "not_checked_in" }
-  | { state: "too_early"; data: any; minutesLeft: number; minutesStayed: number }
-  | { state: "already_checked_out"; data: any }
-  | { state: "success"; data: any; minutesStayed: number }
+  | { state: "too_early"; data: any; minutesLeft: number; minutesStayed: number; activeSeminarTitle: string; checkedInAt: any }
+  | { state: "already_checked_out"; data: any; latestCheckoutAt: any }
+  | { state: "success"; data: any; minutesStayed: number; activeSeminarTitle: string }
   | { state: "error"; message: string };
 
 function formatIdInput(raw: string) {
@@ -40,6 +41,7 @@ function formatIdInput(raw: string) {
 function formatTime(ts: any) {
   try {
     const d = ts?.toDate ? ts.toDate() : new Date(ts);
+    if (isNaN(d.getTime())) return "";
     return d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
   } catch { return ""; }
 }
@@ -51,6 +53,16 @@ function formatDuration(minutes: number) {
   if (m === 0) return `${h}h`;
   return `${h}h ${m}m`;
 }
+
+// Robustly parse Firestore Timestamp — handles toDate(), _seconds, seconds
+const tsToDate = (ts: any): Date => {
+  if (!ts) return new Date(0);
+  if (typeof ts.toDate === "function") return ts.toDate();
+  if (ts._seconds !== undefined) return new Date(ts._seconds * 1000);
+  if (ts.seconds !== undefined) return new Date(ts.seconds * 1000);
+  const d = new Date(ts);
+  return isNaN(d.getTime()) ? new Date(0) : d;
+};
 
 // Progress ring for the "too early" state
 function TimeRing({ progress, size = 80 }: { progress: number; size?: number }) {
@@ -104,50 +116,66 @@ export default function SelfCheckoutPage() {
 
       const docSnap = snap.docs[0];
       const data = { id: docSnap.id, ...docSnap.data() } as any;
+      const attendance = data.seminarAttendance || {};
 
-      // Must be checked in first
-      if (data.status !== "attendee" || !data.checkedInAt) {
-        setResult({ state: "not_checked_in" });
+      // Find the seminar they are CURRENTLY checked into
+      const activeEntry = Object.entries(attendance).find(([_, v]: any) => v.status === "checked-in");
+
+      if (!activeEntry) {
+        // They are not in a seminar right now. Have they checked out of one previously?
+        const completedSessions = Object.values(attendance).filter((v: any) => v.status === "checked-out");
+        if (completedSessions.length > 0) {
+          // Find the most recent checkout time
+          const latestCheckoutAt = completedSessions
+            .map((v: any) => tsToDate(v.checkedOutAt).getTime())
+            .sort((a, b) => b - a)[0];
+          setResult({ state: "already_checked_out", data, latestCheckoutAt });
+        } else {
+          setResult({ state: "not_checked_in" });
+        }
         submitLockRef.current = false;
         return;
       }
 
-      // Already checked out
-      if (data.checkedOutAt) {
-        setResult({ state: "already_checked_out", data });
-        submitLockRef.current = false;
-        return;
-      }
+      const [activeSeminarId, activeRecord] = activeEntry as [string, any];
+      const activeSeminarTitle = SEMINAR_OPTIONS.find(s => s.id === activeSeminarId)?.title || "Unknown Seminar";
 
-      // ── Minimum attendance enforcement ────────────────────────────────────
-      // Robustly parse Firestore Timestamp — handles toDate(), _seconds, seconds
-      const tsToDate = (ts: any): Date => {
-        if (!ts) return new Date(0);
-        if (typeof ts.toDate === "function") return ts.toDate();
-        if (ts._seconds !== undefined) return new Date(ts._seconds * 1000);
-        if (ts.seconds !== undefined) return new Date(ts.seconds * 1000);
-        const d = new Date(ts);
-        return isNaN(d.getTime()) ? new Date(0) : d;
-      };
-
-      const checkedInDate = tsToDate(data.checkedInAt);
+      // Calculate time stayed in CURRENT seminar
+      const checkedInDate = tsToDate(activeRecord.checkedInAt);
       const now = new Date();
-      const minutesStayed = Math.floor((now.getTime() - checkedInDate.getTime()) / 60000);
-      const minutesLeft = MIN_ATTENDANCE_MINUTES - minutesStayed;
+      const currentSessionMinutes = Math.max(0, Math.floor((now.getTime() - checkedInDate.getTime()) / 60000));
 
-      if (minutesLeft > 0) {
-        setResult({ state: "too_early", data, minutesLeft, minutesStayed });
-        submitLockRef.current = false;
-        return;
-      }
-      // ─────────────────────────────────────────────────────────────────────
-
-      await updateDoc(doc(db, "cvmas_registrations", data.id), {
-        checkedOutAt: serverTimestamp(),
-        minutesAttended: minutesStayed,
+      // Add up all time stayed in PREVIOUSLY completed seminars
+      let previousTotalMinutes = 0;
+      Object.values(attendance).forEach((v: any) => {
+        if (v.status === "checked-out" && v.checkedInAt && v.checkedOutAt) {
+          previousTotalMinutes += Math.max(0, Math.floor((tsToDate(v.checkedOutAt).getTime() - tsToDate(v.checkedInAt).getTime()) / 60000));
+        }
       });
 
-      setResult({ state: "success", data, minutesStayed });
+      const totalMinutesStayed = previousTotalMinutes + currentSessionMinutes;
+      const minutesLeft = MIN_ATTENDANCE_MINUTES - totalMinutesStayed;
+
+      if (minutesLeft > 0) {
+        setResult({ 
+          state: "too_early", 
+          data, 
+          minutesLeft, 
+          minutesStayed: totalMinutesStayed,
+          activeSeminarTitle,
+          checkedInAt: activeRecord.checkedInAt
+        });
+        submitLockRef.current = false;
+        return;
+      }
+
+      // Update the active seminar record specifically
+      await updateDoc(doc(db, "cvmas_registrations", data.id), {
+        [`seminarAttendance.${activeSeminarId}.checkedOutAt`]: serverTimestamp(),
+        [`seminarAttendance.${activeSeminarId}.status`]: "checked-out",
+      });
+
+      setResult({ state: "success", data, minutesStayed: totalMinutesStayed, activeSeminarTitle });
     } catch (err) {
       console.error(err);
       setResult({ state: "error", message: "Something went wrong. Check your connection and try again." });
@@ -243,14 +271,14 @@ export default function SelfCheckoutPage() {
                   </span>
                 </div>
               </div>
-              <div>
+              <div className="min-w-0">
                 <div className="flex items-center gap-1.5 mb-1">
                   <FaLock size={10} className="text-[#06402B]" />
                   <p className="text-[10px] font-black uppercase tracking-widest text-[#06402B]">Not yet eligible</p>
                 </div>
-                <p className="text-lg font-black text-zinc-900 leading-tight">{result.data.fullName}</p>
-                <p className="text-xs text-zinc-500 font-medium mt-0.5">
-                  Checked in at {formatTime(result.data.checkedInAt)}
+                <p className="text-lg font-black text-zinc-900 leading-tight truncate">{result.data.fullName}</p>
+                <p className="text-xs text-zinc-500 font-medium mt-0.5 truncate">
+                  {result.activeSeminarTitle}
                 </p>
               </div>
             </div>
@@ -269,7 +297,7 @@ export default function SelfCheckoutPage() {
 
             <p className="text-xs text-zinc-500 font-medium text-center leading-relaxed">
               You need to stay for at least{" "}
-              <strong className="text-zinc-700">{formatDuration(MIN_ATTENDANCE_MINUTES)}</strong> total.
+              <strong className="text-zinc-700">{formatDuration(MIN_ATTENDANCE_MINUTES)}</strong> across all sessions.
               Come back to check out in{" "}
               <strong className="text-[#06402B]">{formatDuration(result.minutesLeft)}</strong>.
             </p>
@@ -293,7 +321,7 @@ export default function SelfCheckoutPage() {
             <div>
               <p className="text-sm font-black text-amber-700 uppercase tracking-widest">Not checked in yet</p>
               <p className="text-xs font-medium text-amber-600 mt-1 leading-relaxed">
-                We don't have a check-in record for this ID. Make sure you scanned in at the entrance first.
+                We don't have an active check-in record for you. Make sure you scan in at a seminar door first!
               </p>
             </div>
             <button onClick={reset}
@@ -313,11 +341,11 @@ export default function SelfCheckoutPage() {
               <div className="w-12 h-12 rounded-2xl bg-amber-500 flex items-center justify-center shrink-0">
                 <FaClock size={20} className="text-white" />
               </div>
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-widest text-amber-600 mb-0.5">Already checked out</p>
-                <p className="text-lg font-black text-zinc-900 leading-tight">{result.data.fullName}</p>
+              <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-widest text-amber-600 mb-0.5">No Active Sessions</p>
+                <p className="text-lg font-black text-zinc-900 leading-tight truncate">{result.data.fullName}</p>
                 <p className="text-[11px] font-mono text-amber-600 mt-0.5">
-                  at {formatTime(result.data.checkedOutAt)}
+                  Last checkout at {formatTime(result.latestCheckoutAt)}
                 </p>
               </div>
             </div>
@@ -342,9 +370,10 @@ export default function SelfCheckoutPage() {
               >
                 <FaCheckCircle size={24} className="text-white" />
               </motion.div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600 mb-0.5">✓ Checked out</p>
-                <p className="text-xl font-black text-zinc-900 leading-tight">{result.data.fullName}</p>
+                <p className="text-xl font-black text-zinc-900 leading-tight truncate">{result.data.fullName}</p>
+                <p className="text-xs text-zinc-500 font-bold mt-0.5 truncate">{result.activeSeminarTitle}</p>
               </div>
             </div>
 
@@ -360,13 +389,18 @@ export default function SelfCheckoutPage() {
             <div className="flex items-center gap-2 text-zinc-500 text-xs font-medium border-t border-zinc-100 pt-3">
               <FaIdCard size={10} className="shrink-0" /> {result.data.idNumber}
               <span className="text-zinc-300">·</span>
-              <FaClock size={10} className="shrink-0" />
-              {formatTime(result.data.checkedInAt)} → now
+              <FaClock size={10} className="shrink-0" /> Checkout Complete
             </div>
 
             <p className="text-center text-xs text-zinc-500 font-medium flex items-center justify-center gap-1.5">
               <FaPaw size={10} /> Attendance recorded — safe travels!
             </p>
+
+            <button onClick={reset}
+              className="w-full mt-2 py-3 bg-zinc-100 text-zinc-600 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-zinc-200 transition-all active:scale-95"
+            >
+              Done
+            </button>
           </motion.div>
         )}
 
