@@ -641,55 +641,81 @@ let valB: any = (b as any)[sortConfig.key];
           </div>
 
           {/* Toolbar (Search & Filters) */}
-          <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between bg-white dark:bg-zinc-900 p-3 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
-            <div className="relative flex-1 max-w-md">
-              <FaSearch size={13} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
-              <input
-                type="text" value={search} onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search name, ID number, or block..."
-                className="w-full pl-9 pr-4 py-2.5 text-sm bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl outline-none focus:border-[#06402B] dark:focus:border-emerald-500 font-medium transition-colors"
-              />
-            </div>
+<div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm overflow-hidden">
 
-            <div className="flex flex-wrap gap-2 items-center">
-              <div className="flex flex-wrap bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-1">
-                {(["all", "pre-registered", "attendee", "invalid"] as const).map((f) => (
-                  <button
-                    key={f} onClick={() => setStatusFilter(f)}
-                    className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
-                      statusFilter === f ? "bg-[#06402B] text-white shadow-sm" : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
-                    }`}
-                  >
-                    {f === "all" ? "All" : f === "pre-registered" ? "Pending" : f === "attendee" ? "Ever Attended" : "Cut/Invalid"}
-                  </button>
-                ))}
-              </div>
+  {/* Row 1: Search + Export */}
+  <div className="flex items-center gap-3 px-4 py-3 border-b border-zinc-100 dark:border-zinc-800">
+    <div className="relative flex-1">
+      <FaSearch size={12} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" />
+      <input
+        type="text"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Search name, ID number, or block…"
+        className="w-full pl-9 pr-4 py-2.5 text-sm bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl outline-none focus:border-[#06402B] dark:focus:border-emerald-500 font-medium transition-colors placeholder:text-zinc-400"
+      />
+    </div>
+    <button
+      onClick={exportCSV}
+      className="shrink-0 flex items-center gap-2 px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors active:scale-95"
+    >
+      <FaDownload size={11} /> Export CSV
+    </button>
+  </div>
 
-              <select
-                value={seminarFilter} onChange={(e) => setSeminarFilter(e.target.value)}
-                className="px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl text-zinc-700 dark:text-zinc-300 outline-none focus:border-[#06402B] dark:focus:border-emerald-500"
-              >
-                <option value="all">Any Seminar Status</option>
-                <option value="not-in-seminar">Not In A Seminar Right Now</option>
-                {SEMINAR_OPTIONS.map((s) => <option key={s.id} value={s.id}>Currently In: {s.title}</option>)}
-              </select>
+  {/* Row 2: Filters + count */}
+  <div className="flex flex-wrap items-center gap-2 px-4 py-3">
 
-              <select
-                value={profFilter} onChange={(e) => setProfFilter(e.target.value)}
-                className="px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl text-zinc-700 dark:text-zinc-300 outline-none focus:border-[#06402B] dark:focus:border-emerald-500"
-              >
-                <option value="all">All Professors</option>
-                {allProfessors.map((p) => <option key={p} value={p}>{p}</option>)}
-              </select>
+    {/* Status pills */}
+    <div className="flex bg-zinc-100 dark:bg-zinc-800 rounded-xl p-1 gap-0.5">
+      {(["all", "pre-registered", "attendee", "invalid"] as const).map((f) => (
+        <button
+          key={f}
+          onClick={() => setStatusFilter(f)}
+          className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${
+            statusFilter === f
+              ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm"
+              : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+          }`}
+        >
+          {f === "all" ? "All" : f === "pre-registered" ? "Pending" : f === "attendee" ? "Ever Attended" : "Cut / Invalid"}
+        </button>
+      ))}
+    </div>
 
-              <button
-                onClick={exportCSV}
-                className="flex items-center gap-2 px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors active:scale-95"
-              >
-                <FaDownload size={12} /> Export CSV
-              </button>
-            </div>
-          </div>
+    <div className="w-px h-5 bg-zinc-200 dark:bg-zinc-700 hidden sm:block shrink-0" />
+
+    {/* Seminar filter — fixed width so it doesn't blow up */}
+    <select
+      value={seminarFilter}
+      onChange={(e) => setSeminarFilter(e.target.value)}
+      className="w-48 px-3 py-2 text-[11px] font-bold bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl text-zinc-700 dark:text-zinc-300 outline-none focus:border-[#06402B] dark:focus:border-emerald-500 truncate"
+    >
+      <option value="all">Any Seminar Status</option>
+      <option value="not-in-seminar">Not In A Seminar</option>
+      {SEMINAR_OPTIONS.map((s) => (
+        <option key={s.id} value={s.id}>In: {s.title.slice(0, 30)}…</option>
+      ))}
+    </select>
+
+    {/* Professor filter */}
+    <select
+      value={profFilter}
+      onChange={(e) => setProfFilter(e.target.value)}
+      className="w-40 px-3 py-2 text-[11px] font-bold bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl text-zinc-700 dark:text-zinc-300 outline-none focus:border-[#06402B] dark:focus:border-emerald-500"
+    >
+      <option value="all">All Professors</option>
+      {allProfessors.map((p) => (
+        <option key={p} value={p}>{p}</option>
+      ))}
+    </select>
+
+    {/* Result count pushed right */}
+    <span className="ml-auto text-[10px] font-black uppercase tracking-widest text-zinc-400 shrink-0">
+      {filteredAndSorted.length} / {registrations.length}
+    </span>
+  </div>
+</div>
 
           {/* Data Table */}
           {loading ? (
