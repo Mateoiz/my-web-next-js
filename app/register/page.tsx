@@ -16,7 +16,7 @@ import FloatingNature from "@/app/components/FloatingNature";
 import WalkingPaws from "@/app/components/WalkingPaws";
 import NatureCursor from "@/app/components/NatureCursor";
 
-// ─── Data (unchanged) ─────────────────────────────────────────────────────────
+// ─── Data (unchanged) 
 
 const blocks1stYear = [
   "1st Year A","1st Year B","1st Year C","1st Year D",
@@ -35,8 +35,7 @@ const blocks3rdYear = [
   "3rd Year K","3rd Year L",
 ];
 
-// ─── Incentive badge metadata ─────────────────────────────────────────────────
-// Used in the UI to show what a professor's incentive covers.
+// ─── Incentive badge metadata ─
 
 export const PROFESSOR_INCENTIVE_SCOPE: Record<string, string> = {
   "Ellema, Jovanito":   "DVM & Agriculture Seminar",
@@ -49,20 +48,19 @@ export const PROFESSOR_INCENTIVE_SCOPE: Record<string, string> = {
   "Mirandilla, James Owen": "All Events",
 };
 
-// ─── Professors offering incentives ──────────────────────────────────────────
-// Only professors who confirmed they give bonus points are listed here.
+// ─── Professors offering incentives 
 
 export const PROFESSORS_DATA: Record<string, { subject: string; blocks: string[] }[]> = {
-  // ── 1st Year ──────────────────────────────────────────────────────────────
+  // ── 1st Year 
   "Jimenez, Marlon": [
     { subject: "Animal Production", blocks: blocks1stYear },
   ],
-  "Gravitez, Maurice": [
+  "Gravidez, Maurice": [
     { subject: "Biochemistry Laboratory", blocks: blocks1stYear },
     { subject: "Embryology Laboratory",   blocks: blocks1stYear },
   ],
 
-  // ── 2nd Year ──────────────────────────────────────────────────────────────
+  // ── 2nd Year 
   "Fragata, Helen": [
     { subject: "Ruminant Production (BASC108A)", blocks: blocks2ndYear },
   ],
@@ -76,7 +74,7 @@ export const PROFESSORS_DATA: Record<string, { subject: string; blocks: string[]
     { subject: "Embryology Lecture (DEVA100A)", blocks: blocks2ndYear },
   ],
 
-  // ── 3rd Year ──────────────────────────────────────────────────────────────
+  // ── 3rd Year 
   "Nicolas, Elma": [
     { subject: "Pharmacology Laboratory", blocks: blocks3rdYear },
   ],
@@ -357,7 +355,6 @@ function ProfessorPicker({
           </AnimatePresence>
         </div>
 
-        {/* Subject pills */}
         <AnimatePresence>
           {entry.professor && selectedSubjects.length > 0 && (
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
@@ -796,7 +793,7 @@ useEffect(() => {
             <div className="relative px-6 sm:px-10 md:px-14 py-10 md:py-12 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
               <div>
                 <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/10 border border-white/20 rounded-full text-[10px] font-black uppercase tracking-widest text-emerald-200 mb-4">
-                  🐾 DLSAU · CVMAS Week 2025
+                  🐾 DLSAU · CVMAS Week 2026
                 </div>
                 <h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight text-white leading-tight mb-2">
                   Hilway<br className="sm:hidden" /> Talks
@@ -949,9 +946,7 @@ useEffect(() => {
                     </Field>
                   </div>
 
-                  {/* Side panel */}
                   <div className="flex flex-col gap-4">
-                    {/* Tip */}
                     <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5 shadow-sm">
                       <div className="flex items-center gap-2 mb-2">
                         <FaLightbulb className="text-blue-500 shrink-0" size={14} />
@@ -962,7 +957,6 @@ useEffect(() => {
                       </p>
                     </div>
 
-                    {/* What to expect */}
                     <div className="bg-white border border-zinc-200 rounded-2xl p-5 shadow-sm space-y-3">
                       <p className="text-[11px] font-black uppercase tracking-widest text-zinc-400">What happens next</p>
                       {[
@@ -1071,7 +1065,6 @@ useEffect(() => {
                       </AnimatePresence>
                     </div>
 
-                    {/* Seminars */}
                     <Field
                       label="Seminars You're Attending"
                       required
@@ -1112,7 +1105,6 @@ useEffect(() => {
                     </Field>
                   </div>
 
-                  {/* Side */}
                   <div className="flex flex-col gap-4">
                     <div className="bg-white border border-zinc-200 rounded-2xl p-5 shadow-sm">
                       <p className="text-[11px] font-black uppercase tracking-widest text-zinc-400 mb-3">Your progress</p>
@@ -1158,11 +1150,9 @@ useEffect(() => {
               </motion.div>
             )}
 
-            {/* ── STEP 2: Professors ── */}
             {step === 2 && (
               <motion.div key="step2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.22 }} className="space-y-5">
 
-                {/* Caution banner */}
                 <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-2xl shadow-sm">
                   <FaExclamationTriangle className="text-amber-500 shrink-0 mt-0.5" size={14} />
                   <div>
