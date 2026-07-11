@@ -150,7 +150,7 @@ export const SEMINAR_OPTIONS: SeminarOption[] = [
   {
     id: "dela-cruz-source",
     title: "From Source to Safety: The importance of water microbiology in public health and food system",
-    speaker: "Mr. Bryan Dela Cruz",
+    speaker: "Dr. Emeliza Laurenciana, MBA",
     programs: [PROG_FT]
   }
 ];

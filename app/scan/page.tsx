@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import {
   doc, getDoc, updateDoc, serverTimestamp,
   collection, getDocs, DocumentReference, deleteField
@@ -15,7 +15,7 @@ import {
   FaUndo, FaHistory, FaBolt, FaTrash, FaChevronDown, FaChevronUp, FaTimes,
 } from "react-icons/fa";
 import { useRouter } from "next/navigation";
-import { SEMINAR_OPTIONS, type Seminar } from "@/lib/seminars";
+import { SEMINAR_OPTIONS, type Seminar, PROGRAM_SHORT_LABEL } from "@/lib/seminars";
 
 import FloatingCubes from "@/app/components/FloatingCubes";
 import CircuitCursor from "@/app/components/CircuitCursor";
@@ -44,6 +44,11 @@ type RecentScan = {
 type SessionStats = { scanned: number; checkedIn: number; duplicate: number; error: number };
 
 const EMPTY_STATS: SessionStats = { scanned: 0, checkedIn: 0, duplicate: 0, error: 0 };
+
+// Program filter tabs for the seminar picker — "All" plus one tab per
+// distinct program found in SEMINAR_OPTIONS, so the list stays relevant
+// however many programs get added later without hardcoding tab labels.
+const PROGRAM_FILTERS = ["all", ...Array.from(new Set(SEMINAR_OPTIONS.flatMap(s => s.programs)))];
 
 // ─── Local Storage Helpers ────────────────────────────────────────────────────
 
@@ -93,10 +98,11 @@ export default function ScanPage() {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const autoResumeTimeoutRef = useRef<any>(null);
   const autoResumeIntervalRef = useRef<any>(null);
-  
+
   const [activeSeminarId, setActiveSeminarId] = useState<string | null>(null);
   const [seminarListOpen, setSeminarListOpen] = useState(true);
-  
+  const [programFilter, setProgramFilter] = useState<string>("all");
+
   const [result, setResult] = useState<ScanResult>({ state: "idle" });
   const [scanMode, setScanMode] = useState<ScanMode>("camera");
   const [scannerReady, setScannerReady] = useState(false);
@@ -119,6 +125,12 @@ export default function ScanPage() {
   const processingRef = useRef(false);
 
   const activeSeminar = SEMINAR_OPTIONS.find(s => s.id === activeSeminarId) ?? null;
+
+  // Seminars visible in the picker, filtered by the selected program tab.
+  const visibleSeminars = useMemo(() => {
+    if (programFilter === "all") return SEMINAR_OPTIONS;
+    return SEMINAR_OPTIONS.filter(s => s.programs.includes(programFilter));
+  }, [programFilter]);
 
   useEffect(() => {
     setSessionStats(loadStats());
@@ -348,11 +360,13 @@ export default function ScanPage() {
         containerRef.current.innerHTML = '<div id="qr-reader" style="width: 100%;"></div>';
       }
 
+      // Bigger scan box so the camera view reads like a real scanner
+      // terminal instead of a small embedded widget.
       const scanner = new Html5QrcodeScanner(
         "qr-reader",
         {
           fps: 10,
-          qrbox: { width: 280, height: 280 },
+          qrbox: { width: 340, height: 340 },
           aspectRatio: 1,
           showTorchButtonIfSupported: true,
           rememberLastUsedCamera: true,
@@ -562,18 +576,20 @@ export default function ScanPage() {
       <div className="hidden md:block"><CircuitCursor /></div>
 
       <div className="relative z-10 flex flex-col flex-1">
-        {/* Header */}
+        {/* Header — kept compact and full-width so it doesn't fight the scanner for space */}
         <div className="pt-24 md:pt-28 px-4 shrink-0">
-          <div className="max-w-sm mx-auto relative overflow-hidden rounded-[2rem] border border-white/10 shadow-2xl bg-[#06402B] text-white">
+          <div className="max-w-2xl mx-auto relative overflow-hidden rounded-[2rem] border border-white/10 shadow-2xl bg-[#06402B] text-white">
             <div className="absolute inset-0 bg-[url('/scanlines.png')] opacity-10 pointer-events-none" />
-            <div className="relative px-5 py-5">
-              <p className="text-[9px] font-mono tracking-[0.3em] uppercase text-emerald-300 mb-1 text-center">
-                CVMAS Week · Terminal
-              </p>
+            <div className="relative px-5 py-4">
               <div className="flex items-center justify-between mb-3">
-                <h1 className="text-lg font-black tracking-tight flex items-center gap-2">
-                  <FaQrcode size={18} /> QR Scanner
-                </h1>
+                <div>
+                  <p className="text-[9px] font-mono tracking-[0.3em] uppercase text-emerald-300">
+                    CVMAS Week · Terminal
+                  </p>
+                  <h1 className="text-lg font-black tracking-tight flex items-center gap-2 mt-0.5">
+                    <FaQrcode size={16} /> QR Scanner
+                  </h1>
+                </div>
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                   <span className="text-[10px] font-mono text-emerald-300 uppercase tracking-widest truncate max-w-[80px]">
@@ -599,8 +615,9 @@ export default function ScanPage() {
           </div>
         </div>
 
-        <div className="flex-1 flex flex-col items-center px-4 pt-5 pb-10 max-w-sm mx-auto w-full space-y-4">
-          
+        {/* Main content — noticeably wider than before so the camera can breathe */}
+        <div className="flex-1 flex flex-col items-center px-4 pt-5 pb-10 max-w-2xl mx-auto w-full space-y-4">
+
           {/* ── Seminar selector ── */}
           <div className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden shadow-sm z-20 relative">
             <button
@@ -628,8 +645,29 @@ export default function ScanPage() {
                   transition={{ duration: 0.2 }}
                   className="overflow-hidden border-t border-zinc-100 dark:border-zinc-800"
                 >
+                  {/* Program filter tabs */}
+                  {PROGRAM_FILTERS.length > 2 && (
+                    <div className="flex gap-1.5 px-3 pt-3 overflow-x-auto">
+                      {PROGRAM_FILTERS.map(pf => (
+                        <button
+                          key={pf}
+                          onClick={() => setProgramFilter(pf)}
+                          className={`shrink-0 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
+                            programFilter === pf
+                              ? "bg-[#06402B] text-white shadow-sm"
+                              : "bg-zinc-100 dark:bg-zinc-800 text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+                          }`}
+                        >
+                          {pf === "all" ? "All Programs" : (PROGRAM_SHORT_LABEL[pf] ?? pf)}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
                   <div className="p-3 space-y-2">
-                    {SEMINAR_OPTIONS.map((s, i) => (
+                    {visibleSeminars.length === 0 ? (
+                      <p className="text-center text-xs font-bold text-zinc-400 py-4">No seminars for this program.</p>
+                    ) : visibleSeminars.map((s, i) => (
                       <button
                         key={s.id}
                         onClick={() => selectSeminar(s.id)}
@@ -652,6 +690,13 @@ export default function ScanPage() {
                               {s.title}
                             </p>
                             <p className="text-[10px] text-zinc-400 mt-0.5 font-medium leading-snug">{s.speaker}</p>
+                            <div className="flex flex-wrap gap-1 mt-1.5">
+                              {s.programs.map(p => (
+                                <span key={p} className="px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-zinc-700 text-zinc-500 dark:text-zinc-400 text-[9px] font-bold uppercase tracking-wide">
+                                  {PROGRAM_SHORT_LABEL[p] ?? p}
+                                </span>
+                              ))}
+                            </div>
                           </div>
                         </div>
                       </button>
@@ -672,67 +717,69 @@ export default function ScanPage() {
             </div>
           ) : (
             <>
-              {/* Toggles */}
-              <div className="w-full flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest">
-                <button
-                  onClick={() => setAutoContinue(v => !v)}
-                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border transition-all ${
-                    autoContinue ? "bg-[#06402B]/10 border-[#06402B]/30 text-[#06402B] dark:bg-emerald-500/10 dark:border-emerald-500/30 dark:text-emerald-400" : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-400"
-                  }`}
-                >
-                  <FaBolt size={10} /> Auto-resume {autoContinue ? "on" : "off"}
-                </button>
-                <button
-                  onClick={() => setSoundOn(v => !v)}
-                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border transition-all ${
-                    soundOn ? "bg-[#06402B]/10 border-[#06402B]/30 text-[#06402B] dark:bg-emerald-500/10 dark:border-emerald-500/30 dark:text-emerald-400" : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-400"
-                  }`}
-                >
-                  🔊 Sound {soundOn ? "on" : "off"}
-                </button>
+              {/* Compact control row: toggles + mode switch side by side on wider screens */}
+              <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest">
+                  <button
+                    onClick={() => setAutoContinue(v => !v)}
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border transition-all ${
+                      autoContinue ? "bg-[#06402B]/10 border-[#06402B]/30 text-[#06402B] dark:bg-emerald-500/10 dark:border-emerald-500/30 dark:text-emerald-400" : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-400"
+                    }`}
+                  >
+                    <FaBolt size={10} /> Auto {autoContinue ? "on" : "off"}
+                  </button>
+                  <button
+                    onClick={() => setSoundOn(v => !v)}
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border transition-all ${
+                      soundOn ? "bg-[#06402B]/10 border-[#06402B]/30 text-[#06402B] dark:bg-emerald-500/10 dark:border-emerald-500/30 dark:text-emerald-400" : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-400"
+                    }`}
+                  >
+                    🔊 {soundOn ? "on" : "off"}
+                  </button>
+                </div>
+
+                <div className="flex bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-1 gap-1">
+                  <button
+                    onClick={() => switchMode("camera")}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+                      scanMode === "camera" ? "bg-[#06402B] text-white shadow-md" : "text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+                    }`}
+                  >
+                    <FaCamera size={12} /> Camera
+                  </button>
+                  <button
+                    onClick={() => switchMode("upload")}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+                      scanMode === "upload" ? "bg-[#06402B] text-white shadow-md" : "text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+                    }`}
+                  >
+                    <FaUpload size={12} /> Upload
+                  </button>
+                </div>
               </div>
 
-              <div className="w-full flex bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-1 gap-1">
-                <button
-                  onClick={() => switchMode("camera")}
-                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
-                    scanMode === "camera" ? "bg-[#06402B] text-white shadow-md" : "text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
-                  }`}
-                >
-                  <FaCamera size={12} /> Camera
-                </button>
-                <button
-                  onClick={() => switchMode("upload")}
-                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
-                    scanMode === "upload" ? "bg-[#06402B] text-white shadow-md" : "text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
-                  }`}
-                >
-                  <FaUpload size={12} /> Upload Image
-                </button>
-              </div>
-
-              {/* Viewport */}
+              {/* ── Viewport — the hero of the page now ── */}
               {scanMode === "camera" && (
-                <div className="relative w-full rounded-3xl overflow-hidden border-2 transition-colors duration-500 border-zinc-300 dark:border-zinc-700 bg-black aspect-square flex items-center justify-center">
-                  
+                <div className="relative w-full rounded-[2rem] overflow-hidden border-4 transition-colors duration-500 border-zinc-800 dark:border-zinc-700 bg-black aspect-square flex items-center justify-center shadow-2xl">
+
                   <div ref={containerRef} className="absolute inset-0 w-full h-full object-cover">
                     <div id="qr-reader" />
                   </div>
 
-                  {/* Viewfinder Overlay */}
+                  {/* Viewfinder Overlay — bigger corner brackets, thicker laser */}
                   {result.state === "scanning" && (
                     <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-10">
-                      <div className="w-[60%] h-[60%] relative">
-                        <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-emerald-500 rounded-tl-xl" />
-                        <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-emerald-500 rounded-tr-xl" />
-                        <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-emerald-500 rounded-bl-xl" />
-                        <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-emerald-500 rounded-br-xl" />
-                        
+                      <div className="w-[72%] h-[72%] relative">
+                        <div className="absolute top-0 left-0 w-12 h-12 border-t-[6px] border-l-[6px] border-emerald-500 rounded-tl-2xl" />
+                        <div className="absolute top-0 right-0 w-12 h-12 border-t-[6px] border-r-[6px] border-emerald-500 rounded-tr-2xl" />
+                        <div className="absolute bottom-0 left-0 w-12 h-12 border-b-[6px] border-l-[6px] border-emerald-500 rounded-bl-2xl" />
+                        <div className="absolute bottom-0 right-0 w-12 h-12 border-b-[6px] border-r-[6px] border-emerald-500 rounded-br-2xl" />
+
                         {/* Animated Scanning Laser */}
-                        <motion.div 
-                          animate={{ y: ["0%", "300%"] }} 
+                        <motion.div
+                          animate={{ y: ["0%", "300%"] }}
                           transition={{ repeat: Infinity, duration: 2, ease: "linear", repeatType: "reverse" }}
-                          className="absolute top-0 left-0 w-full h-1 bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.8)] opacity-70"
+                          className="absolute top-0 left-0 w-full h-1.5 bg-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.9)] opacity-80"
                         />
                       </div>
                     </div>
@@ -742,7 +789,7 @@ export default function ScanPage() {
                     {result.state === "scanning" && (
                       <motion.div
                         key="chip-scanning" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
-                        className="absolute top-4 left-1/2 -translate-x-1/2 px-4 py-1.5 bg-black/60 backdrop-blur-md text-white text-[10px] font-black uppercase tracking-widest rounded-full z-20"
+                        className="absolute top-5 left-1/2 -translate-x-1/2 px-5 py-2 bg-black/60 backdrop-blur-md text-white text-xs font-black uppercase tracking-widest rounded-full z-20"
                       >
                         Point camera at QR code
                       </motion.div>
@@ -750,18 +797,26 @@ export default function ScanPage() {
                     {result.state === "loading" && (
                       <motion.div
                         key="chip-loading" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
-                        className="absolute top-4 left-1/2 -translate-x-1/2 px-4 py-1.5 bg-black/80 backdrop-blur-md text-white text-[10px] font-black uppercase tracking-widest rounded-full flex items-center gap-2 z-20"
+                        className="absolute top-5 left-1/2 -translate-x-1/2 px-5 py-2 bg-black/80 backdrop-blur-md text-white text-xs font-black uppercase tracking-widest rounded-full flex items-center gap-2 z-20"
                       >
-                        <FaSpinner className="animate-spin" size={10} /> Verifying…
+                        <FaSpinner className="animate-spin" size={12} /> Verifying…
                       </motion.div>
                     )}
                   </AnimatePresence>
+
+                  {/* Active seminar badge floats bottom-left so staff always know what they're scanning for */}
+                  <div className="absolute bottom-5 left-5 max-w-[55%] z-20">
+                    <div className="px-3 py-1.5 bg-black/60 backdrop-blur-md rounded-xl">
+                      <p className="text-[8px] font-black uppercase tracking-widest text-emerald-400">Scanning for</p>
+                      <p className="text-[11px] font-bold text-white truncate">{activeSeminar.title}</p>
+                    </div>
+                  </div>
 
                   <AnimatePresence>
                     {autoCountdown !== null && (
                       <motion.button
                         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={handleReset}
-                        className="absolute bottom-4 right-4 flex items-center gap-1.5 px-3 py-1.5 bg-black/70 backdrop-blur-md text-white text-[10px] font-bold uppercase tracking-widest rounded-full hover:bg-black/90 transition-all z-20"
+                        className="absolute bottom-5 right-5 flex items-center gap-1.5 px-3 py-1.5 bg-black/70 backdrop-blur-md text-white text-[10px] font-bold uppercase tracking-widest rounded-full hover:bg-black/90 transition-all z-20"
                       >
                         Next in {autoCountdown}s · tap to skip
                       </motion.button>
@@ -776,23 +831,23 @@ export default function ScanPage() {
                   <input ref={fileInputRef} type="file" accept="image/*" capture="environment" onChange={handleImageUpload} className="hidden" />
 
                   {uploadPreview ? (
-                    <div className={`w-full rounded-3xl overflow-hidden border-2 transition-colors duration-300 relative ${
-                      result.state === "success" ? "border-emerald-500" : result.state === "already_attended" ? "border-amber-500" : result.state === "not_registered" || result.state === "error" || result.state === "not_found" ? "border-red-500" : "border-zinc-300 dark:border-zinc-700"
+                    <div className={`w-full rounded-[2rem] overflow-hidden border-4 transition-colors duration-300 relative shadow-2xl aspect-square ${
+                      result.state === "success" ? "border-emerald-500" : result.state === "already_attended" ? "border-amber-500" : result.state === "not_registered" || result.state === "error" || result.state === "not_found" ? "border-red-500" : "border-zinc-800 dark:border-zinc-700"
                     }`}>
-                      <img src={uploadPreview} alt="Uploaded QR" className="w-full object-contain max-h-72 bg-black" />
+                      <img src={uploadPreview} alt="Uploaded QR" className="w-full h-full object-contain bg-black" />
                       {isUploading && (
                         <div className="absolute inset-0 bg-black/50 flex items-center justify-center backdrop-blur-sm">
-                          <FaSpinner className="animate-spin text-white" size={28} />
+                          <FaSpinner className="animate-spin text-white" size={32} />
                         </div>
                       )}
                     </div>
                   ) : (
-                    <button onClick={() => fileInputRef.current?.click()} className="w-full py-14 border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-3xl flex flex-col items-center justify-center gap-3 hover:border-[#06402B] dark:hover:border-emerald-500 hover:bg-[#06402B]/5 transition-all active:scale-95 group">
-                      <div className="w-14 h-14 rounded-2xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-400 group-hover:text-[#06402B] dark:group-hover:text-emerald-400 transition-colors">
-                        <FaUpload size={22} />
+                    <button onClick={() => fileInputRef.current?.click()} className="w-full aspect-square rounded-[2rem] border-4 border-dashed border-zinc-300 dark:border-zinc-700 flex flex-col items-center justify-center gap-4 hover:border-[#06402B] dark:hover:border-emerald-500 hover:bg-[#06402B]/5 transition-all active:scale-95 group">
+                      <div className="w-20 h-20 rounded-2xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-400 group-hover:text-[#06402B] dark:group-hover:text-emerald-400 transition-colors">
+                        <FaUpload size={32} />
                       </div>
                       <div className="text-center">
-                        <p className="text-sm font-black text-zinc-600 dark:text-zinc-400 uppercase tracking-widest">Tap to upload</p>
+                        <p className="text-base font-black text-zinc-600 dark:text-zinc-400 uppercase tracking-widest">Tap to upload</p>
                         <p className="text-xs text-zinc-400 mt-1 font-medium">Photo, screenshot, or saved QR</p>
                       </div>
                     </button>
@@ -853,7 +908,7 @@ export default function ScanPage() {
                     <span className="flex items-center gap-2"><FaHistory size={11} /> System Log ({recentScans.length})</span>
                     {recentOpen ? <FaChevronUp size={10} /> : <FaChevronDown size={10} />}
                   </button>
-                  
+
                   <AnimatePresence>
                     {recentOpen && (
                       <motion.div initial={{ height: 0 }} animate={{ height: "auto" }} exit={{ height: 0 }} className="overflow-hidden">
@@ -891,7 +946,7 @@ export default function ScanPage() {
                 />
                 <motion.div
                   key="sheet" initial={{ y: "100%", opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: "100%", opacity: 0 }} transition={{ type: "spring", stiffness: 350, damping: 35 }}
-                  className="fixed bottom-0 left-0 right-0 z-50 max-w-sm mx-auto"
+                  className="fixed bottom-0 left-0 right-0 z-50 max-w-md mx-auto"
                 >
                   <div className={`rounded-t-[2rem] p-6 space-y-4 border-t-4 shadow-2xl ${
                     result.state === "success" ? "bg-white dark:bg-zinc-900 border-emerald-500" : result.state === "already_attended" ? "bg-white dark:bg-zinc-900 border-amber-500" : "bg-white dark:bg-zinc-900 border-red-500"
