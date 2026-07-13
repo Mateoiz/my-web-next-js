@@ -6,6 +6,7 @@ const nextConfig: NextConfig = {
   env: {
     NEXT_PUBLIC_BUILD_ID: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || Date.now().toString(),
   },
+  allowedDevOrigins: ["192.168.1.6"],
 
   images: {
     remotePatterns: [

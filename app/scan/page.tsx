@@ -45,7 +45,6 @@ type SessionStats = { scanned: number; checkedIn: number; duplicate: number; err
 
 const EMPTY_STATS: SessionStats = { scanned: 0, checkedIn: 0, duplicate: 0, error: 0 };
 
-// Program filter tabs for the seminar picker
 const PROGRAM_FILTERS = ["all", ...Array.from(new Set(SEMINAR_OPTIONS.flatMap(s => s.programs)))];
 
 // ─── Local Storage Helpers ────────────────────────────────────────────────────
@@ -98,6 +97,7 @@ export default function ScanPage() {
   const autoResumeIntervalRef = useRef<any>(null);
 
   const [activeSeminarId, setActiveSeminarId] = useState<string | null>(null);
+  const activeSeminarIdRef = useRef<string | null>(null);
   const [seminarListOpen, setSeminarListOpen] = useState(true);
   const [programFilter, setProgramFilter] = useState<string>("all");
 
@@ -120,7 +120,13 @@ export default function ScanPage() {
   const [undoing, setUndoing] = useState(false);
   const [soundOn, setSoundOn] = useState(true);
 
+  // The master software lock for the scanner
   const processingRef = useRef(false);
+
+  // Keep the ref in sync to avoid needing to tear down the camera on seminar switch
+  useEffect(() => {
+    activeSeminarIdRef.current = activeSeminarId;
+  }, [activeSeminarId]);
 
   const activeSeminar = SEMINAR_OPTIONS.find(s => s.id === activeSeminarId) ?? null;
 
@@ -211,20 +217,16 @@ export default function ScanPage() {
   const stopScanner = useCallback(async () => {
     if (scannerRef.current) {
       try {
-        await scannerRef.current.stop();
-        scannerRef.current.clear();
+        await scannerRef.current.clear(); // Fixed: .clear() instead of .stop()
       } catch (err) {
         console.warn("Scanner teardown warning:", err);
       }
       scannerRef.current = null;
     }
-    if (containerRef.current) {
-      containerRef.current.innerHTML = '<div id="qr-reader"></div>';
-    }
+    setScannerReady(false);
   }, []);
 
-  const checkInDocRef = useCallback(async (docRef: DocumentReference) => {
-    if (!activeSeminar) return;
+  const checkInDocRef = useCallback(async (docRef: DocumentReference, currentSeminar: Seminar) => {
     const snap = await getDoc(docRef);
 
     if (!snap.exists()) {
@@ -236,50 +238,49 @@ export default function ScanPage() {
 
     const data = { id: snap.id, ...snap.data() } as any;
 
-    if (data.seminarAttendance?.[activeSeminar.id]) {
-      setResult({ state: "already_attended", data, seminar: activeSeminar });
+    if (data.seminarAttendance?.[currentSeminar.id]) {
+      setResult({ state: "already_attended", data, seminar: currentSeminar });
       recordScan({ name: data.fullName, idNumber: data.idNumber, status: "duplicate" });
       playFeedback("duplicate");
       return;
     }
 
-    // Checking if they registered for the seminar (Requires array of strings from the register page fix)
-    if (data.seminars && data.seminars.length > 0 && !data.seminars.includes(activeSeminar.id)) {
-      setResult({ state: "not_registered", data, seminar: activeSeminar });
+    if (data.seminars && data.seminars.length > 0 && !data.seminars.includes(currentSeminar.id)) {
+      setResult({ state: "not_registered", data, seminar: currentSeminar });
       recordScan({ name: data.fullName, idNumber: data.idNumber, status: "error" });
       playFeedback("error");
       return;
     }
 
-    // ── THE CRITICAL FIX ──
-    // Setting `status: "checked-in"` inside the specific seminar's map
     await updateDoc(docRef, {
-      [`seminarAttendance.${activeSeminar.id}.checkedInAt`]: serverTimestamp(),
-      [`seminarAttendance.${activeSeminar.id}.checkedInBy`]: authUser?.uid ?? "unknown",
-      [`seminarAttendance.${activeSeminar.id}.status`]: "checked-in", 
+      [`seminarAttendance.${currentSeminar.id}.checkedInAt`]: serverTimestamp(),
+      [`seminarAttendance.${currentSeminar.id}.checkedInBy`]: authUser?.uid ?? "unknown",
+      [`seminarAttendance.${currentSeminar.id}.status`]: "checked-in", 
       status: "attendee",
       lastCheckedInAt: serverTimestamp(),
     });
 
-    setResult({ state: "success", data: { ...data, status: "attendee" }, seminar: activeSeminar });
+    setResult({ state: "success", data: { ...data, status: "attendee" }, seminar: currentSeminar });
     recordScan({ name: data.fullName, idNumber: data.idNumber, status: "checked_in" });
     playFeedback("success");
-  }, [authUser, recordScan, playFeedback, activeSeminar]);
+  }, [authUser, recordScan, playFeedback]);
 
   const processQR = useCallback(async (rawValue: string) => {
     if (processingRef.current) return;
-    if (!activeSeminar) {
+    processingRef.current = true; // Lock engaged until explicitly reset by the user/timer!
+
+    const currentSeminarId = activeSeminarIdRef.current;
+    const currentSeminar = SEMINAR_OPTIONS.find(s => s.id === currentSeminarId) ?? null;
+
+    if (!currentSeminar) {
       setResult({ state: "error", message: "Please select a seminar first." });
       return;
     }
-    processingRef.current = true;
-    await stopScanner();
 
     if (!navigator.onLine) {
       setResult({ state: "error", message: "You are offline. Reconnect to Wi-Fi/Data to scan." });
       recordScan({ name: "Network Error", status: "error" });
       playFeedback("error");
-      processingRef.current = false;
       return;
     }
 
@@ -287,7 +288,6 @@ export default function ScanPage() {
       setResult({ state: "error", message: "Invalid QR code. Not a CVMAS registration." });
       recordScan({ name: "Unrecognized format", status: "error" });
       playFeedback("error");
-      processingRef.current = false;
       return;
     }
 
@@ -295,7 +295,7 @@ export default function ScanPage() {
     setResult({ state: "loading" });
 
     try {
-      await checkInDocRef(doc(db, "cvmas_registrations", docId));
+      await checkInDocRef(doc(db, "cvmas_registrations", docId), currentSeminar);
     } catch (err: any) {
       const message = err?.code === "permission-denied"
         ? "Permission denied. Ensure your account has admin access."
@@ -303,25 +303,27 @@ export default function ScanPage() {
       setResult({ state: "error", message });
       recordScan({ name: "System Error", status: "error" });
       playFeedback("error");
-    } finally {
-      processingRef.current = false;
     }
-  }, [stopScanner, recordScan, playFeedback, checkInDocRef, activeSeminar]);
+    // Intentionally omitting `finally { processingRef.current = false }` 
+    // This software lock breaks the 300x scan loop by waiting for handleReset.
+  }, [recordScan, playFeedback, checkInDocRef]);
 
   const processRefCode = useCallback(async (code: string) => {
     if (processingRef.current) return;
-    if (!activeSeminar) {
+    processingRef.current = true;
+
+    const currentSeminarId = activeSeminarIdRef.current;
+    const currentSeminar = SEMINAR_OPTIONS.find(s => s.id === currentSeminarId) ?? null;
+
+    if (!currentSeminar) {
       setResult({ state: "error", message: "Please select a seminar first." });
       return;
     }
-    processingRef.current = true;
-    await stopScanner();
 
     if (!navigator.onLine) {
       setResult({ state: "error", message: "You are offline. Reconnect to Wi-Fi/Data to scan." });
       recordScan({ name: "Network Error", status: "error" });
       playFeedback("error");
-      processingRef.current = false;
       return;
     }
 
@@ -333,10 +335,9 @@ export default function ScanPage() {
         setResult({ state: "not_found" });
         recordScan({ name: `Ref code ${code.toUpperCase()}`, status: "not_found" });
         playFeedback("error");
-        processingRef.current = false;
         return;
       }
-      await checkInDocRef(doc(db, "cvmas_registrations", resolved.id));
+      await checkInDocRef(doc(db, "cvmas_registrations", resolved.id), currentSeminar);
     } catch (err: any) {
       const message = err?.code === "permission-denied"
         ? "Permission denied. Ensure your account has admin access."
@@ -344,12 +345,12 @@ export default function ScanPage() {
       setResult({ state: "error", message });
       recordScan({ name: "System Error", status: "error" });
       playFeedback("error");
-    } finally {
-      processingRef.current = false;
     }
-  }, [stopScanner, recordScan, playFeedback, checkInDocRef, activeSeminar]);
+  }, [recordScan, playFeedback, checkInDocRef]);
 
   const startCameraScanner = useCallback(async () => {
+    if (scannerRef.current) return; // Prevent dual mounts
+
     setResult({ state: "scanning" });
     setUploadPreview(null);
     processingRef.current = false;
@@ -412,6 +413,8 @@ export default function ScanPage() {
 
       const decodedText = await qrScanner.scanFile(file, true);
       await qrScanner.clear();
+      
+      processingRef.current = false;
       await processQR(decodedText);
     } catch (err: any) {
       console.error("Image scan error:", err);
@@ -425,36 +428,41 @@ export default function ScanPage() {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
-  }, [stopScanner, processQR, recordScan, playFeedback]);
+  }, [processQR, stopScanner, recordScan, playFeedback]);
 
   const switchMode = useCallback(async (mode: ScanMode) => {
     await stopScanner();
     setResult({ state: "idle" });
     setUploadPreview(null);
     setScanMode(mode);
-    setScannerReady(false);
     processingRef.current = false;
   }, [stopScanner]);
 
+  // Notice we use !!activeSeminarId to strictly prevent constant tear downs when swapping seminars.
+  // The scanner binds to the processQR closure once, which resolves the active seminar securely via ref.
   useEffect(() => {
-    if (!authUser || scanMode !== "camera" || !activeSeminar) return;
+    if (!authUser || scanMode !== "camera" || !activeSeminarId) return;
     startCameraScanner();
     return () => { stopScanner(); };
-  }, [authUser, scanMode, startCameraScanner, stopScanner, activeSeminar]);
+  }, [authUser, scanMode, !!activeSeminarId, startCameraScanner, stopScanner]);
 
-  const handleReset = useCallback(async () => {
+  const handleReset = useCallback(() => {
     if (autoResumeTimeoutRef.current) clearTimeout(autoResumeTimeoutRef.current);
     if (autoResumeIntervalRef.current) clearInterval(autoResumeIntervalRef.current);
     setAutoCountdown(null);
-    await stopScanner();
+    
     setUploadPreview(null);
-    setScannerReady(false);
-    setResult({ state: "idle" });
-    processingRef.current = false;
-    if (scanMode === "camera" && activeSeminar) {
-      startCameraScanner();
+    
+    // Instead of completely tearing down the camera, we just lift the software lock
+    // and let the running instance seamlessly accept new frames.
+    if (scanMode === "camera") {
+      setResult({ state: "scanning" });
+    } else {
+      setResult({ state: "idle" });
     }
-  }, [stopScanner, scanMode, startCameraScanner, activeSeminar]);
+    
+    processingRef.current = false;
+  }, [scanMode]);
 
   const selectSeminar = (id: string) => {
     setActiveSeminarId(id);
@@ -480,13 +488,12 @@ export default function ScanPage() {
         try { sessionStorage.setItem("cvmas_scan_stats", JSON.stringify(next)); } catch {}
         return next;
       });
-      // Remove latest success scan from log
       setRecentScans(prev => {
         const next = prev.filter(s => !(s.time === prev[0]?.time && s.status === "checked_in"));
         try { sessionStorage.setItem("cvmas_recent_scans", JSON.stringify(next)); } catch {}
         return next;
       });
-      await handleReset();
+      handleReset();
     } catch (err) {
       console.error(err);
       alert("Failed to undo check-in. Try again.");
@@ -565,7 +572,6 @@ export default function ScanPage() {
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black relative overflow-hidden font-sans selection:bg-green-500/30 flex flex-col">
-      {/* Background */}
       <div className="absolute inset-0 z-0 pointer-events-none">
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]" />
         <div className="absolute top-[10%] left-[-10%] w-[350px] h-[350px] bg-green-500/10 rounded-full blur-3xl opacity-30" />
@@ -575,7 +581,6 @@ export default function ScanPage() {
       <div className="hidden md:block"><CircuitCursor /></div>
 
       <div className="relative z-10 flex flex-col flex-1">
-        {/* Header */}
         <div className="pt-24 md:pt-28 px-4 shrink-0">
           <div className="max-w-2xl mx-auto relative overflow-hidden rounded-[2rem] border border-white/10 shadow-2xl bg-[#06402B] text-white">
             <div className="absolute inset-0 bg-[url('/scanlines.png')] opacity-10 pointer-events-none" />
@@ -597,7 +602,6 @@ export default function ScanPage() {
                 </div>
               </div>
 
-              {/* Stats */}
               <div className="flex items-center gap-2">
                 <StatPill label="Scanned" value={sessionStats.scanned} />
                 <StatPill label="Checked in" value={sessionStats.checkedIn} accent="emerald" />
@@ -614,10 +618,8 @@ export default function ScanPage() {
           </div>
         </div>
 
-        {/* Main content */}
         <div className="flex-1 flex flex-col items-center px-4 pt-5 pb-10 max-w-2xl mx-auto w-full space-y-4">
 
-          {/* ── Seminar selector ── */}
           <div className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden shadow-sm z-20 relative">
             <button
               onClick={() => setSeminarListOpen(o => !o)}
@@ -644,7 +646,6 @@ export default function ScanPage() {
                   transition={{ duration: 0.2 }}
                   className="overflow-hidden border-t border-zinc-100 dark:border-zinc-800"
                 >
-                  {/* Program filter tabs */}
                   {PROGRAM_FILTERS.length > 2 && (
                     <div className="flex gap-1.5 px-3 pt-3 overflow-x-auto">
                       {PROGRAM_FILTERS.map(pf => (
@@ -706,7 +707,6 @@ export default function ScanPage() {
             </AnimatePresence>
           </div>
 
-          {/* Gate: must select seminar before continuing */}
           {!activeSeminar ? (
             <div className="w-full py-14 flex flex-col items-center justify-center gap-3 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-3xl">
               <FaQrcode size={28} className="text-zinc-300 dark:text-zinc-700" />
@@ -716,7 +716,6 @@ export default function ScanPage() {
             </div>
           ) : (
             <>
-              {/* Compact control row */}
               <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest">
                   <button
@@ -757,7 +756,6 @@ export default function ScanPage() {
                 </div>
               </div>
 
-              {/* ── Viewport ── */}
               {scanMode === "camera" && (
                 <div className="relative w-full rounded-[2rem] overflow-hidden border-4 transition-colors duration-500 border-zinc-800 dark:border-zinc-700 bg-black aspect-square flex items-center justify-center shadow-2xl">
 
@@ -765,7 +763,6 @@ export default function ScanPage() {
                     <div id="qr-reader" />
                   </div>
 
-                  {/* Viewfinder Overlay */}
                   {result.state === "scanning" && (
                     <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-10">
                       <div className="w-[72%] h-[72%] relative">
@@ -774,7 +771,6 @@ export default function ScanPage() {
                         <div className="absolute bottom-0 left-0 w-12 h-12 border-b-[6px] border-l-[6px] border-emerald-500 rounded-bl-2xl" />
                         <div className="absolute bottom-0 right-0 w-12 h-12 border-b-[6px] border-r-[6px] border-emerald-500 rounded-br-2xl" />
 
-                        {/* Animated Scanning Laser */}
                         <motion.div
                           animate={{ y: ["0%", "300%"] }}
                           transition={{ repeat: Infinity, duration: 2, ease: "linear", repeatType: "reverse" }}
@@ -803,7 +799,6 @@ export default function ScanPage() {
                     )}
                   </AnimatePresence>
 
-                  {/* Active seminar badge floats bottom-left */}
                   <div className="absolute bottom-5 left-5 max-w-[55%] z-20">
                     <div className="px-3 py-1.5 bg-black/60 backdrop-blur-md rounded-xl">
                       <p className="text-[8px] font-black uppercase tracking-widest text-emerald-400">Scanning for</p>
@@ -860,7 +855,6 @@ export default function ScanPage() {
                 </div>
               )}
 
-              {/* Manual Entry Fallback */}
               <div className="w-full">
                 {!manualEntryOpen ? (
                   <button onClick={() => setManualEntryOpen(true)} className="w-full py-2.5 text-[11px] font-bold uppercase tracking-widest text-zinc-400 hover:text-[#06402B] dark:hover:text-emerald-400 flex items-center justify-center gap-2 transition-colors">
@@ -886,7 +880,6 @@ export default function ScanPage() {
                 )}
               </div>
 
-              {/* Idle / Initial State */}
               <AnimatePresence mode="wait">
                 {result.state === "idle" && (
                   <motion.div key="idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="w-full py-3 text-center">
@@ -897,7 +890,6 @@ export default function ScanPage() {
                 )}
               </AnimatePresence>
 
-              {/* Recent Scans Log (Terminal Style) */}
               {recentScans.length > 0 && (
                 <div className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-inner mt-4">
                   <button
@@ -935,7 +927,6 @@ export default function ScanPage() {
             </>
           )}
 
-          {/* Bottom Sheet Results */}
           <AnimatePresence>
             {(result.state === "success" || result.state === "already_attended" || result.state === "not_found" || result.state === "not_registered" || result.state === "error") && (
               <>
@@ -952,7 +943,6 @@ export default function ScanPage() {
                   }`}>
                     <div className="w-10 h-1 bg-zinc-200 dark:bg-zinc-700 rounded-full mx-auto -mt-2 mb-2" />
 
-                    {/* SUCCESS */}
                     {result.state === "success" && (
                       <>
                         <div className="flex items-center gap-4">
@@ -980,7 +970,6 @@ export default function ScanPage() {
                       </>
                     )}
 
-                    {/* ALREADY ATTENDED */}
                     {result.state === "already_attended" && (
                       <>
                         <div className="flex items-center gap-4">
@@ -1008,7 +997,6 @@ export default function ScanPage() {
                       </>
                     )}
 
-                    {/* NOT REGISTERED FOR THIS SPECIFIC SEMINAR */}
                     {result.state === "not_registered" && (
                       <>
                         <div className="flex items-center gap-4">
@@ -1026,7 +1014,6 @@ export default function ScanPage() {
                       </>
                     )}
 
-                    {/* OTHER ERRORS */}
                     {result.state === "not_found" && <ErrorPanel title="Not found" message="This code doesn't match any CVMAS registration." onReset={handleReset} scanMode={scanMode} />}
                     {result.state === "error" && <ErrorPanel title="Error" message={(result as any).message} onReset={handleReset} scanMode={scanMode} />}
                   </div>
