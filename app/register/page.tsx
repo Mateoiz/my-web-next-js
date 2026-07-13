@@ -15,12 +15,13 @@ import {
 import FloatingNature from "@/app/components/FloatingNature";
 import WalkingPaws from "@/app/components/WalkingPaws";
 import NatureCursor from "@/app/components/NatureCursor";
+// Shared config — the scanner, self-checkout, and admin dashboard all read
+// seminars from this same file. Previously this page kept its own local
+// copy of SEMINAR_OPTIONS, which had drifted out of sync (different speaker
+// name) and made data harder to trust across the app.
+import { SEMINAR_OPTIONS, type Seminar, PROG_DVM, PROG_AGRI, PROG_FT } from "@/lib/seminars";
 
 // ─── Programs & Year Levels ───────────────────────────────────────────────────
-
-export const PROG_DVM = "Doctor of Veterinary Medicine";
-export const PROG_AGRI = "Bachelor of Science in Agriculture";
-export const PROG_FT = "Bachelor of Science in Food Technology";
 
 export const YEAR_LEVELS = ["1st Year","2nd Year","3rd Year","4th Year","5th Year","6th Year"];
 export const PROGRAM_OPTIONS = [PROG_DVM, PROG_AGRI, PROG_FT];
@@ -112,48 +113,6 @@ export const PROFESSORS_DATA: Record<string, { subject: string; blocks: string[]
     { subject: "Food Analysis (Lecture & Laboratory)", blocks: ["Wednesday, 8:00 AM–12:00 PM"], programs: [PROG_FT] }
   ]
 };
-
-// ─── Dynamic Seminar options ────────────────────────────────────────────────
-
-interface SeminarOption {
-  id: string;
-  title: string;
-  speaker: string;
-  programs: string[];
-}
-
-export const SEMINAR_OPTIONS: SeminarOption[] = [
-  {
-    id: "lao-c-aller-genius",
-    title: "Aller-Genius: New Frontiers in Veterinary Allergy Care",
-    speaker: "Criselda C. Lao, DVM, RN, MAN, USRN, FelPCCP, FelPCVS-CA",
-    programs: DVM_AGRI
-  },
-  {
-    id: "lao-k-photobiomodulation",
-    title: "Use of Photobiomodulation Therapy in Chronic Kidney Disease Cases in the Philippines: A Pilot Study",
-    speaker: "Ken Anthony L. Lao, DVM, FelPCCP, FelPCVS-CA",
-    programs: DVM_AGRI
-  },
-  {
-    id: "sy-emergency",
-    title: "Emergency Topic",
-    speaker: "Nikki & Joshua Sy",
-    programs: DVM_AGRI
-  },
-  {
-    id: "austria-nutrition-surgery",
-    title: "Nutrition in Surgery",
-    speaker: "Everlyn Austria",
-    programs: DVM_AGRI
-  },
-  {
-    id: "dela-cruz-source",
-    title: "From Source to Safety: The importance of water microbiology in public health and food system",
-    speaker: "Dr. Emeliza Laurenciana, MBA",
-    programs: [PROG_FT]
-  }
-];
 
 interface ProfessorEntry { professor: string; subject: string; block: string; }
 
@@ -769,8 +728,13 @@ if (hasDuplicateProfessors) { showError("Fix duplicate professor entries first."
     const cleanId = idNumber.trim();
     const cleanBlock = studentType === "regular" ? formatBlockStr(block) : block.trim() ? `Irregular (${formatBlockStr(block)})` : "Irregular";
     const finalProfessors = professors.filter(p => isValidProfessorEntry(p, program));
-    const finalSeminars = SEMINAR_OPTIONS.filter(s => seminars.includes(s.id));
-    if (finalSeminars.length === 0) { showError("Select at least one seminar you're attending."); setIsSubmitting(false); submitLockRef.current = false; return; }
+
+    // IMPORTANT: store seminars as an array of ID strings, not full Seminar
+    // objects. The scanner checks `data.seminars.includes(activeSeminar.id)`
+    // — comparing objects against a string ID never matches, which was
+    // silently rejecting every valid check-in as "Not Registered."
+    const validSeminarIds = SEMINAR_OPTIONS.filter(s => seminars.includes(s.id)).map(s => s.id);
+    if (validSeminarIds.length === 0) { showError("Select at least one seminar you're attending."); setIsSubmitting(false); submitLockRef.current = false; return; }
 
     try {
       const submitPromise = (async () => {
@@ -779,7 +743,7 @@ if (hasDuplicateProfessors) { showError("Fix duplicate professor entries first."
         return addDoc(collection(db, "cvmas_registrations"), {
           fullName: cleanName, idNumber: cleanId, program, yearLevel, studentType,
           block: cleanBlock, professors: finalProfessors,
-          seminars: finalSeminars,
+          seminars: validSeminarIds,
           status: "pre-registered", createdAt: serverTimestamp(),
         });
       })();
@@ -960,14 +924,10 @@ if (hasDuplicateProfessors) { showError("Fix duplicate professor entries first."
                           onChange={handleIdChange}
                           placeholder="20XX-XX-XXXXXX"
                           maxLength={ID_MAX}
-                          // Added pr-14 to give the 3 paws enough room to animate
                           className={`${inputCls} font-mono tracking-widest ${idError ? "border-red-400 bg-red-50" : ""} pr-14`}
                         />
                         <div className="absolute right-3.5 top-1/2 -translate-y-1/2 flex items-center justify-end">
-                          {/* Renders the custom animation when checking */}
                           {idChecking && <WalkingPaws size={10} className="text-[#06402B]" />}
-                          
-                          {/* Success / Error states */}
                           {!idChecking && ID_REGEX.test(idNumber) && !idError && <FaCheckCircle size={12} className="text-[#06402B]" />}
                           {!idChecking && idError && <FaExclamationTriangle size={12} className="text-red-500" />}
                         </div>

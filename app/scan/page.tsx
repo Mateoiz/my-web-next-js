@@ -45,9 +45,7 @@ type SessionStats = { scanned: number; checkedIn: number; duplicate: number; err
 
 const EMPTY_STATS: SessionStats = { scanned: 0, checkedIn: 0, duplicate: 0, error: 0 };
 
-// Program filter tabs for the seminar picker — "All" plus one tab per
-// distinct program found in SEMINAR_OPTIONS, so the list stays relevant
-// however many programs get added later without hardcoding tab labels.
+// Program filter tabs for the seminar picker
 const PROGRAM_FILTERS = ["all", ...Array.from(new Set(SEMINAR_OPTIONS.flatMap(s => s.programs)))];
 
 // ─── Local Storage Helpers ────────────────────────────────────────────────────
@@ -126,7 +124,6 @@ export default function ScanPage() {
 
   const activeSeminar = SEMINAR_OPTIONS.find(s => s.id === activeSeminarId) ?? null;
 
-  // Seminars visible in the picker, filtered by the selected program tab.
   const visibleSeminars = useMemo(() => {
     if (programFilter === "all") return SEMINAR_OPTIONS;
     return SEMINAR_OPTIONS.filter(s => s.programs.includes(programFilter));
@@ -246,6 +243,7 @@ export default function ScanPage() {
       return;
     }
 
+    // Checking if they registered for the seminar (Requires array of strings from the register page fix)
     if (data.seminars && data.seminars.length > 0 && !data.seminars.includes(activeSeminar.id)) {
       setResult({ state: "not_registered", data, seminar: activeSeminar });
       recordScan({ name: data.fullName, idNumber: data.idNumber, status: "error" });
@@ -253,9 +251,12 @@ export default function ScanPage() {
       return;
     }
 
+    // ── THE CRITICAL FIX ──
+    // Setting `status: "checked-in"` inside the specific seminar's map
     await updateDoc(docRef, {
       [`seminarAttendance.${activeSeminar.id}.checkedInAt`]: serverTimestamp(),
       [`seminarAttendance.${activeSeminar.id}.checkedInBy`]: authUser?.uid ?? "unknown",
+      [`seminarAttendance.${activeSeminar.id}.status`]: "checked-in", 
       status: "attendee",
       lastCheckedInAt: serverTimestamp(),
     });
@@ -360,8 +361,6 @@ export default function ScanPage() {
         containerRef.current.innerHTML = '<div id="qr-reader" style="width: 100%;"></div>';
       }
 
-      // Bigger scan box so the camera view reads like a real scanner
-      // terminal instead of a small embedded widget.
       const scanner = new Html5QrcodeScanner(
         "qr-reader",
         {
@@ -576,7 +575,7 @@ export default function ScanPage() {
       <div className="hidden md:block"><CircuitCursor /></div>
 
       <div className="relative z-10 flex flex-col flex-1">
-        {/* Header — kept compact and full-width so it doesn't fight the scanner for space */}
+        {/* Header */}
         <div className="pt-24 md:pt-28 px-4 shrink-0">
           <div className="max-w-2xl mx-auto relative overflow-hidden rounded-[2rem] border border-white/10 shadow-2xl bg-[#06402B] text-white">
             <div className="absolute inset-0 bg-[url('/scanlines.png')] opacity-10 pointer-events-none" />
@@ -615,7 +614,7 @@ export default function ScanPage() {
           </div>
         </div>
 
-        {/* Main content — noticeably wider than before so the camera can breathe */}
+        {/* Main content */}
         <div className="flex-1 flex flex-col items-center px-4 pt-5 pb-10 max-w-2xl mx-auto w-full space-y-4">
 
           {/* ── Seminar selector ── */}
@@ -717,7 +716,7 @@ export default function ScanPage() {
             </div>
           ) : (
             <>
-              {/* Compact control row: toggles + mode switch side by side on wider screens */}
+              {/* Compact control row */}
               <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest">
                   <button
@@ -758,7 +757,7 @@ export default function ScanPage() {
                 </div>
               </div>
 
-              {/* ── Viewport — the hero of the page now ── */}
+              {/* ── Viewport ── */}
               {scanMode === "camera" && (
                 <div className="relative w-full rounded-[2rem] overflow-hidden border-4 transition-colors duration-500 border-zinc-800 dark:border-zinc-700 bg-black aspect-square flex items-center justify-center shadow-2xl">
 
@@ -766,7 +765,7 @@ export default function ScanPage() {
                     <div id="qr-reader" />
                   </div>
 
-                  {/* Viewfinder Overlay — bigger corner brackets, thicker laser */}
+                  {/* Viewfinder Overlay */}
                   {result.state === "scanning" && (
                     <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-10">
                       <div className="w-[72%] h-[72%] relative">
@@ -804,7 +803,7 @@ export default function ScanPage() {
                     )}
                   </AnimatePresence>
 
-                  {/* Active seminar badge floats bottom-left so staff always know what they're scanning for */}
+                  {/* Active seminar badge floats bottom-left */}
                   <div className="absolute bottom-5 left-5 max-w-[55%] z-20">
                     <div className="px-3 py-1.5 bg-black/60 backdrop-blur-md rounded-xl">
                       <p className="text-[8px] font-black uppercase tracking-widest text-emerald-400">Scanning for</p>
@@ -917,8 +916,8 @@ export default function ScanPage() {
                             <div key={i} className="flex items-center justify-between py-1.5 border-b border-zinc-800/50 last:border-0">
                               <div className="flex items-center gap-2.5 overflow-hidden">
                                 {scan.status === "checked_in" ? <FaCheckCircle size={10} className="text-emerald-500 shrink-0" /> :
-                                scan.status === "duplicate" ? <FaExclamationTriangle size={10} className="text-amber-500 shrink-0" /> :
-                                <FaTimes size={10} className="text-red-500 shrink-0" />}
+                                 scan.status === "duplicate" ? <FaExclamationTriangle size={10} className="text-amber-500 shrink-0" /> :
+                                 <FaTimes size={10} className="text-red-500 shrink-0" />}
                                 <div className="truncate">
                                   <p className="text-xs font-bold text-zinc-200 truncate">{scan.name}</p>
                                   {scan.idNumber && <p className="text-[9px] font-mono text-zinc-500 truncate">{scan.idNumber}</p>}
