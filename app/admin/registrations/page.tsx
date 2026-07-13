@@ -112,7 +112,10 @@ function formatIdInput(raw: string) {
 function getActiveSeminar(registration: Registration) {
   if (!registration.seminarAttendance) return null;
   for (const [seminarId, att] of Object.entries(registration.seminarAttendance)) {
-    if (att.status === "checked-in") {
+    // Same status-agnostic rule as checkout: "active" means has a
+    // check-in timestamp and no check-out yet, regardless of whether the
+    // `status` string was written (older records lack it entirely).
+    if (att.checkedInAt && !att.checkedOutAt) {
       return {
         id: seminarId,
         title: SEMINAR_OPTIONS.find(s => s.id === seminarId)?.title || "Unknown Seminar",
@@ -122,10 +125,28 @@ function getActiveSeminar(registration: Registration) {
   }
   return null;
 }
-
 function getTotalSeminarsAttended(registration: Registration) {
   if (!registration.seminarAttendance) return 0;
   return Object.keys(registration.seminarAttendance).length;
+}
+
+// Same normalizer used in the scanner and checkout pages — `seminars` was
+// stored two different ways depending on registration date: newer docs
+// hold plain ID strings, older docs (the majority) hold full
+// { id, title, speaker, programs } objects. Flatten both to string IDs.
+function getRegisteredSeminarIds(rawSeminars: unknown): string[] {
+  if (!Array.isArray(rawSeminars)) return [];
+  return rawSeminars
+    .map((s: any) => (typeof s === "string" ? s : s?.id))
+    .filter((id: any): id is string => typeof id === "string" && id.length > 0);
+}
+
+// Seminars the student signed up for but never actually attended —
+// useful for spotting no-shows or scanner mismatches at a glance.
+function getMissedSeminars(registration: Registration): string[] {
+  const registeredIds = getRegisteredSeminarIds(registration.seminars);
+  const attendedIds = new Set(Object.keys(registration.seminarAttendance ?? {}));
+  return registeredIds.filter(id => !attendedIds.has(id));
 }
 
 // ─── Live Timer Component for Breaks ──────────────────────────────────────────
@@ -308,11 +329,17 @@ export default function AdminRegistrationsPage() {
   }, [registrations]);
 
   // Live headcount per seminar computed from nested data
-  const seminarOccupancy = useMemo(() => {
-    return SEMINAR_OPTIONS.map(sem => ({
-      ...sem,
-      count: registrations.filter(r => r.seminarAttendance?.[sem.id]?.status === "checked-in").length,
-    }));
+const seminarOccupancy = useMemo(() => {
+    return SEMINAR_OPTIONS.map(sem => {
+      const att = (r: Registration) => r.seminarAttendance?.[sem.id];
+      return {
+        ...sem,
+        count: registrations.filter(r => {
+          const a = att(r);
+          return !!a?.checkedInAt && !a?.checkedOutAt;
+        }).length,
+      };
+    });
   }, [registrations]);
 
   const filteredAndSorted = useMemo(() => {
@@ -362,10 +389,11 @@ let valB: any = (b as any)[sortConfig.key];
     return result;
   }, [registrations, statusFilter, seminarFilter, profFilter, search, sortConfig]);
 
-  const totalEverAttended = registrations.filter((r) => getTotalSeminarsAttended(r) > 0).length;
+const totalEverAttended = registrations.filter((r) => getTotalSeminarsAttended(r) > 0).length;
   const totalPre = registrations.filter((r) => r.status === "pre-registered").length;
   const totalOnBreak = registrations.filter((r) => r.onBreak).length;
   const currentlyInSeminar = registrations.filter((r) => getActiveSeminar(r) !== null).length;
+  const totalWithMissedSeminars = registrations.filter((r) => getMissedSeminars(r).length > 0).length;
 
   const handleSort = (key: SortKey) => {
     setSortConfig(prev => ({
@@ -622,11 +650,12 @@ let valB: any = (b as any)[sortConfig.key];
               </div>
             </div>
 
-            <div className="xl:w-2/3 grid grid-cols-2 sm:grid-cols-4 gap-4">
+<div className="xl:w-2/3 grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-4">
               {[
                 { label: "Total Registrations", value: registrations.length, color: "text-zinc-900 dark:text-zinc-100", bg: "bg-white dark:bg-zinc-900", icon: <FaQrcode size={16} /> },
                 { label: "In A Seminar Now", value: currentlyInSeminar, color: "text-emerald-700 dark:text-emerald-400", bg: "bg-emerald-50 dark:bg-emerald-500/10", icon: <FaCheckCircle size={16} /> },
                 { label: "Ever Attended", value: totalEverAttended, color: "text-blue-700 dark:text-blue-400", bg: "bg-blue-50 dark:bg-blue-500/10", icon: <FaSignOutAlt size={16} /> },
+                { label: "Have No-Shows", value: totalWithMissedSeminars, color: "text-amber-700 dark:text-amber-400", bg: "bg-amber-50 dark:bg-amber-500/10", icon: <FaBan size={16} /> },
                 { label: "Pending", value: totalPre, color: "text-zinc-500 dark:text-zinc-400", bg: "bg-zinc-50 dark:bg-zinc-800/50", icon: <FaHourglass size={16} /> },
               ].map((s) => (
                 <div key={s.label} className={`${s.bg} rounded-2xl border border-zinc-200 dark:border-zinc-800 p-5 flex flex-col justify-between shadow-sm`}>
@@ -742,7 +771,8 @@ let valB: any = (b as any)[sortConfig.key];
                       <SortableHeader label="ID Number" sortKey="idNumber" currentSort={sortConfig} onSort={handleSort} />
                       <SortableHeader label="Program" sortKey="program" currentSort={sortConfig} onSort={handleSort} />
                       <th className="px-5 py-4 text-[9px] font-black uppercase tracking-widest text-zinc-400 border-b border-zinc-200 dark:border-zinc-800">Professors</th>
-                      <th className="px-5 py-4 text-[9px] font-black uppercase tracking-widest text-zinc-400 border-b border-zinc-200 dark:border-zinc-800">Current Seminar</th>
+<th className="px-5 py-4 text-[9px] font-black uppercase tracking-widest text-zinc-400 border-b border-zinc-200 dark:border-zinc-800">Current Seminar</th>
+                      <th className="px-5 py-4 text-[9px] font-black uppercase tracking-widest text-zinc-400 border-b border-zinc-200 dark:border-zinc-800">Missed</th>
                       <SortableHeader label="Sessions" sortKey="totalSeminarsAttended" currentSort={sortConfig} onSort={handleSort} />
                       <SortableHeader label="Registered" sortKey="createdAt" currentSort={sortConfig} onSort={handleSort} />
                       <th className="px-5 py-4 text-[9px] font-black uppercase tracking-widest text-zinc-400 border-b border-zinc-200 dark:border-zinc-800" />
@@ -803,6 +833,27 @@ let valB: any = (b as any)[sortConfig.key];
                                   breakCount={r.breakCount}
                                 />
                               </td>
+<td className="px-5 py-3">
+                                {(() => {
+                                  const missed = getMissedSeminars(r);
+                                  if (missed.length === 0) {
+                                    return <span className="text-zinc-300 dark:text-zinc-600 text-xs">—</span>;
+                                  }
+                                  const titles = missed.map(id => SEMINAR_OPTIONS.find(s => s.id === id)?.title || id);
+                                  return (
+                                    <div className="relative group/missed inline-block">
+                                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-black uppercase tracking-widest bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-500/20 cursor-help">
+                                        <FaBan size={8} /> {missed.length}
+                                      </span>
+                                      <div className="absolute left-0 top-full mt-1.5 w-max max-w-[260px] bg-zinc-900 dark:bg-zinc-100 text-white dark:text-black text-[10px] rounded-xl p-3 opacity-0 group-hover/missed:opacity-100 pointer-events-none transition-opacity shadow-xl z-50">
+                                        <ul className="space-y-1">
+                                          {titles.map((t, i) => <li key={i}>{t}</li>)}
+                                        </ul>
+                                      </div>
+                                    </div>
+                                  );
+                                })()}
+                              </td>
                               <td className="px-5 py-3">
                                 <span className="text-sm font-black text-zinc-700 dark:text-zinc-300">{getTotalSeminarsAttended(r)}</span>
                               </td>
@@ -821,8 +872,8 @@ let valB: any = (b as any)[sortConfig.key];
                             </motion.tr>
                             {expandedId === r.id && (
                               <tr>
-                                <td colSpan={9} className="px-5 pb-3 bg-zinc-50/50 dark:bg-zinc-950/50">
-                                  <SessionHistoryPanel registration={r} />
+<td colSpan={10} className="px-5 pb-3 bg-zinc-50/50 dark:bg-zinc-950/50">         
+                         <SessionHistoryPanel registration={r} />
                                 </td>
                               </tr>
                             )}
