@@ -245,7 +245,13 @@ export default function ScanPage() {
       return;
     }
 
-    if (data.seminars && data.seminars.length > 0 && !data.seminars.includes(currentSeminar.id)) {
+    const registeredIds: string[] = Array.isArray(data.seminars)
+      ? data.seminars
+          .map((s: any) => (typeof s === "string" ? s : s?.id))
+          .filter((id: any): id is string => typeof id === "string" && id.length > 0)
+      : [];
+
+    if (registeredIds.length > 0 && !registeredIds.includes(currentSeminar.id)) {
       setResult({ state: "not_registered", data, seminar: currentSeminar });
       recordScan({ name: data.fullName, idNumber: data.idNumber, status: "error" });
       playFeedback("error");
