@@ -64,6 +64,14 @@ body.splash-active [data-hide-on-splash="true"]
   display: none !important;
 }
 
+/* --- MOBILE / IOS TAP RESPONSIVENESS ---
+   Removes the ~300ms tap delay iOS adds while waiting to see if a tap is
+   the start of a double-tap-to-zoom gesture. Meaningful anywhere staff are
+   tapping quickly and repeatedly, like the scanner controls. */
+button, a {
+  touch-action: manipulation;
+}
+
 :root {
   /* Use Hex codes instead */
   --background: #ffffff;

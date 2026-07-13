@@ -292,9 +292,12 @@ export default function AdminRegistrationsPage() {
       }
       setBreakId("");
       setTimeout(() => setBreakActionStatus(null), 3000);
-    } catch (e) {
+} catch (e: any) {
       console.error(e);
-      setBreakActionStatus({ msg: "Failed to update.", type: "error" });
+      const msg = e?.code === "permission-denied"
+        ? "Permission denied — you may not be signed in as admin on this device/browser."
+        : e?.message || "Failed to update.";
+      setBreakActionStatus({ msg, type: "error" });
     }
   };
 

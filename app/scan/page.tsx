@@ -522,6 +522,25 @@ await scanner.start(
     return () => { stopScanner(); };
   }, [authUser, scanMode, !!activeSeminarId, startCameraScanner, stopScanner]);
 
+  useEffect(() => {
+    const isSheetOpen = result.state === "success" || result.state === "already_attended" || result.state === "not_found" || result.state === "not_registered" || result.state === "error";
+    if (isSheetOpen) {
+      const prevOverflow = document.body.style.overflow;
+      const prevPosition = document.body.style.position;
+      document.body.style.overflow = "hidden";
+      // iOS Safari specifically ignores overflow:hidden on body while a fixed
+      // element is focused/scrolling underneath; position:fixed is the
+      // reliable cross-iOS-version fix for locking background scroll.
+      document.body.style.position = "fixed";
+      document.body.style.width = "100%";
+      return () => {
+        document.body.style.overflow = prevOverflow;
+        document.body.style.position = prevPosition;
+        document.body.style.width = "";
+      };
+    }
+  }, [result.state]);
+
   const handleReset = useCallback(() => {
     if (autoResumeTimeoutRef.current) clearTimeout(autoResumeTimeoutRef.current);
     if (autoResumeIntervalRef.current) clearInterval(autoResumeIntervalRef.current);
@@ -657,7 +676,7 @@ await scanner.start(
       <div className="hidden md:block"><CircuitCursor /></div>
 
       <div className="relative z-10 flex flex-col flex-1">
-        <div className="pt-24 md:pt-28 px-4 shrink-0">
+        <div className="pt-24 md:pt-28 px-4 shrink-0" style={{ paddingTop: "max(6rem, calc(env(safe-area-inset-top) + 4rem))" }}>
 <div className="max-w-2xl mx-auto relative overflow-hidden rounded-[2rem] border border-white/10 shadow-2xl bg-[#06402B] text-white">
             <div className="absolute inset-0 bg-[url('/scanlines.png')] opacity-10 pointer-events-none" />
             <AnimatePresence>
@@ -1062,12 +1081,11 @@ await scanner.start(
                       onChange={e => setManualCode(e.target.value.toUpperCase().replace(/\s+/g, ""))}
                       placeholder="e.g. RB53BQQG"
                       disabled={manualSubmitting}
-                      className="flex-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2.5 text-sm font-bold font-mono tracking-widest text-zinc-900 dark:text-white outline-none focus:border-[#06402B] dark:focus:border-emerald-500 uppercase disabled:opacity-60"
-                    />
-                    <button type="submit" disabled={manualSubmitting || !manualCode.trim()} className="px-4 py-2.5 bg-[#06402B] dark:bg-emerald-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-[#042d1f] dark:hover:bg-emerald-500 transition-colors disabled:opacity-50 flex items-center justify-center min-w-[52px]">
+                      className="flex-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2.5 text-base font-bold font-mono tracking-widest text-zinc-900 dark:text-white outline-none focus:border-[#06402B] dark:focus:border-emerald-500 uppercase disabled:opacity-60"                    />
+<button type="submit" disabled={manualSubmitting || !manualCode.trim()} className="px-4 py-2.5 bg-[#06402B] dark:bg-emerald-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-[#042d1f] dark:hover:bg-emerald-500 transition-colors disabled:opacity-50 flex items-center justify-center min-w-[52px] min-h-[44px]">
                       {manualSubmitting ? <FaSpinner className="animate-spin" size={12} /> : "Go"}
                     </button>
-                    <button type="button" onClick={() => { setManualEntryOpen(false); setManualCode(""); }} className="px-3 py-2.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">
+                    <button type="button" onClick={() => { setManualEntryOpen(false); setManualCode(""); }} className="px-3 py-2.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors min-h-[44px] min-w-[44px]">
                       <FaTimes size={12} />
                     </button>
                   </motion.form>
@@ -1132,12 +1150,16 @@ await scanner.start(
                   key="sheet"
                   drag="y"
                   dragConstraints={{ top: 0, bottom: 0 }}
-                  dragElastic={{ top: 0, bottom: 0.4 }}
-                  onDragEnd={(_, info) => { if (info.offset.y > 100) handleReset(); }}
+                  dragElastic={{ top: 0, bottom: 0.5 }}
+                  dragMomentum={false}
+                  onDragEnd={(_, info) => { if (info.offset.y > 80 || info.velocity.y > 500) handleReset(); }}
                   initial={{ y: "100%", opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: "100%", opacity: 0 }} transition={{ type: "spring", stiffness: 350, damping: 35 }}
+                  style={{ touchAction: "none" }}
                   className="fixed bottom-0 left-0 right-0 z-50 max-w-md mx-auto"
                 >
-                  <div className={`rounded-t-[2rem] p-6 space-y-4 border-t-4 shadow-2xl ${
+<div
+                    style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}
+                    className={`rounded-t-[2rem] p-6 space-y-4 border-t-4 shadow-2xl ${
                     result.state === "success" ? "bg-white dark:bg-zinc-900 border-emerald-500" : result.state === "already_attended" ? "bg-white dark:bg-zinc-900 border-amber-500" : "bg-white dark:bg-zinc-900 border-red-500"
                   }`}>
                     <div className="w-10 h-1 bg-zinc-200 dark:bg-zinc-700 rounded-full mx-auto -mt-2 mb-2" />

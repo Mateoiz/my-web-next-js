@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/db";
 import QRCode from "react-qr-code";
 import { motion, AnimatePresence } from "framer-motion";
@@ -10,7 +10,7 @@ import Link from "next/link";
 import {
   FaCheckCircle, FaDownload, FaSpinner, FaCalendarAlt,
   FaIdCard, FaUser, FaExclamationTriangle, FaImage, FaCopy, FaShareSquare,
-  FaSignOutAlt 
+  FaSignOutAlt, FaLock
 } from "react-icons/fa";
 
 import FloatingCubes from "@/app/components/FloatingCubes";
@@ -24,8 +24,12 @@ export default function ConfirmPage() {
   const [downloadingPng, setDownloadingPng] = useState(false);
   const [copied, setCopied] = useState(false);
   
-  const [canShare, setCanShare] = useState(false);
+const [canShare, setCanShare] = useState(false);
   const qrWrapRef = useRef<HTMLDivElement>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editBlock, setEditBlock] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editError, setEditError] = useState("");
 
   const fetchRegistration = useCallback(async () => {
     if (!id) return;
@@ -62,12 +66,42 @@ export default function ConfirmPage() {
     }
   }, [fetchRegistration]);
 
-  const handleCopyCode = () => {
+const handleCopyCode = () => {
     if (!data) return;
     const refCode = data.id.slice(0, 8).toUpperCase();
     navigator.clipboard.writeText(refCode);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const openEdit = () => {
+    setEditBlock(data.block ?? "");
+    setEditError("");
+    setEditOpen(true);
+  };
+
+  const handleSaveEdit = async () => {
+    const trimmed = editBlock.trim();
+    if (!trimmed) {
+      setEditError("Block can't be empty.");
+      return;
+    }
+    if (trimmed.length > 40) {
+      setEditError("Too long (max 40 characters).");
+      return;
+    }
+    setSavingEdit(true);
+    setEditError("");
+    try {
+      await updateDoc(doc(db, "cvmas_registrations", data.id), { block: trimmed });
+      setData((prev: any) => ({ ...prev, block: trimmed }));
+      setEditOpen(false);
+    } catch (err) {
+      console.error(err);
+      setEditError("Couldn't save — check your connection and try again.");
+    } finally {
+      setSavingEdit(false);
+    }
   };
 
 const handleSaveOrSharePng = async () => {
@@ -281,7 +315,7 @@ const handleSaveOrSharePng = async () => {
         <CircuitCursor />
       </div>
 
-      <div className="relative z-10">
+<main className="relative z-10">
 
         <div className="pt-16 md:pt-24 px-4 print:hidden">
           <div className="max-w-sm mx-auto relative overflow-hidden rounded-[2rem] border border-white/10 shadow-2xl bg-[#06402B] text-white text-center px-5 py-8">
@@ -305,8 +339,12 @@ const handleSaveOrSharePng = async () => {
             initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
             className="bg-white dark:bg-zinc-900/60 backdrop-blur-xl rounded-3xl border border-zinc-200 dark:border-zinc-800 p-6 text-center shadow-xl space-y-5 print:border-none print:shadow-none print:p-0 print:bg-transparent"
           >
-            <div ref={qrWrapRef} className="flex justify-center">
-              <div className="p-4 bg-white rounded-2xl border border-zinc-200 shadow-sm inline-block">
+<div ref={qrWrapRef} className="flex justify-center">
+              <div
+                className="p-4 bg-white rounded-2xl border border-zinc-200 shadow-sm inline-block"
+                role="img"
+                aria-label={`QR code ticket for CVMAS Week entry. Your reference code is ${refCode}. Present this to staff at the door, or read them the reference code directly.`}
+              >
                 <QRCode
                   value={qrValue}
                   size={180}
@@ -314,23 +352,28 @@ const handleSaveOrSharePng = async () => {
                   fgColor="#06402B"
                   bgColor="#ffffff"
                   style={{ height: "auto", maxWidth: "100%", width: "100%" }}
+                  aria-hidden="true"
                 />
               </div>
             </div>
 
-            <div>
+<div>
               <p className="text-[9px] font-bold uppercase tracking-widest text-zinc-400 mb-1">Reference Code</p>
               <div className="flex items-center justify-center gap-2">
                 <p className="text-2xl font-black tracking-[0.15em] text-zinc-900 dark:text-white font-mono print:text-black">
                   {refCode}
                 </p>
-                <button 
+<button 
                   onClick={handleCopyCode} 
                   className="p-2 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 hover:text-zinc-800 dark:hover:text-white rounded-lg transition-colors active:scale-90 print:hidden"
+                  aria-label={copied ? "Reference code copied" : "Copy reference code to clipboard"}
                   title="Copy Code"
                 >
                   {copied ? <FaCheckCircle className="text-[#06402B] dark:text-emerald-400" /> : <FaCopy />}
                 </button>
+                <span className="sr-only" role="status" aria-live="polite">
+                  {copied ? "Reference code copied to clipboard" : ""}
+                </span>
               </div>
             </div>
 
@@ -341,12 +384,70 @@ const handleSaveOrSharePng = async () => {
               </span>
             </div>
 
-            <div className="space-y-2 text-left border-t border-zinc-100 dark:border-zinc-800 pt-4 print:border-zinc-300">
-              <DetailRow icon={<FaUser size={10} />} label="Name" value={data.fullName} />
-              <DetailRow icon={<FaIdCard size={10} />} label="ID Number" value={data.idNumber} />
-              <DetailRow icon={<FaCalendarAlt size={10} />} label="Program & Year" value={`${data.program} · ${data.yearLevel}`} />
-              <DetailRow icon={<span className="text-[9px] font-black">BLK</span>} label="Block" value={data.block} />
-            </div>
+<dl className="space-y-2 text-left border-t border-zinc-100 dark:border-zinc-800 pt-4 print:border-zinc-300">
+              <div className="flex items-center justify-between pb-1">
+                <span className="text-[9px] font-black uppercase tracking-widest text-zinc-400">Your details</span>
+                <span className="flex items-center gap-1 text-[9px] font-bold text-zinc-400 print:hidden">
+                  <FaLock size={8} /> Locked after registration
+                </span>
+              </div>
+              <DetailRow icon={<FaUser size={10} />} label="Name" value={data.fullName} locked />
+              <DetailRow icon={<FaIdCard size={10} />} label="ID Number" value={data.idNumber} locked />
+              <DetailRow icon={<FaCalendarAlt size={10} />} label="Program & Year" value={`${data.program} · ${data.yearLevel}`} locked />
+              <div className="flex items-center justify-between gap-2">
+                <DetailRow icon={<span className="text-[9px] font-black">BLK</span>} label="Block" value={data.block} className="flex-1" />
+                <button
+                  onClick={openEdit}
+                  className="shrink-0 text-[10px] font-black uppercase tracking-widest text-[#06402B] dark:text-emerald-400 hover:underline outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 rounded px-1.5 py-1 print:hidden"
+                >
+                  Edit
+                </button>
+              </div>
+            </dl>
+{Array.isArray(data.seminars) && data.seminars.length > 0 && (() => {
+              const attendance = data.seminarAttendance ?? {};
+              return (
+                <div className="text-left border-t border-zinc-100 dark:border-zinc-800 pt-4 space-y-2 print:border-zinc-300">
+<div className="flex items-center justify-between">
+                    <p className="text-[9px] font-black uppercase tracking-widest text-zinc-400">
+                      Registered seminars ({data.seminars.length})
+                    </p>
+                    <span className="flex items-center gap-1 text-[9px] font-bold text-zinc-400 print:hidden">
+                      <FaLock size={8} /> Locked
+                    </span>
+                  </div>
+                  <ul className="space-y-1.5">
+                    {data.seminars.map((s: any, i: number) => {
+                      const seminarId = typeof s === "string" ? s : s?.id;
+                      const title = typeof s === "string" ? s : s?.title ?? s?.id ?? "Unknown seminar";
+                      const att = seminarId ? attendance[seminarId] : null;
+                      const checkedIn = !!att?.checkedInAt;
+                      const checkedOut = !!att?.checkedOutAt;
+
+                      return (
+                        <li key={i} className="text-xs font-medium text-zinc-700 dark:text-zinc-300 print:text-black">
+                          <div className="flex items-start gap-2">
+                            <FaCheckCircle
+                              size={10}
+                              className={`mt-0.5 shrink-0 print:hidden ${checkedIn ? "text-emerald-500" : "text-zinc-300 dark:text-zinc-600"}`}
+                              aria-hidden="true"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <span>{title}</span>
+                              {checkedIn && (
+                                <span className="block text-[10px] font-mono text-emerald-600 dark:text-emerald-400 mt-0.5">
+                                  {checkedOut ? "Attended — checked out" : "Currently checked in"}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              );
+            })()}
 
             {data.professors?.length > 0 && (
               <div className="text-left border-t border-zinc-100 dark:border-zinc-800 pt-4 space-y-2 print:border-zinc-300">
@@ -382,8 +483,7 @@ const handleSaveOrSharePng = async () => {
             <button
               onClick={handleSaveOrSharePng}
               disabled={downloadingPng}
-              className="flex-1 py-3.5 bg-[#06402B] dark:bg-emerald-600 rounded-2xl text-[11px] font-bold uppercase tracking-widest text-white hover:bg-[#0a5a38] dark:hover:bg-emerald-500 shadow-lg transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 touch-manipulation"
-            >
+className="flex-1 py-3.5 bg-[#06402B] dark:bg-emerald-600 rounded-2xl text-[11px] font-bold uppercase tracking-widest text-white hover:bg-[#0a5a38] dark:hover:bg-emerald-500 shadow-lg transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 touch-manipulation outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2"            >
               {downloadingPng ? (
                 <><FaSpinner size={11} className="animate-spin" /> Saving…</>
               ) : (
@@ -392,7 +492,7 @@ const handleSaveOrSharePng = async () => {
             </button>
             <button
               onClick={() => window.print()}
-              className="flex-1 py-3.5 border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 rounded-2xl text-[11px] font-bold uppercase tracking-widest text-zinc-600 dark:text-zinc-300 hover:text-[#06402B] dark:hover:text-emerald-400 hover:border-[#06402B]/30 transition-all flex items-center justify-center gap-2 active:scale-95 touch-manipulation shadow-sm"
+              className="flex-1 py-3.5 border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 rounded-2xl text-[11px] font-bold uppercase tracking-widest text-zinc-600 dark:text-zinc-300 hover:text-[#06402B] dark:hover:text-emerald-400 hover:border-[#06402B]/30 transition-all flex items-center justify-center gap-2 active:scale-95 touch-manipulation shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-[#06402B]/40 focus-visible:ring-offset-2"
             >
               <FaDownload size={11} /> Print / PDF
             </button>
@@ -407,7 +507,7 @@ const handleSaveOrSharePng = async () => {
             
             <Link 
               href="/checkout"
-              className="w-full py-4 bg-amber-500 hover:bg-amber-400 text-white rounded-2xl font-black text-sm uppercase tracking-widest transition-all flex items-center justify-center gap-2 active:scale-95 shadow-md shadow-amber-500/20"
+              className="w-full py-4 bg-amber-500 hover:bg-amber-400 text-white rounded-2xl font-black text-sm uppercase tracking-widest transition-all flex items-center justify-center gap-2 active:scale-95 shadow-md shadow-amber-500/20 outline-none focus-visible:ring-2 focus-visible:ring-amber-300 focus-visible:ring-offset-2"
             >
               Self Check-Out <FaSignOutAlt size={13} />
             </Link>
@@ -417,18 +517,77 @@ const handleSaveOrSharePng = async () => {
           </div>
 
         </div>
-      </div>
+
+        <AnimatePresence>
+          {editOpen && (
+            <>
+              <motion.div
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                onClick={() => !savingEdit && setEditOpen(false)}
+                className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
+              />
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 8 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }}
+                role="dialog" aria-modal="true" aria-labelledby="edit-block-title"
+                className="fixed inset-x-4 top-1/2 -translate-y-1/2 z-50 max-w-sm mx-auto bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-2xl p-6 space-y-4"
+              >
+                <h2 id="edit-block-title" className="text-lg font-black text-zinc-900 dark:text-white">Edit block section</h2>
+<p className="text-xs text-zinc-500 font-medium leading-relaxed">
+                  Your name, ID number, program, and seminar selections are locked once
+                  submitted — they're tied to your QR code and attendance records, so
+                  changing them here could break your check-in. Only your block section
+                  can be corrected. Contact an organizer if anything else needs fixing.
+                </p>
+                <div className="space-y-1.5">
+                  <label htmlFor="editBlock" className="block text-[11px] font-black uppercase tracking-widest text-zinc-500">
+                    Block Section
+                  </label>
+                  <input
+                    id="editBlock"
+                    type="text"
+                    value={editBlock}
+                    onChange={e => setEditBlock(e.target.value)}
+                    maxLength={40}
+                    autoFocus
+                    className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 text-base font-bold text-zinc-900 dark:text-white outline-none focus:border-[#06402B] dark:focus:border-emerald-500"
+                  />
+                  {editError && (
+                    <p role="alert" className="text-[11px] font-bold text-red-500">{editError}</p>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setEditOpen(false)}
+                    disabled={savingEdit}
+                    className="flex-1 py-3 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all active:scale-95 disabled:opacity-50 outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSaveEdit}
+                    disabled={savingEdit}
+                    className="flex-1 py-3 bg-[#06402B] dark:bg-emerald-600 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-[#0a5a38] dark:hover:bg-emerald-500 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2 outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
+                  >
+                    {savingEdit ? <><FaSpinner className="animate-spin" size={11} /> Saving…</> : "Save"}
+                  </button>
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
+      </main>
     </div>
   );
 }
 
-function DetailRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+function DetailRow({ icon, label, value, locked, className = "" }: { icon: React.ReactNode; label: string; value: string; locked?: boolean; className?: string }) {
   return (
-    <div className="flex items-start gap-2 print:text-black">
-      <span className="text-zinc-400 mt-0.5 shrink-0 print:text-zinc-600">{icon}</span>
+    <div className={`flex items-start gap-2 print:text-black ${className}`}>
+      <span className="text-zinc-400 mt-0.5 shrink-0 print:text-zinc-600" aria-hidden="true">{icon}</span>
       <div className="min-w-0">
-        <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-400 print:text-zinc-500">{label}: </span>
-        <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200 print:text-black">{value}</span>
+        <dt className="inline text-[9px] font-bold uppercase tracking-widest text-zinc-400 print:text-zinc-500">{label}: </dt>
+        <dd className="inline text-xs font-bold text-zinc-800 dark:text-zinc-200 print:text-black">{value}</dd>
+        {locked && <FaLock size={7} className="inline ml-1.5 text-zinc-300 dark:text-zinc-600 print:hidden" aria-hidden="true" />}
       </div>
     </div>
   );
