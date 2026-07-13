@@ -119,11 +119,19 @@ export default function SelfCheckoutPage() {
       const attendance = data.seminarAttendance || {};
 
       // Find the seminar they are CURRENTLY checked into
-      const activeEntry = Object.entries(attendance).find(([_, v]: any) => v.status === "checked-in");
+// Older check-in records never wrote a `status` field at all — they
+      // only have checkedInAt/checkedInBy. Treat any record with a
+      // checkedInAt but no checkedOutAt as "currently active," regardless
+      // of whether `status` says "checked-in" or is missing entirely.
+      const activeEntry = Object.entries(attendance).find(
+        ([_, v]: any) => v.checkedInAt && !v.checkedOutAt
+      );
 
       if (!activeEntry) {
         // They are not in a seminar right now. Have they checked out of one previously?
-        const completedSessions = Object.values(attendance).filter((v: any) => v.status === "checked-out");
+        const completedSessions = Object.values(attendance).filter(
+          (v: any) => v.checkedInAt && v.checkedOutAt
+        );
         if (completedSessions.length > 0) {
           // Find the most recent checkout time
           const latestCheckoutAt = completedSessions
@@ -145,14 +153,14 @@ export default function SelfCheckoutPage() {
       const now = new Date();
       const currentSessionMinutes = Math.max(0, Math.floor((now.getTime() - checkedInDate.getTime()) / 60000));
 
-      // Add up all time stayed in PREVIOUSLY completed seminars
-      let previousTotalMinutes = 0;
+let previousTotalMinutes = 0;
       Object.values(attendance).forEach((v: any) => {
-        if (v.status === "checked-out" && v.checkedInAt && v.checkedOutAt) {
+        // Same status-field-agnostic check as above — count any completed
+        // session (has both timestamps) regardless of the status string.
+        if (v.checkedInAt && v.checkedOutAt) {
           previousTotalMinutes += Math.max(0, Math.floor((tsToDate(v.checkedOutAt).getTime() - tsToDate(v.checkedInAt).getTime()) / 60000));
         }
       });
-
       const totalMinutesStayed = previousTotalMinutes + currentSessionMinutes;
       const minutesLeft = MIN_ATTENDANCE_MINUTES - totalMinutesStayed;
 

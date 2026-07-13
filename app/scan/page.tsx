@@ -104,6 +104,7 @@ export default function ScanPage() {
   const [result, setResult] = useState<ScanResult>({ state: "idle" });
   const [scanMode, setScanMode] = useState<ScanMode>("camera");
   const [scannerReady, setScannerReady] = useState(false);
+  const [justLocked, setJustLocked] = useState(false);
   const [authUser, setAuthUser] = useState<User | null>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [uploadPreview, setUploadPreview] = useState<string | null>(null);
@@ -127,6 +128,20 @@ export default function ScanPage() {
   useEffect(() => {
     activeSeminarIdRef.current = activeSeminarId;
   }, [activeSeminarId]);
+
+const [isOnline, setIsOnline] = useState(true);
+  const [cameraPermission, setCameraPermission] = useState<"unknown" | "prompting" | "granted" | "denied" | "unavailable">("unknown");
+  useEffect(() => {
+    setIsOnline(navigator.onLine);
+    const goOnline = () => setIsOnline(true);
+    const goOffline = () => setIsOnline(false);
+    window.addEventListener("online", goOnline);
+    window.addEventListener("offline", goOffline);
+    return () => {
+      window.removeEventListener("online", goOnline);
+      window.removeEventListener("offline", goOffline);
+    };
+  }, []);
 
   const activeSeminar = SEMINAR_OPTIONS.find(s => s.id === activeSeminarId) ?? null;
 
@@ -214,10 +229,18 @@ export default function ScanPage() {
 
   // ── Scanner Engine ─────────────────────────────────────────────────────────
 
-  const stopScanner = useCallback(async () => {
+const stopScanner = useCallback(async () => {
     if (scannerRef.current) {
       try {
-        await scannerRef.current.clear(); // Fixed: .clear() instead of .stop()
+        // Html5Qrcode exposes isScanning; only call stop() if actively
+        // running, then clear() to tear down the video element. Both are
+        // guarded with typeof checks since teardown can race with init.
+        if (scannerRef.current.isScanning && typeof scannerRef.current.stop === "function") {
+          await scannerRef.current.stop();
+        }
+        if (typeof scannerRef.current.clear === "function") {
+          scannerRef.current.clear();
+        }
       } catch (err) {
         console.warn("Scanner teardown warning:", err);
       }
@@ -354,42 +377,89 @@ export default function ScanPage() {
     }
   }, [recordScan, playFeedback, checkInDocRef]);
 
-  const startCameraScanner = useCallback(async () => {
+ const startCameraScanner = useCallback(async () => {
     if (scannerRef.current) return; // Prevent dual mounts
 
+    // No camera hardware at all — don't even attempt a permission prompt.
+    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+      setCameraPermission("unavailable");
+      setResult({ state: "error", message: "This device or browser doesn't support camera access." });
+      return;
+    }
+
+    setCameraPermission("prompting");
     setResult({ state: "scanning" });
     setUploadPreview(null);
     processingRef.current = false;
 
+    // Request the camera explicitly first, so we can distinguish "user
+    // denied" from "no camera" from "camera busy" — instead of letting
+    // Html5QrcodeScanner's internal prompt fail silently into one generic
+    // error message.
+    let stream: MediaStream | null = null;
     try {
-      const { Html5QrcodeScanner } = await import("html5-qrcode");
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+      setCameraPermission("granted");
+    } catch (err: any) {
+      console.error("Camera permission error", err);
+      if (err?.name === "NotAllowedError" || err?.name === "PermissionDeniedError") {
+        setCameraPermission("denied");
+        setResult({ state: "error", message: "Camera access was denied. Enable it in your browser's site settings, then retry." });
+      } else if (err?.name === "NotFoundError" || err?.name === "OverconstrainedError") {
+        setCameraPermission("unavailable");
+        setResult({ state: "error", message: "No camera was found on this device." });
+      } else if (err?.name === "NotReadableError") {
+        setCameraPermission("denied");
+        setResult({ state: "error", message: "Camera is already in use by another app. Close it and retry." });
+      } else {
+        setCameraPermission("denied");
+        setResult({ state: "error", message: "Couldn't access the camera. Please retry." });
+      }
+      return;
+    } finally {
+      // We only needed this stream to trigger/confirm the permission prompt;
+      // Html5QrcodeScanner opens its own stream right after. Release ours
+      // immediately so we don't hold the camera open twice.
+      stream?.getTracks().forEach(t => t.stop());
+    }
+
+try {
+      const { Html5Qrcode } = await import("html5-qrcode");
 
       if (containerRef.current) {
         containerRef.current.innerHTML = '<div id="qr-reader" style="width: 100%;"></div>';
       }
 
-      const scanner = new Html5QrcodeScanner(
-        "qr-reader",
+      const scanner = new Html5Qrcode("qr-reader", { verbose: false });
+
+      // Html5Qrcode.start() takes over immediately with the camera we
+      // already have permission for — no second internal permission
+      // gate/button like Html5QrcodeScanner shows, so no flash-on-then-off.
+await scanner.start(
+        { facingMode: "environment" },
         {
           fps: 10,
           qrbox: { width: 340, height: 340 },
           aspectRatio: 1,
-          showTorchButtonIfSupported: true,
-          rememberLastUsedCamera: true,
         },
-        false
-      );
-
-      scanner.render(
-        (decodedText: string) => processQR(decodedText),
+        (decodedText: string) => {
+          // Fire the Lens-style "lock" snap the instant a code is detected,
+          // slightly ahead of the actual async verification, so the UI
+          // feels instantly responsive even while Firestore is still loading.
+          if (!processingRef.current) {
+            setJustLocked(true);
+            setTimeout(() => setJustLocked(false), 500);
+          }
+          processQR(decodedText);
+        },
         () => {}
       );
 
       scannerRef.current = scanner;
       setScannerReady(true);
     } catch (error) {
-      console.error("Camera init failed", error);
-      setResult({ state: "error", message: "Camera initialization failed. Please allow camera permissions." });
+      console.error("Scanner init failed", error);
+      setResult({ state: "error", message: "Camera initialization failed. Please retry." });
     }
   }, [processQR]);
 
@@ -588,8 +658,18 @@ export default function ScanPage() {
 
       <div className="relative z-10 flex flex-col flex-1">
         <div className="pt-24 md:pt-28 px-4 shrink-0">
-          <div className="max-w-2xl mx-auto relative overflow-hidden rounded-[2rem] border border-white/10 shadow-2xl bg-[#06402B] text-white">
+<div className="max-w-2xl mx-auto relative overflow-hidden rounded-[2rem] border border-white/10 shadow-2xl bg-[#06402B] text-white">
             <div className="absolute inset-0 bg-[url('/scanlines.png')] opacity-10 pointer-events-none" />
+            <AnimatePresence>
+              {!isOnline && (
+                <motion.div
+                  initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                  className="absolute -top-2 left-1/2 -translate-x-1/2 px-3 py-1 bg-red-600 text-white text-[9px] font-black uppercase tracking-widest rounded-full shadow-lg z-30"
+                >
+                  Offline
+                </motion.div>
+              )}
+            </AnimatePresence>
             <div className="relative px-5 py-4">
               <div className="flex items-center justify-between mb-3">
                 <div>
@@ -761,28 +841,131 @@ export default function ScanPage() {
                   </button>
                 </div>
               </div>
+{scanMode === "camera" && result.state === "error" && (
+                <div className="w-full py-10 flex flex-col items-center gap-3 border-2 border-dashed border-red-200 dark:border-red-900/40 rounded-3xl bg-red-50/50 dark:bg-red-500/5 px-6">
+                  <FaExclamationTriangle size={22} className="text-red-400" />
+                  <p className="text-xs font-bold text-red-500 text-center">{(result as any).message}</p>
+                  {cameraPermission === "denied" && (
+                    <p className="text-[10px] text-zinc-400 text-center leading-relaxed max-w-xs">
+                      Look for a camera icon in your address bar, or check
+                      Site Settings → Camera in your browser, then retry.
+                    </p>
+                  )}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => startCameraScanner()}
+                      className="px-4 py-2 bg-red-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-red-500 transition-all active:scale-95"
+                    >
+                      Retry Camera
+                    </button>
+                    {cameraPermission === "unavailable" && (
+                      <button
+                        onClick={() => switchMode("upload")}
+                        className="px-4 py-2 bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-200 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-zinc-300 dark:hover:bg-zinc-600 transition-all active:scale-95"
+                      >
+                        Use Upload Instead
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
 
-              {scanMode === "camera" && (
+              {scanMode === "camera" && result.state !== "error" && (
                 <div className="relative w-full rounded-[2rem] overflow-hidden border-4 transition-colors duration-500 border-zinc-800 dark:border-zinc-700 bg-black aspect-square flex items-center justify-center shadow-2xl">
 
                   <div ref={containerRef} className="absolute inset-0 w-full h-full object-cover">
                     <div id="qr-reader" />
                   </div>
-
-                  {result.state === "scanning" && (
+{(result.state === "scanning" || result.state === "loading") && (
                     <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-10">
-                      <div className="w-[72%] h-[72%] relative">
-                        <div className="absolute top-0 left-0 w-12 h-12 border-t-[6px] border-l-[6px] border-emerald-500 rounded-tl-2xl" />
-                        <div className="absolute top-0 right-0 w-12 h-12 border-t-[6px] border-r-[6px] border-emerald-500 rounded-tr-2xl" />
-                        <div className="absolute bottom-0 left-0 w-12 h-12 border-b-[6px] border-l-[6px] border-emerald-500 rounded-bl-2xl" />
-                        <div className="absolute bottom-0 right-0 w-12 h-12 border-b-[6px] border-r-[6px] border-emerald-500 rounded-br-2xl" />
-
+                      <motion.div
+                        animate={{
+                          width: justLocked ? "50%" : "72%",
+                          height: justLocked ? "50%" : "72%",
+                        }}
+                        transition={{ type: "spring", stiffness: 500, damping: 26 }}
+                        className="relative"
+                      >
+                        {/* Corner brackets — snap inward and flash emerald on lock */}
                         <motion.div
-                          animate={{ y: ["0%", "300%"] }}
-                          transition={{ repeat: Infinity, duration: 2, ease: "linear", repeatType: "reverse" }}
-                          className="absolute top-0 left-0 w-full h-1.5 bg-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.9)] opacity-80"
+                          animate={{
+                            borderColor: justLocked ? "#34d399" : "#10b981",
+                            scale: justLocked ? 1.08 : 1,
+                          }}
+                          transition={{ duration: 0.25 }}
+                          className="absolute top-0 left-0 w-12 h-12 border-t-[6px] border-l-[6px] rounded-tl-2xl"
+                          style={{ borderColor: "#10b981" }}
                         />
-                      </div>
+                        <motion.div
+                          animate={{
+                            borderColor: justLocked ? "#34d399" : "#10b981",
+                            scale: justLocked ? 1.08 : 1,
+                          }}
+                          transition={{ duration: 0.25 }}
+                          className="absolute top-0 right-0 w-12 h-12 border-t-[6px] border-r-[6px] rounded-tr-2xl"
+                          style={{ borderColor: "#10b981" }}
+                        />
+                        <motion.div
+                          animate={{
+                            borderColor: justLocked ? "#34d399" : "#10b981",
+                            scale: justLocked ? 1.08 : 1,
+                          }}
+                          transition={{ duration: 0.25 }}
+                          className="absolute bottom-0 left-0 w-12 h-12 border-b-[6px] border-l-[6px] rounded-bl-2xl"
+                          style={{ borderColor: "#10b981" }}
+                        />
+                        <motion.div
+                          animate={{
+                            borderColor: justLocked ? "#34d399" : "#10b981",
+                            scale: justLocked ? 1.08 : 1,
+                          }}
+                          transition={{ duration: 0.25 }}
+                          className="absolute bottom-0 right-0 w-12 h-12 border-b-[6px] border-r-[6px] rounded-br-2xl"
+                          style={{ borderColor: "#10b981" }}
+                        />
+
+                        {/* Scanning laser — only while actively hunting, hidden once locked */}
+                        <AnimatePresence>
+                          {!justLocked && result.state === "scanning" && (
+                            <motion.div
+                              exit={{ opacity: 0 }}
+                              animate={{ y: ["0%", "300%"] }}
+                              transition={{ repeat: Infinity, duration: 2, ease: "linear", repeatType: "reverse" }}
+                              className="absolute top-0 left-0 w-full h-1.5 bg-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.9)] opacity-80"
+                            />
+                          )}
+                        </AnimatePresence>
+
+                        {/* Lock flash — brief radiating pulse the moment a code locks */}
+                        <AnimatePresence>
+                          {justLocked && (
+                            <motion.div
+                              initial={{ opacity: 0.9, scale: 0.6 }}
+                              animate={{ opacity: 0, scale: 1.6 }}
+                              exit={{ opacity: 0 }}
+                              transition={{ duration: 0.5, ease: "easeOut" }}
+                              className="absolute inset-0 rounded-2xl border-4 border-emerald-400"
+                            />
+                          )}
+                        </AnimatePresence>
+
+                        {/* Center checkmark pop on lock */}
+                        <AnimatePresence>
+                          {justLocked && (
+                            <motion.div
+                              initial={{ scale: 0, opacity: 0 }}
+                              animate={{ scale: 1, opacity: 1 }}
+                              exit={{ scale: 0.5, opacity: 0 }}
+                              transition={{ type: "spring", stiffness: 500, damping: 20 }}
+                              className="absolute inset-0 flex items-center justify-center"
+                            >
+                              <div className="w-12 h-12 rounded-full bg-emerald-500/90 flex items-center justify-center shadow-lg shadow-emerald-500/50">
+                                <FaCheckCircle size={22} className="text-white" />
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </motion.div>
                     </div>
                   )}
 
@@ -812,13 +995,18 @@ export default function ScanPage() {
                     </div>
                   </div>
 
-                  <AnimatePresence>
+<AnimatePresence>
                     {autoCountdown !== null && (
                       <motion.button
-                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={handleReset}
-                        className="absolute bottom-5 right-5 flex items-center gap-1.5 px-3 py-1.5 bg-black/70 backdrop-blur-md text-white text-[10px] font-bold uppercase tracking-widest rounded-full hover:bg-black/90 transition-all z-20"
+                        initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} onClick={handleReset}
+                        className="absolute bottom-5 right-5 flex items-center gap-2 px-3.5 py-2 bg-black/70 backdrop-blur-md text-white text-[10px] font-bold uppercase tracking-widest rounded-full hover:bg-black/90 active:scale-95 transition-all z-20"
                       >
-                        Next in {autoCountdown}s · tap to skip
+                        <motion.span
+                          animate={{ opacity: [1, 0.4, 1] }}
+                          transition={{ repeat: Infinity, duration: 1 }}
+                          className="w-1.5 h-1.5 rounded-full bg-emerald-400"
+                        />
+                        Next in {autoCountdown}s
                       </motion.button>
                     )}
                   </AnimatePresence>
@@ -940,8 +1128,13 @@ export default function ScanPage() {
                   key="backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                   onClick={handleReset} className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
                 />
-                <motion.div
-                  key="sheet" initial={{ y: "100%", opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: "100%", opacity: 0 }} transition={{ type: "spring", stiffness: 350, damping: 35 }}
+<motion.div
+                  key="sheet"
+                  drag="y"
+                  dragConstraints={{ top: 0, bottom: 0 }}
+                  dragElastic={{ top: 0, bottom: 0.4 }}
+                  onDragEnd={(_, info) => { if (info.offset.y > 100) handleReset(); }}
+                  initial={{ y: "100%", opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: "100%", opacity: 0 }} transition={{ type: "spring", stiffness: 350, damping: 35 }}
                   className="fixed bottom-0 left-0 right-0 z-50 max-w-md mx-auto"
                 >
                   <div className={`rounded-t-[2rem] p-6 space-y-4 border-t-4 shadow-2xl ${
@@ -1040,7 +1233,15 @@ function StatPill({ label, value, accent }: { label: string; value: number; acce
   const color = accent === "emerald" ? "text-emerald-300" : accent === "amber" ? "text-amber-300" : "text-white";
   return (
     <div className="flex items-baseline gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/10">
-      <span className={`text-sm font-black ${color}`}>{value}</span>
+      <motion.span
+        key={value}
+        initial={{ scale: 1.3 }}
+        animate={{ scale: 1 }}
+        transition={{ type: "spring", stiffness: 500, damping: 15 }}
+        className={`text-sm font-black ${color}`}
+      >
+        {value}
+      </motion.span>
       <span className="text-[9px] font-bold uppercase tracking-widest text-white/60">{label}</span>
     </div>
   );
