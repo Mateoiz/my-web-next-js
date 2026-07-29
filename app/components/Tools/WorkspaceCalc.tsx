@@ -67,10 +67,12 @@ const GradeRow = memo(({ label, values, setValues, type }: {
     <div className="col-span-3">
       <input
         type="number"
-        placeholder={type === "direct" ? "0–20" : "0"}
+        placeholder="0"
+        min="0"
+        step="any"
         value={values.raw}
         onChange={e => setValues({ ...values, raw: e.target.value })}
-        className={`w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-3 md:py-2 text-center font-mono font-bold text-sm outline-none focus:border-[#06402B] dark:focus:border-emerald-500 focus:ring-2 focus:ring-[#06402B]/10 dark:focus:ring-emerald-500/10 transition-colors ${type === "direct" ? "text-[#06402B] dark:text-emerald-400" : ""}`}
+        className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-3 md:py-2 text-center font-mono font-bold text-sm outline-none focus:border-[#06402B] dark:focus:border-emerald-500 focus:ring-2 focus:ring-[#06402B]/10 dark:focus:ring-emerald-500/10 transition-colors"
       />
     </div>
     <div className="col-span-3">
@@ -78,6 +80,8 @@ const GradeRow = memo(({ label, values, setValues, type }: {
         <input
           type="number"
           placeholder="/ 100"
+          min="0"
+          step="any"
           value={values.total}
           onChange={e => setValues({ ...values, total: e.target.value })}
           className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-3 md:py-2 text-center font-mono text-sm outline-none focus:border-[#06402B] dark:focus:border-emerald-500 focus:ring-2 focus:ring-[#06402B]/10 dark:focus:ring-emerald-500/10 transition-colors text-zinc-600 dark:text-zinc-400"
@@ -110,8 +114,11 @@ export default function GradeCalculator() {
     percentage: number | null; gpa: number | null; error: string | null;
   }>({ percentage: null, gpa: null, error: null });
 
-  const setRow = (key: keyof ReturnType<typeof EMPTY_ROWS>, val: RowState) =>
+  const setRow = (key: keyof ReturnType<typeof EMPTY_ROWS>, val: RowState) => {
     setRows(r => ({ ...r, [key]: val }));
+    // Clear stale result whenever the user edits any field
+    setResult({ percentage: null, gpa: null, error: null });
+  };
 
   // ── Compute ────────────────────────────────────────────────────────────────
 
@@ -214,6 +221,7 @@ export default function GradeCalculator() {
     <motion.div
       initial={{ opacity: 0, scale: 0.97 }}
       animate={{ opacity: 1, scale: 1 }}
+      onKeyDown={e => { if (e.key === "Enter") calculateGrade(); }}
       className="max-w-4xl mx-auto bg-white/80 dark:bg-[#18181b]/80 backdrop-blur-md border border-zinc-200 dark:border-[#06402B]/30 rounded-[2rem] shadow-sm relative p-6 md:p-8 w-full"
     >
       <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#06402B] to-emerald-400 dark:from-emerald-600 dark:to-emerald-400 rounded-t-[2rem]" />
@@ -235,7 +243,7 @@ export default function GradeCalculator() {
           {PROGRAMS.map(p => (
             <button
               key={p}
-              onClick={() => setProgram(p)}
+              onClick={() => { setProgram(p); setResult({ percentage: null, gpa: null, error: null }); }}
               className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
                 program === p
                   ? "bg-[#06402B] text-white shadow-sm"

@@ -23,7 +23,7 @@ export async function POST(req: Request) {
     const headers = [
       "Reference Code", "Full Name", "ID Number", "Program",
       "Year Level", "Student Type", "Block", "Status",
-      "Registered At", 
+      "Registered At",
       "Aller-Genius In", "Aller-Genius Out",
       "PhotoBio In", "PhotoBio Out",
       "Emergency In", "Emergency Out",
@@ -32,7 +32,7 @@ export async function POST(req: Request) {
     ];
 
     const rows = (registrations as any[]).map((r) => {
-      const att = r.seminarAttendance || {}; 
+      const att = r.seminarAttendance || {};
 
       return [
         r.id?.slice(0, 8)?.toUpperCase() ?? "",
@@ -44,23 +44,23 @@ export async function POST(req: Request) {
         r.block ?? "",
         (r.status ?? "").toUpperCase(),
         formatTime(r.createdAt),
-        
+
         // Aller-Genius
-        formatTime(att["aller-genius"]?.checkedInAt),
-        formatTime(att["aller-genius"]?.checkedOutAt),
-        
+        formatTime(att["lao-c-aller-genius"]?.checkedInAt),
+        formatTime(att["lao-c-aller-genius"]?.checkedOutAt),
+
         // Photobiomodulation
-        formatTime(att["photobiomodulation"]?.checkedInAt),
-        formatTime(att["photobiomodulation"]?.checkedOutAt),
-        
+        formatTime(att["lao-k-photobiomodulation"]?.checkedInAt),
+        formatTime(att["lao-k-photobiomodulation"]?.checkedOutAt),
+
         // Emergency
-        formatTime(att["emergency-topic"]?.checkedInAt),
-        formatTime(att["emergency-topic"]?.checkedOutAt),
-        
+        formatTime(att["sy-emergency"]?.checkedInAt),
+        formatTime(att["sy-emergency"]?.checkedOutAt),
+
         // Nutrition
-        formatTime(att["nutrition-surgery"]?.checkedInAt),
-        formatTime(att["nutrition-surgery"]?.checkedOutAt),
-        
+        formatTime(att["austria-nutrition-surgery"]?.checkedInAt),
+        formatTime(att["austria-nutrition-surgery"]?.checkedOutAt),
+
         r.professors?.map((p: any) => `${p.professor} (${p.subject} · ${p.block})`).join(" | ") ?? "",
       ];
     });

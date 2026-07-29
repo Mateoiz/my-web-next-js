@@ -46,8 +46,7 @@ const SubjectRow = memo(({ sub, index, program, updateSubject, removeSubject, ca
   sub: { id: number; name: string; raw: string; units: string; isMajor: boolean };
   index: number;
   program: Program;
-  updateSubject: (id: number, field: string, value: any) => void;
-  removeSubject: (id: number) => void;
+updateSubject: (id: number, field: "name" | "raw" | "units" | "isMajor", value: string | boolean) => void;  removeSubject: (id: number) => void;
   canRemove: boolean;
 }) => {
   const previewGPA = sub.raw && !isNaN(parseFloat(sub.raw))
@@ -136,30 +135,32 @@ export default function GWACalculator() {
   const removeSubject = useCallback((id: number) =>
     setSubjects(prev => prev.length > 1 ? prev.filter(s => s.id !== id) : prev), []);
 
-  const updateSubject = useCallback((id: number, field: string, value: any) =>
+ const updateSubject = useCallback((id: number, field: "name" | "raw" | "units" | "isMajor", value: string | boolean) =>  
     setSubjects(prev => prev.map(s => s.id === id ? { ...s, [field]: value } : s)), []);
 
   const calculateGWA = () => {
     setResult({ gwa: null, title: null, error: null });
     let totalWeighted = 0;
     let totalUnits = 0;
-    let hasLowGrade = false;
+let hasLowGrade = false;
+    // Handbook §3.2.9: board programs min 2.5, non-board min 3.0
+    const disqualifyThreshold = program === "Standard" ? 3.0 : 2.5;
 
     for (const s of subjects) {
       if (!s.raw || !s.units) continue;
       const raw = parseFloat(s.raw);
       const units = parseFloat(s.units);
       if (isNaN(raw) || isNaN(units)) continue;
-      if (raw > 100 || raw < 0) return setResult({ gwa: null, title: null, error: `Invalid score in ${s.name || "a subject"}: ${raw}` });
+if (raw > 100 || raw < 0) return setResult(r => ({ ...r, error: `Invalid score in "${s.name || "a subject"}": ${raw}. Must be 0–100.` }));
 
       const subjectGPA = getGpaFromScore(raw, program, s.isMajor);
-      if (subjectGPA < 2.0) hasLowGrade = true;
+if (subjectGPA < disqualifyThreshold) hasLowGrade = true;
 
       totalWeighted += subjectGPA * units;
       totalUnits += units;
     }
 
-    if (totalUnits === 0) return setResult({ gwa: null, title: null, error: "Enter valid scores and units." });
+if (totalUnits === 0) return setResult(r => ({ ...r, error: "Enter at least one valid score and unit value." }));
 
     const computedGWA = totalWeighted / totalUnits;
     let title = null;
@@ -205,7 +206,7 @@ export default function GWACalculator() {
           {PROGRAMS.map(p => (
             <button
               key={p}
-              onClick={() => setProgram(p)}
+onClick={() => { setProgram(p); setResult({ gwa: null, title: null, error: null }); }}
               className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
                 program === p
                   ? "bg-[#06402B] text-white shadow-sm"
@@ -236,9 +237,9 @@ export default function GWACalculator() {
         </div>
         <p className="text-[9px] text-zinc-400 dark:text-zinc-500 mt-3 text-center flex items-center justify-center gap-1.5 font-medium">
           <FaInfoCircle />
-          {program !== "Standard"
-            ? "*Minors use standard scale. Any grade < 2.0 disqualifies."
-            : "*Any subject grade below 2.0 instantly disqualifies honors."}
+{program === "Standard"
+            ? "*Any subject GPA below 3.0 disqualifies honors (Handbook §3.2.9)."
+            : "*Min 2.5 GPA per major subject required. Minor subjects use standard scale."}
         </p>
       </div>
 
@@ -315,7 +316,7 @@ export default function GWACalculator() {
           >
             <span className="text-[10px] md:text-xs font-bold uppercase text-zinc-500 tracking-widest mb-1">Weighted Average (GWA)</span>
             <div className={`text-6xl md:text-7xl font-black tracking-tighter ${result.gwa >= 3.0 && result.title ? "text-[#06402B] dark:text-emerald-400" : "text-zinc-700 dark:text-white"}`}>
-              {result.gwa.toFixed(4)}
+{result.gwa.toFixed(2)}
             </div>
 
             {result.title ? (
@@ -323,7 +324,7 @@ export default function GWACalculator() {
                 <FaAward size={14} /> {result.title}
               </div>
             ) : result.gwa >= 3.0 ? (
-              <p className="text-red-500 font-bold uppercase tracking-widest text-[10px] mt-4">Disqualified due to a grade below 2.0</p>
+<p className="text-red-500 font-bold uppercase tracking-widest text-[10px] mt-4">A subject fell below the {program === "Standard" ? "3.0" : "2.5"} honors minimum.</p>
             ) : (
               <p className="text-zinc-400 text-xs mt-4 font-medium">Keep pushing next semester!</p>
             )}

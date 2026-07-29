@@ -1,14 +1,15 @@
 "use client";
 
 import React, { useEffect, useState, useMemo, useCallback } from "react";
-import { collection, query, orderBy, onSnapshot, doc, updateDoc, serverTimestamp, increment } from "firebase/firestore";
+// 👇 Added deleteDoc to the imports
+import { collection, query, orderBy, onSnapshot, doc, updateDoc, serverTimestamp, increment, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/db";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   FaQrcode, FaUsers, FaCheckCircle, FaHourglass,
   FaSearch, FaDownload, FaSpinner, FaSync, FaSort,
   FaSortUp, FaSortDown, FaCircle, FaClock, FaIdBadge,
-  FaWalking, FaBan, FaSignOutAlt, FaMicrophone, FaChevronDown, FaChevronUp,
+  FaWalking, FaBan, FaSignOutAlt, FaMicrophone, FaChevronDown, FaChevronUp, FaTrash, FaExclamationCircle
 } from "react-icons/fa";
 
 import FloatingCubes from "@/app/components/FloatingCubes";
@@ -112,9 +113,6 @@ function formatIdInput(raw: string) {
 function getActiveSeminar(registration: Registration) {
   if (!registration.seminarAttendance) return null;
   for (const [seminarId, att] of Object.entries(registration.seminarAttendance)) {
-    // Same status-agnostic rule as checkout: "active" means has a
-    // check-in timestamp and no check-out yet, regardless of whether the
-    // `status` string was written (older records lack it entirely).
     if (att.checkedInAt && !att.checkedOutAt) {
       return {
         id: seminarId,
@@ -130,10 +128,6 @@ function getTotalSeminarsAttended(registration: Registration) {
   return Object.keys(registration.seminarAttendance).length;
 }
 
-// Same normalizer used in the scanner and checkout pages — `seminars` was
-// stored two different ways depending on registration date: newer docs
-// hold plain ID strings, older docs (the majority) hold full
-// { id, title, speaker, programs } objects. Flatten both to string IDs.
 function getRegisteredSeminarIds(rawSeminars: unknown): string[] {
   if (!Array.isArray(rawSeminars)) return [];
   return rawSeminars
@@ -141,8 +135,6 @@ function getRegisteredSeminarIds(rawSeminars: unknown): string[] {
     .filter((id: any): id is string => typeof id === "string" && id.length > 0);
 }
 
-// Seminars the student signed up for but never actually attended —
-// useful for spotting no-shows or scanner mismatches at a glance.
 function getMissedSeminars(registration: Registration): string[] {
   const registeredIds = getRegisteredSeminarIds(registration.seminars);
   const attendedIds = new Set(Object.keys(registration.seminarAttendance ?? {}));
@@ -229,7 +221,11 @@ export default function AdminRegistrationsPage() {
   const [breakId, setBreakId] = useState("");
   const [breakActionStatus, setBreakActionStatus] = useState<{ msg: string; type: "error"|"success" } | null>(null);
 
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Registration | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deleteError, setDeleteError] = useState("");
 
   useEffect(() => {
     const q = query(collection(db, "cvmas_registrations"), orderBy("createdAt", "desc"));
@@ -313,12 +309,50 @@ export default function AdminRegistrationsPage() {
       }
       setBreakId("");
       setTimeout(() => setBreakActionStatus(null), 3000);
-} catch (e: any) {
+    } catch (e: any) {
       console.error(e);
       const msg = e?.code === "permission-denied"
         ? "Permission denied — you may not be signed in as admin on this device/browser."
         : e?.message || "Failed to update.";
       setBreakActionStatus({ msg, type: "error" });
+    }
+  };
+
+// ─── DELETE REGISTRATION LOGIC ──────────────────────────────────────────────
+  const openDeleteModal = (r: Registration) => {
+    setDeleteTarget(r);
+    setDeleteConfirmText("");
+    setDeleteError("");
+  };
+
+  const closeDeleteModal = () => {
+    if (deletingId) return; // don't allow closing mid-request
+    setDeleteTarget(null);
+    setDeleteConfirmText("");
+    setDeleteError("");
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+    if (deleteConfirmText.trim() !== deleteTarget.fullName.trim()) {
+      setDeleteError("Name doesn't match — type it exactly as shown to confirm.");
+      return;
+    }
+
+    setDeletingId(deleteTarget.id);
+    setDeleteError("");
+    try {
+      await deleteDoc(doc(db, "cvmas_registrations", deleteTarget.id));
+      setDeleteTarget(null);
+      setDeleteConfirmText("");
+    } catch (err: any) {
+      console.error("Failed to delete", err);
+      const msg = err?.code === "permission-denied"
+        ? "Permission denied — you may not be signed in as admin on this device/browser."
+        : "Failed to delete. Check your connection and try again.";
+      setDeleteError(msg);
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -328,8 +362,7 @@ export default function AdminRegistrationsPage() {
     return Array.from(set).sort();
   }, [registrations]);
 
-  // Live headcount per seminar computed from nested data
-const seminarOccupancy = useMemo(() => {
+  const seminarOccupancy = useMemo(() => {
     return SEMINAR_OPTIONS.map(sem => {
       const att = (r: Registration) => r.seminarAttendance?.[sem.id];
       return {
@@ -370,8 +403,8 @@ const seminarOccupancy = useMemo(() => {
     });
 
     result.sort((a, b) => {
-let valA: any = (a as any)[sortConfig.key];
-let valB: any = (b as any)[sortConfig.key];
+      let valA: any = (a as any)[sortConfig.key];
+      let valB: any = (b as any)[sortConfig.key];
       if (sortConfig.key === "createdAt") {
         valA = resolveDate(a.createdAt)?.getTime() || 0;
         valB = resolveDate(b.createdAt)?.getTime() || 0;
@@ -389,7 +422,7 @@ let valB: any = (b as any)[sortConfig.key];
     return result;
   }, [registrations, statusFilter, seminarFilter, profFilter, search, sortConfig]);
 
-const totalEverAttended = registrations.filter((r) => getTotalSeminarsAttended(r) > 0).length;
+  const totalEverAttended = registrations.filter((r) => getTotalSeminarsAttended(r) > 0).length;
   const totalPre = registrations.filter((r) => r.status === "pre-registered").length;
   const totalOnBreak = registrations.filter((r) => r.onBreak).length;
   const currentlyInSeminar = registrations.filter((r) => getActiveSeminar(r) !== null).length;
@@ -483,7 +516,6 @@ const totalEverAttended = registrations.filter((r) => getTotalSeminarsAttended(r
     setIsSyncing(true);
     setSyncStatus("idle");
 
-    // Make safe payloads with ISO strings
     const safePayload = registrations.map(r => {
       const safeAtt: any = {};
       if (r.seminarAttendance) {
@@ -650,7 +682,7 @@ const totalEverAttended = registrations.filter((r) => getTotalSeminarsAttended(r
               </div>
             </div>
 
-<div className="xl:w-2/3 grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-4">
+            <div className="xl:w-2/3 grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-4">
               {[
                 { label: "Total Registrations", value: registrations.length, color: "text-zinc-900 dark:text-zinc-100", bg: "bg-white dark:bg-zinc-900", icon: <FaQrcode size={16} /> },
                 { label: "In A Seminar Now", value: currentlyInSeminar, color: "text-emerald-700 dark:text-emerald-400", bg: "bg-emerald-50 dark:bg-emerald-500/10", icon: <FaCheckCircle size={16} /> },
@@ -673,81 +705,73 @@ const totalEverAttended = registrations.filter((r) => getTotalSeminarsAttended(r
           </div>
 
           {/* Toolbar (Search & Filters) */}
-<div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm overflow-hidden">
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm overflow-hidden">
+            <div className="flex items-center gap-3 px-4 py-3 border-b border-zinc-100 dark:border-zinc-800">
+              <div className="relative flex-1">
+                <FaSearch size={12} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search name, ID number, or block…"
+                  className="w-full pl-9 pr-4 py-2.5 text-sm bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl outline-none focus:border-[#06402B] dark:focus:border-emerald-500 font-medium transition-colors placeholder:text-zinc-400"
+                />
+              </div>
+              <button
+                onClick={exportCSV}
+                className="shrink-0 flex items-center gap-2 px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors active:scale-95"
+              >
+                <FaDownload size={11} /> Export CSV
+              </button>
+            </div>
 
-  {/* Row 1: Search + Export */}
-  <div className="flex items-center gap-3 px-4 py-3 border-b border-zinc-100 dark:border-zinc-800">
-    <div className="relative flex-1">
-      <FaSearch size={12} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" />
-      <input
-        type="text"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        placeholder="Search name, ID number, or block…"
-        className="w-full pl-9 pr-4 py-2.5 text-sm bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl outline-none focus:border-[#06402B] dark:focus:border-emerald-500 font-medium transition-colors placeholder:text-zinc-400"
-      />
-    </div>
-    <button
-      onClick={exportCSV}
-      className="shrink-0 flex items-center gap-2 px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors active:scale-95"
-    >
-      <FaDownload size={11} /> Export CSV
-    </button>
-  </div>
+            <div className="flex flex-wrap items-center gap-2 px-4 py-3">
+              <div className="flex bg-zinc-100 dark:bg-zinc-800 rounded-xl p-1 gap-0.5">
+                {(["all", "pre-registered", "attendee", "invalid"] as const).map((f) => (
+                  <button
+                    key={f}
+                    onClick={() => setStatusFilter(f)}
+                    className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${
+                      statusFilter === f
+                        ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm"
+                        : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+                    }`}
+                  >
+                    {f === "all" ? "All" : f === "pre-registered" ? "Pending" : f === "attendee" ? "Ever Attended" : "Cut / Invalid"}
+                  </button>
+                ))}
+              </div>
 
-  {/* Row 2: Filters + count */}
-  <div className="flex flex-wrap items-center gap-2 px-4 py-3">
+              <div className="w-px h-5 bg-zinc-200 dark:bg-zinc-700 hidden sm:block shrink-0" />
 
-    {/* Status pills */}
-    <div className="flex bg-zinc-100 dark:bg-zinc-800 rounded-xl p-1 gap-0.5">
-      {(["all", "pre-registered", "attendee", "invalid"] as const).map((f) => (
-        <button
-          key={f}
-          onClick={() => setStatusFilter(f)}
-          className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${
-            statusFilter === f
-              ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm"
-              : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
-          }`}
-        >
-          {f === "all" ? "All" : f === "pre-registered" ? "Pending" : f === "attendee" ? "Ever Attended" : "Cut / Invalid"}
-        </button>
-      ))}
-    </div>
+              <select
+                value={seminarFilter}
+                onChange={(e) => setSeminarFilter(e.target.value)}
+                className="w-48 px-3 py-2 text-[11px] font-bold bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl text-zinc-700 dark:text-zinc-300 outline-none focus:border-[#06402B] dark:focus:border-emerald-500 truncate"
+              >
+                <option value="all">Any Seminar Status</option>
+                <option value="not-in-seminar">Not In A Seminar</option>
+                {SEMINAR_OPTIONS.map((s) => (
+                  <option key={s.id} value={s.id}>In: {s.title.slice(0, 30)}…</option>
+                ))}
+              </select>
 
-    <div className="w-px h-5 bg-zinc-200 dark:bg-zinc-700 hidden sm:block shrink-0" />
+              <select
+                value={profFilter}
+                onChange={(e) => setProfFilter(e.target.value)}
+                className="w-40 px-3 py-2 text-[11px] font-bold bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl text-zinc-700 dark:text-zinc-300 outline-none focus:border-[#06402B] dark:focus:border-emerald-500"
+              >
+                <option value="all">All Professors</option>
+                {allProfessors.map((p) => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
 
-    {/* Seminar filter — fixed width so it doesn't blow up */}
-    <select
-      value={seminarFilter}
-      onChange={(e) => setSeminarFilter(e.target.value)}
-      className="w-48 px-3 py-2 text-[11px] font-bold bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl text-zinc-700 dark:text-zinc-300 outline-none focus:border-[#06402B] dark:focus:border-emerald-500 truncate"
-    >
-      <option value="all">Any Seminar Status</option>
-      <option value="not-in-seminar">Not In A Seminar</option>
-      {SEMINAR_OPTIONS.map((s) => (
-        <option key={s.id} value={s.id}>In: {s.title.slice(0, 30)}…</option>
-      ))}
-    </select>
-
-    {/* Professor filter */}
-    <select
-      value={profFilter}
-      onChange={(e) => setProfFilter(e.target.value)}
-      className="w-40 px-3 py-2 text-[11px] font-bold bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl text-zinc-700 dark:text-zinc-300 outline-none focus:border-[#06402B] dark:focus:border-emerald-500"
-    >
-      <option value="all">All Professors</option>
-      {allProfessors.map((p) => (
-        <option key={p} value={p}>{p}</option>
-      ))}
-    </select>
-
-    {/* Result count pushed right */}
-    <span className="ml-auto text-[10px] font-black uppercase tracking-widest text-zinc-400 shrink-0">
-      {filteredAndSorted.length} / {registrations.length}
-    </span>
-  </div>
-</div>
+              <span className="ml-auto text-[10px] font-black uppercase tracking-widest text-zinc-400 shrink-0">
+                {filteredAndSorted.length} / {registrations.length}
+              </span>
+            </div>
+          </div>
 
           {/* Data Table */}
           {loading ? (
@@ -771,11 +795,11 @@ const totalEverAttended = registrations.filter((r) => getTotalSeminarsAttended(r
                       <SortableHeader label="ID Number" sortKey="idNumber" currentSort={sortConfig} onSort={handleSort} />
                       <SortableHeader label="Program" sortKey="program" currentSort={sortConfig} onSort={handleSort} />
                       <th className="px-5 py-4 text-[9px] font-black uppercase tracking-widest text-zinc-400 border-b border-zinc-200 dark:border-zinc-800">Professors</th>
-<th className="px-5 py-4 text-[9px] font-black uppercase tracking-widest text-zinc-400 border-b border-zinc-200 dark:border-zinc-800">Current Seminar</th>
+                      <th className="px-5 py-4 text-[9px] font-black uppercase tracking-widest text-zinc-400 border-b border-zinc-200 dark:border-zinc-800">Current Seminar</th>
                       <th className="px-5 py-4 text-[9px] font-black uppercase tracking-widest text-zinc-400 border-b border-zinc-200 dark:border-zinc-800">Missed</th>
                       <SortableHeader label="Sessions" sortKey="totalSeminarsAttended" currentSort={sortConfig} onSort={handleSort} />
                       <SortableHeader label="Registered" sortKey="createdAt" currentSort={sortConfig} onSort={handleSort} />
-                      <th className="px-5 py-4 text-[9px] font-black uppercase tracking-widest text-zinc-400 border-b border-zinc-200 dark:border-zinc-800" />
+                      <th className="px-5 py-4 text-[9px] font-black uppercase tracking-widest text-zinc-400 border-b border-zinc-200 dark:border-zinc-800">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/50 relative z-0">
@@ -833,7 +857,7 @@ const totalEverAttended = registrations.filter((r) => getTotalSeminarsAttended(r
                                   breakCount={r.breakCount}
                                 />
                               </td>
-<td className="px-5 py-3">
+                              <td className="px-5 py-3">
                                 {(() => {
                                   const missed = getMissedSeminars(r);
                                   if (missed.length === 0) {
@@ -860,7 +884,16 @@ const totalEverAttended = registrations.filter((r) => getTotalSeminarsAttended(r
                               <td className="px-5 py-3">
                                 <span className="text-[11px] text-zinc-500 dark:text-zinc-400 font-mono whitespace-nowrap">{formatTime(r.createdAt)}</span>
                               </td>
-                              <td className="px-5 py-3">
+                              <td className="px-5 py-3 flex items-center justify-end gap-2">
+<button
+                                  onClick={() => openDeleteModal(r)}
+                                  disabled={deletingId === r.id}
+                                  className="p-2 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors disabled:opacity-50 outline-none focus-visible:ring-2 focus-visible:ring-red-400"
+                                  title="Permanently delete registration"
+                                  aria-label={`Delete registration for ${r.fullName}`}
+                                >
+                                  {deletingId === r.id ? <FaSpinner className="animate-spin" size={12} /> : <FaTrash size={12} />}
+                                </button>
                                 <button
                                   onClick={() => setExpandedId(expandedId === r.id ? null : r.id)}
                                   className="p-2 rounded-lg text-zinc-400 hover:text-[#06402B] dark:hover:text-emerald-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
@@ -872,8 +905,8 @@ const totalEverAttended = registrations.filter((r) => getTotalSeminarsAttended(r
                             </motion.tr>
                             {expandedId === r.id && (
                               <tr>
-<td colSpan={10} className="px-5 pb-3 bg-zinc-50/50 dark:bg-zinc-950/50">         
-                         <SessionHistoryPanel registration={r} />
+                                <td colSpan={10} className="px-5 pb-3 bg-zinc-50/50 dark:bg-zinc-950/50">
+                                  <SessionHistoryPanel registration={r} />
                                 </td>
                               </tr>
                             )}
@@ -893,12 +926,85 @@ const totalEverAttended = registrations.filter((r) => getTotalSeminarsAttended(r
           )}
         </div>
       </div>
+
+      <AnimatePresence>
+        {deleteTarget && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={closeDeleteModal}
+              className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 8 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }}
+              role="dialog" aria-modal="true" aria-labelledby="delete-modal-title"
+              className="fixed inset-x-4 top-1/2 -translate-y-1/2 z-50 max-w-sm mx-auto bg-white dark:bg-zinc-900 rounded-3xl border border-red-200 dark:border-red-500/30 shadow-2xl p-6 space-y-4"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-red-50 dark:bg-red-500/10 text-red-500 flex items-center justify-center shrink-0">
+                  <FaTrash size={18} />
+                </div>
+                <div>
+                  <h2 id="delete-modal-title" className="text-base font-black text-zinc-900 dark:text-white leading-tight">
+                    Permanently delete registration?
+                  </h2>
+                  <p className="text-[11px] text-zinc-400 font-medium mt-0.5">This cannot be undone.</p>
+                </div>
+              </div>
+
+              <div className="bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 space-y-1">
+                <p className="text-sm font-black text-zinc-900 dark:text-white">{deleteTarget.fullName}</p>
+                <p className="text-xs font-mono text-zinc-500">{deleteTarget.idNumber}</p>
+                {getTotalSeminarsAttended(deleteTarget) > 0 && (
+                  <p className="text-[10px] font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1 pt-1">
+                    <FaExclamationCircle size={9} /> Has {getTotalSeminarsAttended(deleteTarget)} recorded attendance session(s) — these will be lost too.
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                <label htmlFor="deleteConfirm" className="block text-[11px] font-black uppercase tracking-widest text-zinc-500">
+                  Type <span className="text-red-500">{deleteTarget.fullName}</span> to confirm
+                </label>
+                <input
+                  id="deleteConfirm"
+                  type="text"
+                  value={deleteConfirmText}
+                  onChange={e => setDeleteConfirmText(e.target.value)}
+                  autoFocus
+                  autoComplete="off"
+                  className="w-full bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm font-bold text-zinc-900 dark:text-white outline-none focus:border-red-400"
+                />
+                {deleteError && (
+                  <p role="alert" className="text-[11px] font-bold text-red-500">{deleteError}</p>
+                )}
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={closeDeleteModal}
+                  disabled={!!deletingId}
+                  className="flex-1 py-3 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all active:scale-95 disabled:opacity-50 outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmDelete}
+                  disabled={!!deletingId || deleteConfirmText.trim() !== deleteTarget.fullName.trim()}
+                  className="flex-1 py-3 bg-red-600 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-red-500 transition-all active:scale-95 disabled:opacity-40 flex items-center justify-center gap-2 outline-none focus-visible:ring-2 focus-visible:ring-red-400"
+                >
+                  {deletingId ? <><FaSpinner className="animate-spin" size={11} /> Deleting…</> : "Delete Permanently"}
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
 
 // ─── Sub-Components ───────────────────────────────────────────────────────────
-
 function SortableHeader({ label, sortKey, currentSort, onSort }: { label: string, sortKey: SortKey, currentSort: { key: string, direction: string }, onSort: (k: SortKey) => void }) {
   const isActive = currentSort.key === sortKey;
   return (
@@ -973,5 +1079,3 @@ function CurrentSeminarBadge({
     </span>
   );
 }
-
-// React.Fragment import needed for the table row grouping above
