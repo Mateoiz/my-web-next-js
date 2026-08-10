@@ -675,35 +675,42 @@ export default function FlashcardMaker({ onStudyModeChange }: FlashcardMakerProp
     if (skipped.length > 0) showAlert("Import Complete", `${newCards.length} imported, ${skipped.length} skipped.`);
   };
 
-  const handleSaveDeck = async () => {
-    if (!deckTitle.trim() || deckTitle.trim().length < 3) return showAlert("Title Issue", "Title must be 3–100 chars.");
-    if (!deckSubject.trim()) return showAlert("Missing Subject", "Enter a course code.");
-    const empty = cards.filter(c => !c.front.trim() || !c.back.trim());
-    if (empty.length > 0) return showAlert("Incomplete Cards", `${empty.length} card(s) missing term or description.`);
-    if (!auth.currentUser) return showAlert("Not Logged In", "You must be logged in to save.");
-    setIsSaving(true);
+const handleSaveDeck = async () => {
+  if (!deckTitle.trim() || deckTitle.trim().length < 3) return showAlert("Title Issue", "Title must be 3–100 chars.");
+  if (!deckSubject.trim()) return showAlert("Missing Subject", "Enter a course code.");
+  const empty = cards.filter(c => !c.front.trim() || !c.back.trim());
+  if (empty.length > 0) return showAlert("Incomplete Cards", `${empty.length} card(s) missing term or description.`);
+  if (!auth.currentUser) return showAlert("Not Logged In", "You must be logged in to save.");
+  setIsSaving(true);
+  try {
+    let username = "Lasallian";
     try {
       const userSnap = await getDoc(doc(db, "users", auth.currentUser.uid));
-      const username = userSnap.exists() ? userSnap.data().username : "Lasallian";
-      const deckData = {
-        userId: auth.currentUser.uid, authorUsername: username,
-        title: deckTitle.trim(), subject: deckSubject.trim().toUpperCase(),
-        college: isPublic ? deckCollege : "Private",
-        cards: cards.map(c => ({
-          id: c.id, front: c.front.trim(), back: c.back.trim(),
-          starred: c.starred || false,
-          interval: c.interval, easeFactor: c.easeFactor,
-          repetitions: c.repetitions, nextReview: c.nextReview,
-        })),
-        isPublic,
-      };
-      if (currentDeckId) await updateDoc(doc(db, "flashcard_decks", currentDeckId), deckData);
-      else await addDoc(collection(db, "flashcard_decks"), { ...deckData, upvotes: 0, downloads: 0, createdAt: serverTimestamp() });
-      setOriginalState(null);
-      setView('library');
-    } catch { showAlert("Save Failed", "Something went wrong. Try again."); }
-    finally { setIsSaving(false); }
-  };
+      if (userSnap.exists()) username = userSnap.data().username;
+    } catch {
+      // network unavailable — use fallback, write will still queue via offline persistence
+    }
+    const deckData = {
+      userId: auth.currentUser.uid, authorUsername: username,
+      title: deckTitle.trim(), subject: deckSubject.trim().toUpperCase(),
+      college: isPublic ? deckCollege : "Private",
+cards: cards.map(c => ({
+  id: c.id, front: c.front.trim(), back: c.back.trim(),
+  starred: c.starred || false,
+  interval: c.interval ?? null,
+  easeFactor: c.easeFactor ?? null,
+  repetitions: c.repetitions ?? null,
+  nextReview: c.nextReview ?? null,
+})),
+      isPublic,
+    };
+    if (currentDeckId) await updateDoc(doc(db, "flashcard_decks", currentDeckId), deckData);
+    else await addDoc(collection(db, "flashcard_decks"), { ...deckData, upvotes: 0, downloads: 0, createdAt: serverTimestamp() });
+    setOriginalState(null);
+    setView('library');
+  } catch { showAlert("Save Failed", "Something went wrong. Try again."); }
+  finally { setIsSaving(false); }
+};
 
   const handleSendToFriend = async () => {
     if (!sendToUsername.trim()) return showAlert("Missing Username", "Enter a username.");
