@@ -39,11 +39,15 @@ const firebaseConfig = {
 
 // Initialize Firebase (Singleton Pattern to prevent re-initialization errors)
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-const db = initializeFirestore(app, {
-  localCache: persistentLocalCache({
-    tabManager: persistentMultipleTabManager()
-  })
-});
+import { getFirestore } from "firebase/firestore";
+
+const db = getApps().length > 0
+  ? getFirestore(app)
+  : initializeFirestore(app, {
+      localCache: persistentLocalCache({
+        tabManager: persistentMultipleTabManager()
+      })
+    });
 const storage = getStorage(app);
 const auth = getAuth(app);
 
